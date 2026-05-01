@@ -1,10 +1,24 @@
-<!DOCTYPE html>
+<!-- To add a new tool in the future, you only need to do three things:
 
+Add an entry to the TOOLS object at the top of the script (lede text, meta line, download label, filename suffix)
+Add a <div class="tool-tab" data-tool="yourkey"> in the nav
+Add a <div class="tool-panel" id="tool-yourkey"> in the left panel with your controls — the switchTool() function handles the rest automatically
+Greyscale tool has:
+
+Brightness slider (−100 → +100) with the same big Bodoni number treatment
+Contrast slider (50% → 200%)
+Invert and Sepia toggles (sepia gives a warm amber tint over the greyscale)
+Hint label in the section header updates dynamically ("neutral", "sepia", "dark", etc.)
+Exports as filename_grey.pdf
+The header lede and meta lines also swap when you switch tabs. -->
+
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Monochrome — PDF Threshold Press</title>
+<title>l'atelier — PDF Tools</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;0,6..96,900;1,6..96,400&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -17,588 +31,341 @@
     --ink: #0c0a08;
     --ink-soft: #2a2622;
     --ink-mute: #6b655a;
-    --rule: #0c0a08;
     --accent: #8a1d18;
   }
 
-- { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
-background: var(–paper);
-color: var(–ink);
-font-family: ‘Bodoni Moda’, serif;
-min-height: 100vh;
-overflow-x: hidden;
-}
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Bodoni Moda', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
 
-/* paper grain */
-body::before {
-content: “”;
-position: fixed;
-inset: 0;
-pointer-events: none;
-z-index: 1;
-background-image:
-radial-gradient(rgba(12,10,8,0.05) 1px, transparent 1px),
-radial-gradient(rgba(12,10,8,0.04) 1px, transparent 1px);
-background-size: 3px 3px, 7px 7px;
-background-position: 0 0, 1px 2px;
-mix-blend-mode: multiply;
-opacity: .55;
-}
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background-image:
+      radial-gradient(rgba(12,10,8,0.05) 1px, transparent 1px),
+      radial-gradient(rgba(12,10,8,0.04) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 2px;
+    mix-blend-mode: multiply;
+    opacity: .55;
+  }
 
-.mono { font-family: ‘JetBrains Mono’, monospace; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
 
-.frame {
-position: relative;
-z-index: 2;
-max-width: 1400px;
-margin: 0 auto;
-padding: 28px 40px 60px;
-}
+  .frame {
+    position: relative;
+    z-index: 2;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 28px 40px 60px;
+  }
 
-/* HEADER */
-header.masthead {
-border-top: 3px solid var(–ink);
-border-bottom: 1px solid var(–ink);
-padding: 14px 0 8px;
-margin-bottom: 0;
-}
-.kicker {
-display: flex;
-justify-content: space-between;
-align-items: baseline;
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 10.5px;
-letter-spacing: 0.18em;
-text-transform: uppercase;
-color: var(–ink-soft);
-padding-bottom: 8px;
-border-bottom: 1px solid var(–ink);
-}
-.kicker span:nth-child(2) { letter-spacing: 0.05em; }
+  /* ── HEADER ── */
+  header.masthead {
+    border-top: 3px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    padding: 14px 0 8px;
+  }
+  .kicker {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ink);
+  }
+  h1.title {
+    font-family: 'Bodoni Moda', serif;
+    font-weight: 900;
+    font-size: clamp(64px, 13vw, 188px);
+    letter-spacing: -0.04em;
+    line-height: 0.86;
+    margin: 22px 0 6px;
+    font-variation-settings: "opsz" 96;
+  }
+  h1.title em { font-style: italic; font-weight: 400; color: var(--accent); }
+  .title-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 10px;
+  }
 
-h1.title {
-font-family: ‘Bodoni Moda’, serif;
-font-weight: 900;
-font-size: clamp(64px, 13vw, 188px);
-letter-spacing: -0.04em;
-line-height: 0.86;
-margin: 22px 0 6px;
-font-variation-settings: “opsz” 96;
-}
-h1.title em {
-font-style: italic;
-font-weight: 400;
-color: var(–accent);
-}
+  .subhead {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 36px;
+    align-items: end;
+    border-top: 1px solid var(--ink);
+    padding-top: 14px;
+    margin-top: 8px;
+  }
+  .subhead .lede {
+    font-family: 'Bodoni Moda', serif;
+    font-style: italic;
+    font-size: 19px;
+    line-height: 1.4;
+    color: var(--ink-soft);
+    max-width: 50ch;
+    transition: opacity .2s;
+  }
+  .subhead .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    text-align: right;
+    line-height: 1.7;
+  }
 
-.subhead {
-display: grid;
-grid-template-columns: 1.4fr 1fr;
-gap: 36px;
-align-items: end;
-border-top: 1px solid var(–ink);
-padding-top: 14px;
-margin-top: 8px;
-}
-.subhead .lede {
-font-family: ‘Bodoni Moda’, serif;
-font-style: italic;
-font-size: 19px;
-line-height: 1.4;
-color: var(–ink-soft);
-max-width: 50ch;
-}
-.subhead .meta {
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 11px;
-letter-spacing: 0.08em;
-text-transform: uppercase;
-color: var(–ink-soft);
-text-align: right;
-line-height: 1.7;
-}
+  /* ── TOOL NAV ── */
+  .tool-nav {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 3px solid var(--ink);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tool-nav::-webkit-scrollbar { display: none; }
+  .tool-nav-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px 0 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    border-right: 1px solid var(--ink);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .tool-nav-label::before { content: "§"; color: var(--accent); }
+  .tool-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-right: 1px solid var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s, color .15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .tool-tab:hover:not(.active) { background: var(--paper-2); }
+  .tool-tab.active { background: var(--ink); color: var(--paper); }
+  .tool-tab .tab-num { font-size: 9px; opacity: .5; letter-spacing: 0.1em; }
+  .tool-tab.active .tab-num { opacity: .7; }
 
-/* MAIN GRID */
-main {
-display: grid;
-grid-template-columns: 360px 1fr;
-gap: 0;
-margin-top: 28px;
-border-top: 3px solid var(–ink);
-border-bottom: 3px solid var(–ink);
-min-height: 600px;
-}
-@media (max-width: 900px) {
-main { grid-template-columns: 1fr; }
-.panel-left { border-right: none !important; border-bottom: 1px solid var(–ink); }
-}
+  /* ── MAIN GRID ── */
+  main {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    border-bottom: 3px solid var(--ink);
+    min-height: 600px;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    .panel-left { border-right: none !important; border-bottom: 1px solid var(--ink); }
+  }
+  .panel { padding: 28px 26px; }
+  .panel-left { border-right: 1px solid var(--ink); background: var(--paper-2); }
 
-.panel {
-padding: 28px 26px;
-}
-.panel-left {
-border-right: 1px solid var(–ink);
-background: var(–paper-2);
-}
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .section-label::before { content: "§"; margin-right: 6px; color: var(--accent); }
 
-.section-label {
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 10.5px;
-letter-spacing: 0.22em;
-text-transform: uppercase;
-color: var(–ink-mute);
-margin-bottom: 10px;
-display: flex;
-justify-content: space-between;
-}
-.section-label::before {
-content: “§”;
-margin-right: 6px;
-color: var(–accent);
-}
+  /* ── DROP ZONE ── */
+  .drop {
+    border: 1.5px dashed var(--ink);
+    padding: 36px 22px;
+    text-align: center;
+    cursor: pointer;
+    transition: background .25s, border-color .25s;
+  }
+  .drop:hover, .drop.drag { background: var(--paper); border-color: var(--accent); }
+  .drop .glyph { font-family: 'Bodoni Moda', serif; font-style: italic; font-size: 64px; line-height: 1; margin-bottom: 6px; }
+  .drop .lbl { font-family: 'Bodoni Moda', serif; font-size: 22px; }
+  .drop .sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute); margin-top: 8px; }
+  #fileInput { display: none; }
 
-/* DROP ZONE */
-.drop {
-border: 1.5px dashed var(–ink);
-padding: 36px 22px;
-text-align: center;
-cursor: pointer;
-transition: background .25s, border-color .25s;
-position: relative;
-}
-.drop:hover, .drop.drag {
-background: var(–paper);
-border-color: var(–accent);
-}
-.drop .glyph {
-font-family: ‘Bodoni Moda’, serif;
-font-style: italic;
-font-size: 64px;
-line-height: 1;
-color: var(–ink);
-margin-bottom: 6px;
-}
-.drop .lbl {
-font-family: ‘Bodoni Moda’, serif;
-font-size: 22px;
-letter-spacing: -0.01em;
-}
-.drop .sub {
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 10.5px;
-letter-spacing: 0.16em;
-text-transform: uppercase;
-color: var(–ink-mute);
-margin-top: 8px;
-}
-#fileInput { display: none; }
+  /* ── FILE CARD ── */
+  .filecard { border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 14px 0; margin: 16px 0; display: none; }
+  .filecard.on { display: block; }
+  .filecard .name { font-family: 'Bodoni Moda', serif; font-weight: 700; font-size: 17px; margin-bottom: 4px; word-break: break-all; line-height: 1.2; }
+  .filecard .stats { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute); display: flex; gap: 14px; flex-wrap: wrap; }
+  .filecard .stats span b { color: var(--ink); font-weight: 500; }
 
-/* FILE STATE */
-.filecard {
-border-top: 1px solid var(–ink);
-border-bottom: 1px solid var(–ink);
-padding: 14px 0;
-margin: 16px 0;
-display: none;
-}
-.filecard.on { display: block; }
-.filecard .name {
-font-family: ‘Bodoni Moda’, serif;
-font-weight: 700;
-font-size: 17px;
-margin-bottom: 4px;
-word-break: break-all;
-line-height: 1.2;
-}
-.filecard .stats {
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 10.5px;
-letter-spacing: 0.1em;
-text-transform: uppercase;
-color: var(–ink-mute);
-display: flex;
-gap: 14px;
-flex-wrap: wrap;
-}
-.filecard .stats span b {
-color: var(–ink);
-font-weight: 500;
-}
+  /* ── TOOL PANELS ── */
+  .tool-panel { display: none; }
+  .tool-panel.active { display: block; }
 
-/* THRESHOLD */
-.threshold-block { margin-top: 26px; }
+  /* ── SHARED: BIG NUMBER DISPLAY ── */
+  .big-display {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .big-display .num {
+    font-family: 'Bodoni Moda', serif;
+    font-weight: 900;
+    font-size: 76px;
+    line-height: 0.85;
+    letter-spacing: -0.04em;
+    font-variation-settings: "opsz" 96;
+  }
+  .big-display .num.md { font-size: 60px; }
+  .big-display .denom { font-family: 'Bodoni Moda', serif; font-style: italic; font-size: 22px; color: var(--ink-mute); }
+  .big-display .tag { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; background: var(--ink); color: var(--paper); padding: 4px 8px; }
 
-.thresh-display {
-display: flex;
-align-items: baseline;
-gap: 10px;
-margin-bottom: 8px;
-}
-.thresh-display .num {
-font-family: ‘Bodoni Moda’, serif;
-font-weight: 900;
-font-size: 76px;
-line-height: 0.85;
-letter-spacing: -0.04em;
-font-variation-settings: “opsz” 96;
-}
-.thresh-display .denom {
-font-family: ‘Bodoni Moda’, serif;
-font-style: italic;
-font-size: 22px;
-color: var(–ink-mute);
-}
-.thresh-display .tag {
-margin-left: auto;
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 10px;
-letter-spacing: 0.18em;
-text-transform: uppercase;
-background: var(–ink);
-color: var(–paper);
-padding: 4px 8px;
-}
+  /* histogram */
+  .histo { height: 56px; width: 100%; background: var(--paper); border: 1px solid var(--ink); margin: 6px 0 12px; position: relative; overflow: hidden; }
+  .histo canvas { display: block; width: 100%; height: 100%; }
+  .histo .needle { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--accent); pointer-events: none; }
+  .histo .needle::before { content: ""; position: absolute; top: -3px; left: -3px; width: 7px; height: 7px; background: var(--accent); transform: rotate(45deg); }
 
-/* histogram */
-.histo {
-height: 56px;
-width: 100%;
-background: var(–paper);
-border: 1px solid var(–ink);
-margin: 6px 0 12px;
-position: relative;
-overflow: hidden;
-}
-.histo canvas { display: block; width: 100%; height: 100%; }
-.histo .needle {
-position: absolute;
-top: 0; bottom: 0;
-width: 1px;
-background: var(–accent);
-pointer-events: none;
-}
-.histo .needle::before {
-content: “”;
-position: absolute;
-top: -3px;
-left: -3px;
-width: 7px; height: 7px;
-background: var(–accent);
-transform: rotate(45deg);
-}
+  /* slider */
+  input[type=range].slider { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer; }
+  input[type=range].slider::-webkit-slider-runnable-track { height: 4px; background: var(--ink); }
+  input[type=range].slider::-moz-range-track { height: 4px; background: var(--ink); }
+  input[type=range].slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 28px; background: var(--accent); border: 1.5px solid var(--ink); margin-top: -12px; cursor: grab; border-radius: 0; }
+  input[type=range].slider::-moz-range-thumb { width: 18px; height: 28px; background: var(--accent); border: 1.5px solid var(--ink); cursor: grab; border-radius: 0; }
+  .slider-tags { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute); margin-top: 4px; }
 
-/* slider */
-input[type=range].slider {
--webkit-appearance: none;
-appearance: none;
-width: 100%;
-height: 28px;
-background: transparent;
-cursor: pointer;
-}
-input[type=range].slider::-webkit-slider-runnable-track {
-height: 4px;
-background: var(–ink);
-border: none;
-}
-input[type=range].slider::-moz-range-track {
-height: 4px;
-background: var(–ink);
-}
-input[type=range].slider::-webkit-slider-thumb {
--webkit-appearance: none;
-appearance: none;
-width: 18px;
-height: 28px;
-background: var(–accent);
-border: 1.5px solid var(–ink);
-margin-top: -12px;
-cursor: grab;
-border-radius: 0;
-}
-input[type=range].slider::-moz-range-thumb {
-width: 18px;
-height: 28px;
-background: var(–accent);
-border: 1.5px solid var(–ink);
-cursor: grab;
-border-radius: 0;
-}
-.slider-tags {
-display: flex;
-justify-content: space-between;
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 9.5px;
-letter-spacing: 0.16em;
-text-transform: uppercase;
-color: var(–ink-mute);
-margin-top: 4px;
-}
+  /* toggles */
+  .toggles { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+  .toggle { border: 1px solid var(--ink); padding: 7px 11px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; background: var(--paper); cursor: pointer; user-select: none; transition: all .15s; }
+  .toggle:hover { background: var(--paper-2); }
+  .toggle.on { background: var(--ink); color: var(--paper); }
 
-/* TOGGLES */
-.toggles {
-display: flex;
-gap: 8px;
-margin-top: 18px;
-flex-wrap: wrap;
-}
-.toggle {
-border: 1px solid var(–ink);
-padding: 7px 11px;
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 10px;
-letter-spacing: 0.14em;
-text-transform: uppercase;
-background: var(–paper);
-cursor: pointer;
-user-select: none;
-transition: all .15s;
-}
-.toggle:hover { background: var(–paper-2); }
-.toggle.on {
-background: var(–ink);
-color: var(–paper);
-}
+  /* greyscale slider rows */
+  .grey-row { margin-bottom: 22px; }
 
-/* PAGE NAV */
-.pagenav {
-display: flex;
-align-items: center;
-gap: 0;
-margin-top: 24px;
-border: 1px solid var(–ink);
-}
-.pagenav button {
-flex: 0 0 44px;
-height: 44px;
-background: var(–paper);
-border: none;
-border-right: 1px solid var(–ink);
-font-family: ‘Bodoni Moda’, serif;
-font-size: 22px;
-cursor: pointer;
-transition: background .15s;
-}
-.pagenav button:last-child {
-border-right: none;
-border-left: 1px solid var(–ink);
-}
-.pagenav button:hover:not(:disabled) { background: var(–ink); color: var(–paper); }
-.pagenav button:disabled { opacity: 0.3; cursor: not-allowed; }
-.pagenav .num {
-flex: 1;
-text-align: center;
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 12px;
-letter-spacing: 0.12em;
-}
-.pagenav .num b { font-weight: 700; }
+  /* ── RESOLUTION CHECKBOX ── */
+  .res-label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+    user-select: none;
+  }
+  .res-label input { display: none; }
+  .res-box {
+    width: 13px; height: 13px;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    flex-shrink: 0;
+    position: relative;
+    transition: background .15s;
+  }
+  .res-label input:checked + .res-box { background: var(--ink); }
+  .res-label input:checked + .res-box::after {
+    content: "";
+    position: absolute;
+    left: 2px; top: 0px;
+    width: 5px; height: 8px;
+    border-right: 1.5px solid var(--paper);
+    border-bottom: 1.5px solid var(--paper);
+    transform: rotate(40deg);
+  }
+  .res-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-left: auto;
+    white-space: nowrap;
+  }
 
-/* DOWNLOAD */
-.actions { margin-top: 28px; }
-.btn-print {
-display: block;
-width: 100%;
-padding: 18px 16px;
-background: var(–ink);
-color: var(–paper);
-border: none;
-font-family: ‘Bodoni Moda’, serif;
-font-weight: 700;
-font-size: 22px;
-letter-spacing: -0.01em;
-cursor: pointer;
-text-align: left;
-position: relative;
-transition: background .2s, padding-left .2s;
-font-variation-settings: “opsz” 48;
-}
-.btn-print::after {
-content: “→”;
-position: absolute;
-right: 16px;
-top: 50%;
-transform: translateY(-50%);
-font-size: 24px;
-transition: right .2s;
-}
-.btn-print:hover:not(:disabled) {
-background: var(–accent);
-padding-left: 22px;
-}
-.btn-print:hover:not(:disabled)::after { right: 12px; }
-.btn-print:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-print .small {
-display: block;
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 9.5px;
-font-weight: 400;
-letter-spacing: 0.2em;
-text-transform: uppercase;
-margin-top: 4px;
-opacity: .65;
-}
+  /* ── PAGE NAV ── */
+  .pagenav { display: flex; align-items: center; margin-top: 24px; border: 1px solid var(--ink); }
+  .pagenav button { flex: 0 0 44px; height: 44px; background: var(--paper); border: none; border-right: 1px solid var(--ink); font-family: 'Bodoni Moda', serif; font-size: 22px; cursor: pointer; transition: background .15s; }
+  .pagenav button:last-child { border-right: none; border-left: 1px solid var(--ink); }
+  .pagenav button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .pagenav button:disabled { opacity: 0.3; cursor: not-allowed; }
+  .pagenav .num { flex: 1; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; }
+  .pagenav .num b { font-weight: 700; }
 
-/* PREVIEW */
-.panel-right {
-background:
-linear-gradient(135deg, transparent 49.5%, rgba(12,10,8,0.04) 49.5%, rgba(12,10,8,0.04) 50.5%, transparent 50.5%) 0 0 / 24px 24px,
-var(–paper);
-display: flex;
-flex-direction: column;
-}
+  /* ── DOWNLOAD ── */
+  .actions { margin-top: 28px; }
+  .btn-print { display: block; width: 100%; padding: 18px 16px; background: var(--ink); color: var(--paper); border: none; font-family: 'Bodoni Moda', serif; font-weight: 700; font-size: 22px; letter-spacing: -0.01em; cursor: pointer; text-align: left; position: relative; transition: background .2s, padding-left .2s; font-variation-settings: "opsz" 48; }
+  .btn-print::after { content: "→"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 24px; transition: right .2s; }
+  .btn-print:hover:not(:disabled) { background: var(--accent); padding-left: 22px; }
+  .btn-print:hover:not(:disabled)::after { right: 12px; }
+  .btn-print:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-print .small { display: block; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 400; letter-spacing: 0.2em; text-transform: uppercase; margin-top: 4px; opacity: .65; }
 
-.preview-bar {
-display: flex;
-justify-content: space-between;
-align-items: center;
-border-bottom: 1px solid var(–ink);
-padding-bottom: 10px;
-margin-bottom: 16px;
-}
-.preview-bar .title {
-font-family: ‘Bodoni Moda’, serif;
-font-size: 26px;
-font-weight: 700;
-}
-.preview-bar .title em {
-font-style: italic;
-font-weight: 400;
-color: var(–ink-mute);
-}
+  /* ── PREVIEW ── */
+  .panel-right {
+    background:
+      linear-gradient(135deg, transparent 49.5%, rgba(12,10,8,0.04) 49.5%, rgba(12,10,8,0.04) 50.5%, transparent 50.5%) 0 0 / 24px 24px,
+      var(--paper);
+    display: flex;
+    flex-direction: column;
+  }
+  .preview-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--ink); padding-bottom: 10px; margin-bottom: 16px; }
+  .preview-bar .title { font-family: 'Bodoni Moda', serif; font-size: 26px; font-weight: 700; }
+  .preview-bar .title em { font-style: italic; font-weight: 400; color: var(--ink-mute); }
+  .preview-stage { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 480px; position: relative; }
+  .preview-stage .empty { text-align: center; color: var(--ink-mute); }
+  .preview-stage .empty .big { font-family: 'Bodoni Moda', serif; font-style: italic; font-size: 48px; line-height: 1; margin-bottom: 12px; }
+  .preview-stage .empty .small { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .preview-canvas-wrap { background: white; box-shadow: 0 1px 0 rgba(12,10,8,0.15), 0 8px 22px -6px rgba(12,10,8,0.35), 0 18px 50px -10px rgba(12,10,8,0.25); max-width: 100%; max-height: 78vh; }
+  .preview-canvas-wrap canvas { display: block; max-width: 100%; max-height: 78vh; height: auto; width: auto; }
 
-.preview-stage {
-flex: 1;
-display: flex;
-align-items: center;
-justify-content: center;
-min-height: 480px;
-position: relative;
-}
-.preview-stage .empty {
-text-align: center;
-color: var(–ink-mute);
-}
-.preview-stage .empty .big {
-font-family: ‘Bodoni Moda’, serif;
-font-style: italic;
-font-size: 48px;
-line-height: 1;
-margin-bottom: 12px;
-}
-.preview-stage .empty .small {
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 11px;
-letter-spacing: 0.18em;
-text-transform: uppercase;
-}
+  /* ── LOADER ── */
+  .loader { position: absolute; inset: 0; background: rgba(236,230,216,0.9); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 10; backdrop-filter: blur(2px); }
+  .loader.on { display: flex; }
+  .loader .lab { font-family: 'Bodoni Moda', serif; font-style: italic; font-size: 32px; margin-bottom: 6px; }
+  .loader .pct { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.16em; color: var(--ink-mute); }
+  .loader .bar { width: 240px; height: 4px; background: var(--paper-2); border: 1px solid var(--ink); margin-top: 14px; overflow: hidden; }
+  .loader .bar > div { height: 100%; background: var(--ink); width: 0%; transition: width .25s; }
 
-.preview-canvas-wrap {
-background: white;
-box-shadow:
-0 1px 0 rgba(12,10,8,0.15),
-0 8px 22px -6px rgba(12,10,8,0.35),
-0 18px 50px -10px rgba(12,10,8,0.25);
-max-width: 100%;
-max-height: 78vh;
-position: relative;
-}
-.preview-canvas-wrap canvas {
-display: block;
-max-width: 100%;
-max-height: 78vh;
-height: auto;
-width: auto;
-}
-.preview-canvas-wrap::before {
-content: “”;
-position: absolute;
-inset: -6px;
-border: 1px solid var(–ink);
-pointer-events: none;
-z-index: -1;
-opacity: 0.0;
-}
+  /* ── FOOTER ── */
+  footer { display: flex; justify-content: space-between; align-items: baseline; margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--ink); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute); }
+  footer em { font-family: 'Bodoni Moda', serif; font-style: italic; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--ink-soft); }
 
-/* LOADER */
-.loader {
-position: absolute;
-inset: 0;
-background: rgba(236,230,216,0.9);
-display: none;
-align-items: center;
-justify-content: center;
-flex-direction: column;
-z-index: 10;
-backdrop-filter: blur(2px);
-}
-.loader.on { display: flex; }
-.loader .lab {
-font-family: ‘Bodoni Moda’, serif;
-font-style: italic;
-font-size: 32px;
-margin-bottom: 6px;
-}
-.loader .pct {
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 12px;
-letter-spacing: 0.16em;
-color: var(–ink-mute);
-}
-.loader .bar {
-width: 240px;
-height: 4px;
-background: var(–paper-2);
-border: 1px solid var(–ink);
-margin-top: 14px;
-overflow: hidden;
-}
-.loader .bar > div {
-height: 100%;
-background: var(–ink);
-width: 0%;
-transition: width .25s;
-}
-
-/* FOOTER */
-footer {
-display: flex;
-justify-content: space-between;
-align-items: baseline;
-margin-top: 28px;
-padding-top: 14px;
-border-top: 1px solid var(–ink);
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 10.5px;
-letter-spacing: 0.16em;
-text-transform: uppercase;
-color: var(–ink-mute);
-}
-footer em {
-font-family: ‘Bodoni Moda’, serif;
-font-style: italic;
-font-size: 14px;
-text-transform: none;
-letter-spacing: 0;
-color: var(–ink-soft);
-}
-
-/* error */
-.err {
-margin-top: 12px;
-padding: 10px 12px;
-border-left: 3px solid var(–accent);
-background: rgba(138,29,24,0.08);
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 11px;
-color: var(–ink-soft);
-display: none;
-}
-.err.on { display: block; }
+  .err { margin-top: 12px; padding: 10px 12px; border-left: 3px solid var(--accent); background: rgba(138,29,24,0.08); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-soft); display: none; }
+  .err.on { display: block; }
 </style>
-
 </head>
 <body>
 <div class="frame">
@@ -609,12 +376,13 @@ display: none;
       <span>·  ·  ·</span>
       <span>FRI · 01 MAY MMXXVI</span>
     </div>
-    <h1 class="title">Mono<em>chrome</em></h1>
+    <h1 class="title">L'<em>atelier</em></h1>
+    <div class="title-sub">PDF Tools</div>
     <div class="subhead">
-      <div class="lede">
+      <div class="lede" id="masterLede">
         A typographic press for converting any portable document into pure black-and-white impression — by adjustable threshold.
       </div>
-      <div class="meta">
+      <div class="meta" id="masterMeta">
         Two values · zero shades<br/>
         Client-side only · no upload<br/>
         Threshold · 0 → 255
@@ -622,91 +390,140 @@ display: none;
     </div>
   </header>
 
+  <!-- TOOL NAVIGATION -->
+  <nav class="tool-nav">
+    <div class="tool-nav-label">Editions</div>
+    <div class="tool-tab active" data-tool="threshold">
+      <span class="tab-num">I.</span> Threshold
+    </div>
+    <div class="tool-tab" data-tool="greyscale">
+      <span class="tab-num">II.</span> Greyscale
+    </div>
+  </nav>
+
   <main>
-    <!-- LEFT: CONTROLS -->
     <section class="panel panel-left">
 
-```
-  <div class="section-label"><span>I. Source Manuscript</span><span>—</span></div>
-  <div class="drop" id="dropZone">
-    <div class="glyph">¶</div>
-    <div class="lbl">Lay paper here</div>
-    <div class="sub">PDF · click or drop</div>
-  </div>
-  <input type="file" id="fileInput" accept="application/pdf">
-  <div class="err" id="errBox"></div>
+      <!-- SHARED: Source -->
+      <div class="section-label"><span>I. Source Manuscript</span><span>—</span></div>
+      <div class="drop" id="dropZone">
+        <div class="glyph">¶</div>
+        <div class="lbl">Upload PDF</div>
+        <div class="sub">PDF · click or drop</div>
+      </div>
+      <input type="file" id="fileInput" accept="application/pdf">
+      <div class="err" id="errBox"></div>
 
-  <div class="filecard" id="fileCard">
-    <div class="name" id="fileName">—</div>
-    <div class="stats">
-      <span>Pp. <b id="pageCount">—</b></span>
-      <span>Size <b id="fileSize">—</b></span>
-      <span>Status <b id="fileStatus">ready</b></span>
-    </div>
-  </div>
+      <div class="filecard" id="fileCard">
+        <div class="name" id="fileName">—</div>
+        <div class="stats">
+          <span>Pp. <b id="pageCount">—</b></span>
+          <span>Size <b id="fileSize">—</b></span>
+          <span>Status <b id="fileStatus">ready</b></span>
+        </div>
+      </div>
 
-  <div class="threshold-block">
-    <div class="section-label"><span>II. Threshold</span><span id="threshHint">midtone</span></div>
-    <div class="thresh-display">
-      <span class="num" id="threshNum">128</span>
-      <span class="denom">/255</span>
-      <span class="tag" id="threshPct">50%</span>
-    </div>
-    <div class="histo">
-      <canvas id="histoCanvas"></canvas>
-      <div class="needle" id="threshNeedle" style="left: 50%;"></div>
-    </div>
-    <input type="range" min="0" max="255" value="128" class="slider" id="threshSlider">
-    <div class="slider-tags">
-      <span>0 · pure white</span>
-      <span>255 · pure black</span>
-    </div>
+      <!-- ═══ THRESHOLD PANEL ═══ -->
+      <div class="tool-panel active" id="tool-threshold">
+        <div style="margin-top:26px">
+          <div class="section-label"><span>II. Threshold</span><span id="threshHint">midtone</span></div>
+          <div class="big-display">
+            <span class="num" id="threshNum">128</span>
+            <span class="denom">/255</span>
+            <span class="tag" id="threshPct">50%</span>
+          </div>
+          <div class="histo">
+            <canvas id="histoCanvas"></canvas>
+            <div class="needle" id="threshNeedle" style="left:50%"></div>
+          </div>
+          <input type="range" min="0" max="255" value="128" class="slider" id="threshSlider">
+          <div class="slider-tags">
+            <span>0 · pure white</span>
+            <span>255 · pure black</span>
+          </div>
+          <div class="toggles">
+            <div class="toggle" id="invertToggle">↻ Invert</div>
+          </div>
+        </div>
+      </div>
 
-    <div class="toggles">
-      <div class="toggle" id="invertToggle">↻ Invert</div>
-      <div class="toggle on" id="ditherToggle" style="display:none;">~ Dither</div>
-    </div>
-  </div>
+      <!-- ═══ GREYSCALE PANEL ═══ -->
+      <div class="tool-panel" id="tool-greyscale">
+        <div style="margin-top:26px">
+          <div class="section-label"><span>II. Greyscale</span><span id="greyHint">neutral</span></div>
 
-  <div class="section-label" style="margin-top:26px"><span>III. Folio</span><span>—</span></div>
-  <div class="pagenav">
-    <button id="prevPage" disabled>‹</button>
-    <div class="num">Page <b id="curPage">—</b> / <b id="totPage">—</b></div>
-    <button id="nextPage" disabled>›</button>
-  </div>
+          <div class="grey-row">
+            <div class="big-display">
+              <span class="num md" id="brightNum">0</span>
+              <span class="denom">bright</span>
+              <span class="tag" id="brightTag">neutral</span>
+            </div>
+            <input type="range" min="-100" max="100" value="0" class="slider" id="brightSlider">
+            <div class="slider-tags"><span>−100 · dark</span><span>+100 · light</span></div>
+          </div>
 
-  <div class="actions">
-    <button class="btn-print" id="downloadBtn" disabled>
-      Print to PDF
-      <span class="small">— render &amp; download all pages</span>
-    </button>
-  </div>
+          <div class="grey-row">
+            <div class="big-display">
+              <span class="num md" id="contrastNum">100</span>
+              <span class="denom">%</span>
+              <span class="tag" id="contrastTag">normal</span>
+            </div>
+            <input type="range" min="50" max="200" value="100" class="slider" id="contrastSlider">
+            <div class="slider-tags"><span>50% · flat</span><span>200% · punchy</span></div>
+          </div>
 
-</section>
+          <div class="toggles">
+            <div class="toggle" id="greyInvertToggle">↻ Invert</div>
+            <div class="toggle" id="sepiaToggle">◈ Sepia</div>
+          </div>
+        </div>
+      </div>
 
-<!-- RIGHT: PREVIEW -->
-<section class="panel panel-right">
-  <div class="preview-bar">
-    <div class="title">Proof <em>— preview impression</em></div>
-    <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute)" id="proofMeta">awaiting source</div>
-  </div>
-  <div class="preview-stage" id="previewStage">
-    <div class="empty" id="emptyState">
-      <div class="big">— no proof yet —</div>
-      <div class="small">load a pdf to begin</div>
-    </div>
-    <div class="preview-canvas-wrap" id="canvasWrap" style="display:none;">
-      <canvas id="previewCanvas"></canvas>
-    </div>
-    <div class="loader" id="loader">
-      <div class="lab" id="loaderLabel">Setting type…</div>
-      <div class="pct" id="loaderPct">0%</div>
-      <div class="bar"><div id="loaderBar"></div></div>
-    </div>
-  </div>
-</section>
-```
+      <!-- SHARED: Folio -->
+      <div class="section-label" style="margin-top:26px"><span>III. Folio</span><span>—</span></div>
+      <div class="pagenav">
+        <button id="prevPage" disabled>‹</button>
+        <div class="num">Page <b id="curPage">—</b> / <b id="totPage">—</b></div>
+        <button id="nextPage" disabled>›</button>
+      </div>
 
+      <!-- SHARED: Download -->
+      <div class="actions">
+        <label class="res-label" for="hiResCheck">
+          <input type="checkbox" id="hiResCheck">
+          <span class="res-box"></span>
+          <span>Preserve original resolution</span>
+          <span class="res-note">300 dpi · slower</span>
+        </label>
+        <button class="btn-print" id="downloadBtn" disabled>
+          <span id="downloadLabel">Print to PDF</span>
+          <span class="small" id="downloadSub">— render &amp; download all pages</span>
+        </button>
+      </div>
+
+    </section>
+
+    <!-- RIGHT: PREVIEW -->
+    <section class="panel panel-right">
+      <div class="preview-bar">
+        <div class="title">Proof <em>— preview impression</em></div>
+        <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute)" id="proofMeta">awaiting source</div>
+      </div>
+      <div class="preview-stage" id="previewStage">
+        <div class="empty" id="emptyState">
+          <div class="big">— no proof yet —</div>
+          <div class="small">load a pdf to begin</div>
+        </div>
+        <div class="preview-canvas-wrap" id="canvasWrap" style="display:none">
+          <canvas id="previewCanvas"></canvas>
+        </div>
+        <div class="loader" id="loader">
+          <div class="lab" id="loaderLabel">Setting type…</div>
+          <div class="pct" id="loaderPct">0%</div>
+          <div class="bar"><div id="loaderBar"></div></div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer>
@@ -718,62 +535,105 @@ display: none;
 </div>
 
 <script>
-  // ====== PDF.js setup ======
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  // ====== State ======
-  const state = {
-    pdfDoc: null,
-    numPages: 0,
-    curPage: 1,
-    threshold: 128,
-    invert: false,
-    // Cache: per-page original (rendered) ImageData + dimensions.
-    // We store the grayscale luminance values to avoid recomputing on slider change.
-    pages: [], // [{lum: Uint8ClampedArray, w, h, histo: Uint32Array(256)}]
-    fileName: '',
-    fileSize: 0,
-    rendering: false,
+  // ── Tool registry: add a new entry here to add a new tool ──
+  const TOOLS = {
+    threshold: {
+      lede: 'A typographic press for converting any portable document into pure black-and-white impression — by adjustable threshold.',
+      meta: 'Two values · zero shades<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
+      downloadLabel: 'Print to PDF',
+      downloadSub: '— render &amp; download all pages',
+      suffix: '_bw',
+    },
+    greyscale: {
+      lede: 'Desaturate any PDF to true greyscale — 256 tonal steps with precision brightness and contrast, no banding, no thresholding.',
+      meta: '256 shades of grey<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
+      downloadLabel: 'Export Greyscale PDF',
+      downloadSub: '— render &amp; download all pages',
+      suffix: '_grey',
+    },
   };
 
-  // ====== Element refs ======
+  let activeTool = 'threshold';
+
+  const state = {
+    pdfDoc: null, numPages: 0, curPage: 1,
+    // threshold
+    threshold: 128, invert: false,
+    // greyscale
+    brightness: 0, contrast: 100, greyInvert: false, sepia: false,
+    // output
+    hiRes: false,
+    // cache
+    pages: [], fileName: '', fileSize: 0,
+  };
+
   const $ = id => document.getElementById(id);
-  const dropZone = $('dropZone');
-  const fileInput = $('fileInput');
-  const fileCard = $('fileCard');
-  const fileNameEl = $('fileName');
-  const pageCountEl = $('pageCount');
-  const fileSizeEl = $('fileSize');
-  const fileStatusEl = $('fileStatus');
-  const errBox = $('errBox');
 
-  const threshSlider = $('threshSlider');
-  const threshNum = $('threshNum');
-  const threshPct = $('threshPct');
-  const threshHint = $('threshHint');
-  const threshNeedle = $('threshNeedle');
-  const histoCanvas = $('histoCanvas');
-
-  const invertToggle = $('invertToggle');
-
-  const prevBtn = $('prevPage');
-  const nextBtn = $('nextPage');
-  const curPageEl = $('curPage');
-  const totPageEl = $('totPage');
-
-  const downloadBtn = $('downloadBtn');
+  // element refs
+  const dropZone      = $('dropZone');
+  const fileInput     = $('fileInput');
+  const fileCard      = $('fileCard');
+  const fileNameEl    = $('fileName');
+  const pageCountEl   = $('pageCount');
+  const fileSizeEl    = $('fileSize');
+  const fileStatusEl  = $('fileStatus');
+  const errBox        = $('errBox');
+  const threshSlider  = $('threshSlider');
+  const threshNum     = $('threshNum');
+  const threshPct     = $('threshPct');
+  const threshHint    = $('threshHint');
+  const threshNeedle  = $('threshNeedle');
+  const histoCanvas   = $('histoCanvas');
+  const invertToggle  = $('invertToggle');
+  const brightSlider  = $('brightSlider');
+  const brightNum     = $('brightNum');
+  const brightTag     = $('brightTag');
+  const contrastSlider= $('contrastSlider');
+  const contrastNum   = $('contrastNum');
+  const contrastTag   = $('contrastTag');
+  const greyInvertToggle = $('greyInvertToggle');
+  const sepiaToggle   = $('sepiaToggle');
+  const prevBtn       = $('prevPage');
+  const nextBtn       = $('nextPage');
+  const curPageEl     = $('curPage');
+  const totPageEl     = $('totPage');
+  const downloadBtn   = $('downloadBtn');
+  const downloadLabel = $('downloadLabel');
+  const downloadSub   = $('downloadSub');
   const previewCanvas = $('previewCanvas');
-  const canvasWrap = $('canvasWrap');
-  const emptyState = $('emptyState');
-  const proofMeta = $('proofMeta');
+  const canvasWrap    = $('canvasWrap');
+  const emptyState    = $('emptyState');
+  const proofMeta     = $('proofMeta');
+  const loader        = $('loader');
+  const loaderLabel   = $('loaderLabel');
+  const loaderPct     = $('loaderPct');
+  const loaderBar     = $('loaderBar');
+  const hiResCheck    = $('hiResCheck');
 
-  const loader = $('loader');
-  const loaderLabel = $('loaderLabel');
-  const loaderPct = $('loaderPct');
-  const loaderBar = $('loaderBar');
+  // ── Tool switching ──
+  document.querySelectorAll('.tool-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTool(tab.dataset.tool));
+  });
 
-  // ====== Helpers ======
+  function switchTool(id) {
+    if (id === activeTool) return;
+    activeTool = id;
+    document.querySelectorAll('.tool-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.tool === id));
+    document.querySelectorAll('.tool-panel').forEach(p =>
+      p.classList.toggle('active', p.id === 'tool-' + id));
+    const tool = TOOLS[id];
+    $('masterLede').innerHTML = tool.lede;
+    $('masterMeta').innerHTML = tool.meta;
+    downloadLabel.innerHTML = tool.downloadLabel;
+    downloadSub.innerHTML = tool.downloadSub;
+    if (state.pdfDoc) { drawPreview(); drawHistogram(); }
+  }
+
+  // ── Helpers ──
   function showError(msg) {
     errBox.textContent = '⚠ ' + msg;
     errBox.classList.add('on');
@@ -783,24 +643,17 @@ display: none;
 
   function fmtBytes(b) {
     if (b < 1024) return b + ' B';
-    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
-    return (b/1024/1024).toFixed(2) + ' MB';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
   }
 
   function setLoader(on, label, pct) {
-    if (on) {
-      loader.classList.add('on');
-      if (label) loaderLabel.textContent = label;
-      if (pct != null) {
-        loaderPct.textContent = Math.round(pct) + '%';
-        loaderBar.style.width = pct + '%';
-      }
-    } else {
-      loader.classList.remove('on');
-    }
+    loader.classList.toggle('on', on);
+    if (on && label != null) loaderLabel.textContent = label;
+    if (on && pct != null) { loaderPct.textContent = Math.round(pct) + '%'; loaderBar.style.width = pct + '%'; }
   }
 
-  function thresholdHint(v) {
+  function threshHintText(v) {
     if (v < 64) return 'low key';
     if (v < 110) return 'shadow';
     if (v < 145) return 'midtone';
@@ -808,55 +661,58 @@ display: none;
     return 'high key';
   }
 
-  // ====== File handling ======
+  function contrastHintText(v) {
+    if (v < 80) return 'flat';
+    if (v < 95) return 'soft';
+    if (v <= 115) return 'normal';
+    if (v <= 150) return 'punchy';
+    return 'harsh';
+  }
+
+  function greyHintText() {
+    if (state.sepia) return 'sepia';
+    if (state.greyInvert) return 'inverted';
+    if (state.brightness > 40) return 'bright';
+    if (state.brightness < -40) return 'dark';
+    if (state.contrast > 140) return 'punchy';
+    return 'neutral';
+  }
+
+  // ── File handling ──
   dropZone.addEventListener('click', () => fileInput.click());
-  dropZone.addEventListener('dragover', e => {
-    e.preventDefault(); dropZone.classList.add('drag');
-  });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
   dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag');
+    e.preventDefault(); dropZone.classList.remove('drag');
     if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
   });
-  fileInput.addEventListener('change', e => {
-    if (e.target.files.length) handleFile(e.target.files[0]);
-  });
+  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
 
   async function handleFile(file) {
     clearError();
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      showError('That doesn\u2019t look like a PDF.');
-      return;
+      showError('That doesn’t look like a PDF.'); return;
     }
     state.fileName = file.name;
-    state.fileSize = file.size;
-
     fileNameEl.textContent = file.name;
     fileSizeEl.textContent = fmtBytes(file.size);
     fileStatusEl.textContent = 'loading';
     fileCard.classList.add('on');
-
     setLoader(true, 'Loading manuscript…', 0);
     try {
       const buf = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: buf });
-      const pdf = await loadingTask.promise;
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
       state.pdfDoc = pdf;
       state.numPages = pdf.numPages;
       state.curPage = 1;
       state.pages = new Array(pdf.numPages).fill(null);
-
       pageCountEl.textContent = pdf.numPages;
       totPageEl.textContent = String(pdf.numPages).padStart(2, '0');
-      curPageEl.textContent = String(1).padStart(2, '0');
-
-      // Render all pages' luminance into cache (so threshold slider is instant)
+      curPageEl.textContent = '01';
       for (let i = 1; i <= pdf.numPages; i++) {
-        setLoader(true, 'Setting type · pg ' + i + ' / ' + pdf.numPages, ((i-1) / pdf.numPages) * 100);
+        setLoader(true, 'Setting type · pg ' + i + ' / ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
         await renderPageToLuminance(i);
       }
-
       fileStatusEl.textContent = 'ready';
       downloadBtn.disabled = false;
       updatePageButtons();
@@ -873,67 +729,70 @@ display: none;
     }
   }
 
-  // ====== Rendering ======
-  // Render a PDF page to an offscreen canvas, then store luminance values.
-  async function renderPageToLuminance(pageNum) {
-    const page = await state.pdfDoc.getPage(pageNum);
-    // Choose a scale that gives a good balance of fidelity vs memory.
-    // Aim for max ~1800px on the long side.
-    const baseViewport = page.getViewport({ scale: 1 });
-    const target = 1800;
-    const scale = Math.min(2.5, target / Math.max(baseViewport.width, baseViewport.height));
-    const viewport = page.getViewport({ scale });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    const ctx = canvas.getContext('2d');
-
-    // White background so transparent PDFs render correctly
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const d = img.data;
-    const lum = new Uint8ClampedArray(canvas.width * canvas.height);
-    const histo = new Uint32Array(256);
-    for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-      // Rec. 709-ish luminance
-      const v = (0.2126 * d[i] + 0.7152 * d[i+1] + 0.0722 * d[i+2]) | 0;
-      lum[j] = v;
-      histo[v]++;
-    }
-
-    state.pages[pageNum - 1] = {
-      lum, w: canvas.width, h: canvas.height, histo
-    };
+  // ── Page luminance cache ──
+  function getRenderScale(baseVp) {
+    if (state.hiRes) return 300 / 72;
+    return Math.min(2.5, 1800 / Math.max(baseVp.width, baseVp.height));
   }
 
-  // Apply threshold to a cached page's luminance and write into a target canvas
-  function applyThresholdToCanvas(pageData, canvas, threshold, invert) {
-    canvas.width = pageData.w;
-    canvas.height = pageData.h;
-    const ctx = canvas.getContext('2d');
-    const img = ctx.createImageData(pageData.w, pageData.h);
+  async function renderPageToLuminance(pageNum) {
+    const page = await state.pdfDoc.getPage(pageNum);
+    const baseVp = page.getViewport({ scale: 1 });
+    const scale = getRenderScale(baseVp);
+    const vp = page.getViewport({ scale });
+    const c = document.createElement('canvas');
+    c.width = Math.floor(vp.width);
+    c.height = Math.floor(vp.height);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const img = ctx.getImageData(0, 0, c.width, c.height);
     const d = img.data;
-    const lum = pageData.lum;
+    const lum = new Uint8ClampedArray(c.width * c.height);
+    const histo = new Uint32Array(256);
+    for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+      const v = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) | 0;
+      lum[j] = v; histo[v]++;
+    }
+    state.pages[pageNum - 1] = { lum, w: c.width, h: c.height, histo, scale };
+  }
 
-    // If invert is true: pixels brighter than threshold become BLACK, darker become WHITE.
-    // Default: pixels darker than threshold become BLACK (ink), brighter become WHITE (paper).
-    if (!invert) {
-      for (let j = 0, i = 0; j < lum.length; j++, i += 4) {
-        const black = lum[j] < threshold;
-        const v = black ? 0 : 255;
-        d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
+  // ── Processing functions ──
+  function applyThresholdToCanvas(pd, canvas) {
+    canvas.width = pd.w; canvas.height = pd.h;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(pd.w, pd.h);
+    const d = img.data; const lum = pd.lum;
+    const thresh = state.threshold; const inv = state.invert;
+    for (let j = 0, i = 0; j < lum.length; j++, i += 4) {
+      const v = (inv ? lum[j] >= thresh : lum[j] < thresh) ? 0 : 255;
+      d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function applyGreyscaleToCanvas(pd, canvas) {
+    canvas.width = pd.w; canvas.height = pd.h;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(pd.w, pd.h);
+    const d = img.data; const lum = pd.lum;
+    const bf = state.brightness * 1.28;
+    const cf = state.contrast / 100;
+    const inv = state.greyInvert;
+    const sep = state.sepia;
+    for (let j = 0, i = 0; j < lum.length; j++, i += 4) {
+      let v = (lum[j] - 128) * cf + 128 + bf;
+      v = Math.max(0, Math.min(255, v)) | 0;
+      if (inv) v = 255 - v;
+      if (sep) {
+        d[i]   = Math.min(255, (v * 1.12) | 0);
+        d[i+1] = v;
+        d[i+2] = Math.max(0,  (v * 0.72) | 0);
+      } else {
+        d[i] = v; d[i+1] = v; d[i+2] = v;
       }
-    } else {
-      for (let j = 0, i = 0; j < lum.length; j++, i += 4) {
-        const black = lum[j] >= threshold;
-        const v = black ? 0 : 255;
-        d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
-      }
+      d[i+3] = 255;
     }
     ctx.putImageData(img, 0, 0);
   }
@@ -941,27 +800,24 @@ display: none;
   function drawPreview() {
     const pd = state.pages[state.curPage - 1];
     if (!pd) return;
-    applyThresholdToCanvas(pd, previewCanvas, state.threshold, state.invert);
+    if (activeTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas);
+    else applyGreyscaleToCanvas(pd, previewCanvas);
     proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · pg ' + state.curPage + '/' + state.numPages;
   }
 
   function drawHistogram() {
     const pd = state.pages[state.curPage - 1];
     if (!pd) return;
-    const cs = histoCanvas;
-    const cw = cs.clientWidth || 300;
-    const ch = cs.clientHeight || 56;
-    cs.width = cw * devicePixelRatio;
-    cs.height = ch * devicePixelRatio;
-    const ctx = cs.getContext('2d');
+    const cw = histoCanvas.clientWidth || 300;
+    const ch = histoCanvas.clientHeight || 56;
+    histoCanvas.width = cw * devicePixelRatio;
+    histoCanvas.height = ch * devicePixelRatio;
+    const ctx = histoCanvas.getContext('2d');
     ctx.scale(devicePixelRatio, devicePixelRatio);
     ctx.clearRect(0, 0, cw, ch);
-
-    // Find max for scaling (ignore extreme bins to avoid one tall spike at 255)
     let max = 0;
     for (let i = 1; i < 255; i++) if (pd.histo[i] > max) max = pd.histo[i];
-    if (max === 0) max = 1;
-
+    if (!max) max = 1;
     ctx.fillStyle = '#0c0a08';
     const barW = cw / 256;
     for (let i = 0; i < 256; i++) {
@@ -970,87 +826,104 @@ display: none;
     }
   }
 
-  // ====== Slider ======
+  // ── Threshold controls ──
   threshSlider.addEventListener('input', e => {
     const v = +e.target.value;
     state.threshold = v;
     threshNum.textContent = v;
     threshPct.textContent = Math.round((v / 255) * 100) + '%';
-    threshHint.textContent = thresholdHint(v);
+    threshHint.textContent = threshHintText(v);
     threshNeedle.style.left = ((v / 255) * 100) + '%';
     if (state.pdfDoc) drawPreview();
   });
-
-  // ====== Invert ======
   invertToggle.addEventListener('click', () => {
     state.invert = !state.invert;
     invertToggle.classList.toggle('on', state.invert);
     if (state.pdfDoc) drawPreview();
   });
 
-  // ====== Page nav ======
+  // ── Greyscale controls ──
+  brightSlider.addEventListener('input', e => {
+    const v = +e.target.value;
+    state.brightness = v;
+    brightNum.textContent = v > 0 ? '+' + v : String(v);
+    brightTag.textContent = v < -50 ? 'dark' : v < -10 ? 'dim' : v <= 10 ? 'neutral' : v <= 50 ? 'bright' : 'blown';
+    $('greyHint').textContent = greyHintText();
+    if (state.pdfDoc) drawPreview();
+  });
+  contrastSlider.addEventListener('input', e => {
+    const v = +e.target.value;
+    state.contrast = v;
+    contrastNum.textContent = v;
+    contrastTag.textContent = contrastHintText(v);
+    $('greyHint').textContent = greyHintText();
+    if (state.pdfDoc) drawPreview();
+  });
+  greyInvertToggle.addEventListener('click', () => {
+    state.greyInvert = !state.greyInvert;
+    greyInvertToggle.classList.toggle('on', state.greyInvert);
+    $('greyHint').textContent = greyHintText();
+    if (state.pdfDoc) drawPreview();
+  });
+  sepiaToggle.addEventListener('click', () => {
+    state.sepia = !state.sepia;
+    sepiaToggle.classList.toggle('on', state.sepia);
+    $('greyHint').textContent = greyHintText();
+    if (state.pdfDoc) drawPreview();
+  });
+
+  // ── Resolution toggle ──
+  hiResCheck.addEventListener('change', async () => {
+    state.hiRes = hiResCheck.checked;
+    if (!state.pdfDoc) return;
+    state.pages = new Array(state.numPages).fill(null);
+    const label = state.hiRes ? 'Pressing at 300 dpi · pg ' : 'Setting type · pg ';
+    for (let i = 1; i <= state.numPages; i++) {
+      setLoader(true, label + i + ' / ' + state.numPages, ((i - 1) / state.numPages) * 100);
+      await renderPageToLuminance(i);
+    }
+    drawPreview();
+    drawHistogram();
+    setLoader(false);
+  });
+
+  // ── Page nav ──
   function updatePageButtons() {
     prevBtn.disabled = state.curPage <= 1;
     nextBtn.disabled = state.curPage >= state.numPages;
     curPageEl.textContent = String(state.curPage).padStart(2, '0');
   }
   prevBtn.addEventListener('click', () => {
-    if (state.curPage > 1) {
-      state.curPage--;
-      updatePageButtons();
-      drawPreview();
-      drawHistogram();
-    }
+    if (state.curPage > 1) { state.curPage--; updatePageButtons(); drawPreview(); drawHistogram(); }
   });
   nextBtn.addEventListener('click', () => {
-    if (state.curPage < state.numPages) {
-      state.curPage++;
-      updatePageButtons();
-      drawPreview();
-      drawHistogram();
-    }
+    if (state.curPage < state.numPages) { state.curPage++; updatePageButtons(); drawPreview(); drawHistogram(); }
   });
 
-  // ====== Download ======
+  // ── Download ──
   downloadBtn.addEventListener('click', async () => {
     if (!state.pdfDoc) return;
     downloadBtn.disabled = true;
     setLoader(true, 'Pressing pages…', 0);
-
     try {
       const { jsPDF } = window.jspdf;
-
-      // Use the first page to set up the document orientation/units.
       const tmp = document.createElement('canvas');
       let pdf = null;
-
       for (let i = 0; i < state.numPages; i++) {
-        setLoader(true, 'Pressing pg ' + (i+1) + ' / ' + state.numPages, ((i) / state.numPages) * 100);
+        setLoader(true, 'Pressing pg ' + (i + 1) + ' / ' + state.numPages, (i / state.numPages) * 100);
         const pd = state.pages[i];
-        applyThresholdToCanvas(pd, tmp, state.threshold, state.invert);
-
-        // PDF page sized in points to keep aspect ratio. We use the same px size mapped to points (72 dpi).
-        // To keep file size sane we use 150dpi-equivalent: scale points by 72 / 150.
-        const dpi = 150;
-        const wPt = (pd.w / dpi) * 72;
-        const hPt = (pd.h / dpi) * 72;
+        if (activeTool === 'threshold') applyThresholdToCanvas(pd, tmp);
+        else applyGreyscaleToCanvas(pd, tmp);
+        const wPt = pd.w / pd.scale;
+        const hPt = pd.h / pd.scale;
         const orient = wPt > hPt ? 'l' : 'p';
-
-        // Use PNG for crisp B&W edges (no JPEG smearing)
         const dataUrl = tmp.toDataURL('image/png');
-
-        if (i === 0) {
-          pdf = new jsPDF({ orientation: orient, unit: 'pt', format: [wPt, hPt] });
-        } else {
-          pdf.addPage([wPt, hPt], orient);
-        }
+        if (i === 0) pdf = new jsPDF({ orientation: orient, unit: 'pt', format: [wPt, hPt] });
+        else pdf.addPage([wPt, hPt], orient);
         pdf.addImage(dataUrl, 'PNG', 0, 0, wPt, hPt, undefined, 'FAST');
-        // yield to UI
         await new Promise(r => setTimeout(r, 0));
       }
-
-      const base = state.fileName.replace(/\.pdf$/i, '');
-      pdf.save(base + '_bw.pdf');
+      pdf.save(state.fileName.replace(/\.pdf$/i, '') + TOOLS[activeTool].suffix + '.pdf');
       setLoader(false);
     } catch (err) {
       console.error(err);
@@ -1061,11 +934,11 @@ display: none;
     }
   });
 
-  // Init slider state
-  threshNum.textContent = state.threshold;
-  threshPct.textContent = Math.round((state.threshold / 255) * 100) + '%';
-  threshNeedle.style.left = ((state.threshold / 255) * 100) + '%';
+  // init display
+  threshNum.textContent = '128';
+  threshPct.textContent = '50%';
+  threshNeedle.style.left = '50%';
+  brightNum.textContent = '0';
 </script>
-
 </body>
 </html>
