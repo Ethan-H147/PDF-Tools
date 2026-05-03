@@ -344,12 +344,25 @@ The header lede and meta lines also swap when you switch tabs. -->
   .preview-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--ink); padding-bottom: 10px; margin-bottom: 16px; }
   .preview-bar .title { font-family: 'Bodoni Moda', serif; font-size: 26px; font-weight: 700; }
   .preview-bar .title em { font-style: italic; font-weight: 400; color: var(--ink-mute); }
-  .preview-stage { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 480px; position: relative; }
+  .preview-stage { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 480px; position: relative; overflow: auto; }
+  .preview-stage.zoomed { align-items: flex-start; justify-content: flex-start; padding: 20px; }
   .preview-stage .empty { text-align: center; color: var(--ink-mute); }
   .preview-stage .empty .big { font-family: 'Bodoni Moda', serif; font-style: italic; font-size: 48px; line-height: 1; margin-bottom: 12px; }
   .preview-stage .empty .small { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
-  .preview-canvas-wrap { background: white; box-shadow: 0 1px 0 rgba(12,10,8,0.15), 0 8px 22px -6px rgba(12,10,8,0.35), 0 18px 50px -10px rgba(12,10,8,0.25); max-width: 100%; max-height: 78vh; }
+  .preview-canvas-wrap { background: white; box-shadow: 0 1px 0 rgba(12,10,8,0.15), 0 8px 22px -6px rgba(12,10,8,0.35), 0 18px 50px -10px rgba(12,10,8,0.25); max-width: 100%; max-height: 78vh; flex-shrink: 0; }
   .preview-canvas-wrap canvas { display: block; max-width: 100%; max-height: 78vh; height: auto; width: auto; }
+  .preview-canvas-wrap.zoomed { max-width: none; max-height: none; }
+  .preview-canvas-wrap.zoomed canvas { max-width: none; max-height: none; }
+
+  /* ── ZOOM BAR ── */
+  .zoom-bar { display: flex; align-items: center; border: 1px solid var(--ink); flex-shrink: 0; }
+  .zoom-btn { width: 30px; height: 28px; background: var(--paper); border: none; font-family: 'Bodoni Moda', serif; font-size: 20px; line-height: 1; cursor: pointer; transition: background .15s, color .15s; flex-shrink: 0; }
+  .zoom-btn:first-child { border-right: 1px solid var(--ink); }
+  .zoom-btn:last-child { border-left: 1px solid var(--ink); }
+  .zoom-btn:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .zoom-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .zoom-val { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; width: 52px; text-align: center; cursor: pointer; user-select: none; flex-shrink: 0; }
+  .zoom-val:hover { color: var(--accent); }
 
   /* ── LOADER ── */
   .loader { position: absolute; inset: 0; background: rgba(236,230,216,0.9); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 10; backdrop-filter: blur(2px); }
@@ -374,7 +387,7 @@ The header lede and meta lines also swap when you switch tabs. -->
     <div class="kicker">
       <span>VOL. I — No. 01</span>
       <span>·  ·  ·</span>
-      <span>FRI · 01 MAY MMXXVI</span>
+      <span id="headerDate"></span>
     </div>
     <h1 class="title">PDF<em> atelier</em></h1>
     <div class="title-sub">PDF Tools</div>
@@ -489,12 +502,11 @@ The header lede and meta lines also swap when you switch tabs. -->
 
       <!-- SHARED: Download -->
       <div class="actions">
-        <label class="res-label" for="hiResCheck">
-          <input type="checkbox" id="hiResCheck">
-          <span class="res-box"></span>
-          <span>Preserve original resolution</span>
-          <span class="res-note">300 dpi · slower</span>
-        </label>
+        <div class="toggles" style="margin-bottom:14px">
+          <div class="toggle on" id="resFast">Fast</div>
+          <div class="toggle" id="res300">300 dpi</div>
+          <div class="toggle" id="res600">600 dpi</div>
+        </div>
         <button class="btn-print" id="downloadBtn" disabled>
           <span id="downloadLabel">Print to PDF</span>
           <span class="small" id="downloadSub">— render &amp; download all pages</span>
@@ -507,7 +519,14 @@ The header lede and meta lines also swap when you switch tabs. -->
     <section class="panel panel-right">
       <div class="preview-bar">
         <div class="title">Proof <em>— preview impression</em></div>
-        <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute)" id="proofMeta">awaiting source</div>
+        <div style="display:flex;align-items:center;gap:14px;min-width:0">
+          <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="proofMeta">awaiting source</div>
+          <div class="zoom-bar">
+            <button class="zoom-btn" id="zoomOut" disabled>−</button>
+            <span class="zoom-val" id="zoomVal" title="Click to reset">fit</span>
+            <button class="zoom-btn" id="zoomIn" disabled>+</button>
+          </div>
+        </div>
       </div>
       <div class="preview-stage" id="previewStage">
         <div class="empty" id="emptyState">
@@ -565,7 +584,7 @@ The header lede and meta lines also swap when you switch tabs. -->
     // greyscale
     brightness: 0, contrast: 100, greyInvert: false, sepia: false,
     // output
-    hiRes: false,
+    resolution: 'fast',
     // cache
     pages: [], fileName: '', fileSize: 0,
   };
@@ -611,7 +630,6 @@ The header lede and meta lines also swap when you switch tabs. -->
   const loaderLabel   = $('loaderLabel');
   const loaderPct     = $('loaderPct');
   const loaderBar     = $('loaderBar');
-  const hiResCheck    = $('hiResCheck');
 
   // ── Tool switching ──
   document.querySelectorAll('.tool-tab').forEach(tab => {
@@ -715,6 +733,7 @@ The header lede and meta lines also swap when you switch tabs. -->
       }
       fileStatusEl.textContent = 'ready';
       downloadBtn.disabled = false;
+      $('zoomIn').disabled = false;
       updatePageButtons();
       emptyState.style.display = 'none';
       canvasWrap.style.display = 'block';
@@ -731,7 +750,8 @@ The header lede and meta lines also swap when you switch tabs. -->
 
   // ── Page luminance cache ──
   function getRenderScale(baseVp) {
-    if (state.hiRes) return 300 / 72;
+    if (state.resolution === '600') return 600 / 72;
+    if (state.resolution === '300') return 300 / 72;
     return Math.min(2.5, 1800 / Math.max(baseVp.width, baseVp.height));
   }
 
@@ -872,19 +892,26 @@ The header lede and meta lines also swap when you switch tabs. -->
     if (state.pdfDoc) drawPreview();
   });
 
-  // ── Resolution toggle ──
-  hiResCheck.addEventListener('change', async () => {
-    state.hiRes = hiResCheck.checked;
-    if (!state.pdfDoc) return;
-    state.pages = new Array(state.numPages).fill(null);
-    const label = state.hiRes ? 'Pressing at 300 dpi · pg ' : 'Setting type · pg ';
-    for (let i = 1; i <= state.numPages; i++) {
-      setLoader(true, label + i + ' / ' + state.numPages, ((i - 1) / state.numPages) * 100);
-      await renderPageToLuminance(i);
-    }
-    drawPreview();
-    drawHistogram();
-    setLoader(false);
+  // ── Resolution toggles ──
+  const resButtons = { fast: $('resFast'), '300': $('res300'), '600': $('res600') };
+  const resLabels  = { fast: 'Setting type · pg ', '300': 'Pressing at 300 dpi · pg ', '600': 'Pressing at 600 dpi · pg ' };
+
+  Object.entries(resButtons).forEach(([key, btn]) => {
+    btn.addEventListener('click', async () => {
+      if (state.resolution === key) return;
+      state.resolution = key;
+      Object.values(resButtons).forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      if (!state.pdfDoc) return;
+      state.pages = new Array(state.numPages).fill(null);
+      for (let i = 1; i <= state.numPages; i++) {
+        setLoader(true, resLabels[key] + i + ' / ' + state.numPages, ((i - 1) / state.numPages) * 100);
+        await renderPageToLuminance(i);
+      }
+      drawPreview();
+      drawHistogram();
+      setLoader(false);
+    });
   });
 
   // ── Page nav ──
@@ -933,6 +960,62 @@ The header lede and meta lines also swap when you switch tabs. -->
       downloadBtn.disabled = false;
     }
   });
+
+  // ── Zoom ──
+  const ZOOM_STEPS = [0.5, 0.75, 1, 1.5];
+  let zoomIdx = 2; // index 2 = 1.0 = fit
+
+  function applyZoom() {
+    const z = ZOOM_STEPS[zoomIdx];
+    const zoomOutBtn = $('zoomOut');
+    const zoomInBtn  = $('zoomIn');
+    const zoomValEl  = $('zoomVal');
+    const previewStage = $('previewStage');
+
+    zoomOutBtn.disabled = zoomIdx === 0;
+    zoomInBtn.disabled  = zoomIdx === ZOOM_STEPS.length - 1;
+    zoomValEl.textContent = z === 1 ? 'fit' : Math.round(z * 100) + '%';
+
+    if (z === 1) {
+      canvasWrap.classList.remove('zoomed');
+      previewStage.classList.remove('zoomed');
+      previewCanvas.style.width = '';
+      previewCanvas.style.height = '';
+    } else {
+      const pd = state.pages[state.curPage - 1];
+      if (!pd) return;
+      const stageW = previewStage.clientWidth  - (z > 1 ? 40 : 0);
+      const stageH = previewStage.clientHeight - (z > 1 ? 40 : 0);
+      const fitW = Math.min(stageW, stageH * (pd.w / pd.h));
+      canvasWrap.classList.add('zoomed');
+      previewStage.classList.toggle('zoomed', z > 1);
+      previewCanvas.style.width  = (fitW * z) + 'px';
+      previewCanvas.style.height = 'auto';
+    }
+  }
+
+  $('zoomIn').addEventListener('click', () => {
+    if (zoomIdx < ZOOM_STEPS.length - 1) { zoomIdx++; applyZoom(); }
+  });
+  $('zoomOut').addEventListener('click', () => {
+    if (zoomIdx > 0) { zoomIdx--; applyZoom(); }
+  });
+  $('zoomVal').addEventListener('click', () => {
+    zoomIdx = 2; applyZoom();
+  });
+
+  // reset zoom when page changes or new file loaded
+  const _origDrawPreview = drawPreview;
+  drawPreview = function() { _origDrawPreview(); applyZoom(); };
+
+  // ── Live date in header ──
+  (function() {
+    const now = new Date();
+    const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const d = String(now.getDate()).padStart(2, '0');
+    $('headerDate').textContent = days[now.getDay()] + ' · ' + d + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+  })();
 
   // init display
   threshNum.textContent = '128';
