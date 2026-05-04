@@ -182,7 +182,7 @@ The header lede and meta lines also swap when you switch tabs. -->
   /* ── MAIN GRID ── */
   main {
     display: grid;
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 360px minmax(0, 1fr);
     border-bottom: 3px solid var(--ink);
     min-height: 600px;
   }
@@ -190,8 +190,8 @@ The header lede and meta lines also swap when you switch tabs. -->
     main { grid-template-columns: 1fr; }
     .panel-left { border-right: none !important; border-bottom: 1px solid var(--ink); }
   }
-  .panel { padding: 28px 26px; }
-  .panel-left { border-right: 1px solid var(--ink); background: var(--paper-2); }
+  .panel { padding: 28px 26px; min-width: 0; }
+  .panel-left { border-right: 1px solid var(--ink); background: var(--paper-2); align-self: start; }
 
   .section-label {
     font-family: 'JetBrains Mono', monospace;
@@ -340,12 +340,18 @@ The header lede and meta lines also swap when you switch tabs. -->
       var(--paper);
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    align-self: start;
+    overflow: hidden;
   }
-  .preview-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--ink); padding-bottom: 10px; margin-bottom: 16px; }
-  .preview-bar .title { font-family: 'Bodoni Moda', serif; font-size: 26px; font-weight: 700; }
+  .preview-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-width: 0; border-bottom: 1px solid var(--ink); padding-bottom: 10px; margin-bottom: 16px; }
+  .preview-bar .title { font-family: 'Bodoni Moda', serif; font-size: 26px; font-weight: 700; flex: 1 1 auto; min-width: 0; }
   .preview-bar .title em { font-style: italic; font-weight: 400; color: var(--ink-mute); }
-  .preview-stage { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 480px; position: relative; overflow: auto; }
+  .preview-stage { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 100%; min-width: 0; height: var(--preview-stage-height, 620px); min-height: 480px; position: relative; overflow: auto; overscroll-behavior: contain; }
   .preview-stage.zoomed { align-items: flex-start; justify-content: flex-start; padding: 20px; }
+  .preview-stage.pannable { cursor: grab; touch-action: none; user-select: none; }
+  .preview-stage.panning { cursor: grabbing; }
   .preview-stage .empty { text-align: center; color: var(--ink-mute); }
   .preview-stage .empty .big { font-family: 'Bodoni Moda', serif; font-style: italic; font-size: 48px; line-height: 1; margin-bottom: 12px; }
   .preview-stage .empty .small { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
@@ -361,7 +367,7 @@ The header lede and meta lines also swap when you switch tabs. -->
   .zoom-btn:last-child { border-left: 1px solid var(--ink); }
   .zoom-btn:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
   .zoom-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  .zoom-val { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; width: 52px; text-align: center; cursor: pointer; user-select: none; flex-shrink: 0; }
+  .zoom-val { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; width: 56px; text-align: center; cursor: pointer; user-select: none; flex-shrink: 0; }
   .zoom-val:hover { color: var(--accent); }
 
   /* ── LOADER ── */
@@ -523,7 +529,7 @@ The header lede and meta lines also swap when you switch tabs. -->
           <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="proofMeta">awaiting source</div>
           <div class="zoom-bar">
             <button class="zoom-btn" id="zoomOut" disabled>−</button>
-            <span class="zoom-val" id="zoomVal" title="Click to reset">fit</span>
+            <span class="zoom-val" id="zoomVal" title="Click to fit">fit</span>
             <button class="zoom-btn" id="zoomIn" disabled>+</button>
           </div>
         </div>
@@ -622,10 +628,15 @@ The header lede and meta lines also swap when you switch tabs. -->
   const downloadBtn   = $('downloadBtn');
   const downloadLabel = $('downloadLabel');
   const downloadSub   = $('downloadSub');
+  const leftPanel     = document.querySelector('.panel-left');
   const previewCanvas = $('previewCanvas');
+  const previewStage  = $('previewStage');
   const canvasWrap    = $('canvasWrap');
   const emptyState    = $('emptyState');
   const proofMeta     = $('proofMeta');
+  const zoomOutBtn    = $('zoomOut');
+  const zoomInBtn     = $('zoomIn');
+  const zoomValEl     = $('zoomVal');
   const loader        = $('loader');
   const loaderLabel   = $('loaderLabel');
   const loaderPct     = $('loaderPct');
@@ -648,6 +659,7 @@ The header lede and meta lines also swap when you switch tabs. -->
     $('masterMeta').innerHTML = tool.meta;
     downloadLabel.innerHTML = tool.downloadLabel;
     downloadSub.innerHTML = tool.downloadSub;
+    syncPreviewStageHeight();
     if (state.pdfDoc) { drawPreview(); drawHistogram(); }
   }
 
@@ -733,10 +745,13 @@ The header lede and meta lines also swap when you switch tabs. -->
       }
       fileStatusEl.textContent = 'ready';
       downloadBtn.disabled = false;
-      $('zoomIn').disabled = false;
+      zoomIdx = FIT_ZOOM_INDEX;
+      zoomInBtn.disabled = false;
+      zoomOutBtn.disabled = false;
       updatePageButtons();
       emptyState.style.display = 'none';
       canvasWrap.style.display = 'block';
+      syncPreviewStageHeight();
       drawPreview();
       drawHistogram();
       setLoader(false);
@@ -962,49 +977,152 @@ The header lede and meta lines also swap when you switch tabs. -->
   });
 
   // ── Zoom ──
-  const ZOOM_STEPS = [0.5, 0.75, 1, 1.5];
-  let zoomIdx = 2; // index 2 = 1.0 = fit
+  const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4];
+  const FIT_ZOOM_INDEX = 2;
+  let zoomIdx = FIT_ZOOM_INDEX;
+  let previewHeightRaf = null;
+  let leftPanelResizeObserver = null;
+  const panState = { active: false, pointerId: null, x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
 
-  function applyZoom() {
-    const z = ZOOM_STEPS[zoomIdx];
-    const zoomOutBtn = $('zoomOut');
-    const zoomInBtn  = $('zoomIn');
-    const zoomValEl  = $('zoomVal');
-    const previewStage = $('previewStage');
-
-    zoomOutBtn.disabled = zoomIdx === 0;
-    zoomInBtn.disabled  = zoomIdx === ZOOM_STEPS.length - 1;
-    zoomValEl.textContent = z === 1 ? 'fit' : Math.round(z * 100) + '%';
-
-    if (z === 1) {
-      canvasWrap.classList.remove('zoomed');
-      previewStage.classList.remove('zoomed');
-      previewCanvas.style.width = '';
-      previewCanvas.style.height = '';
-    } else {
-      const pd = state.pages[state.curPage - 1];
-      if (!pd) return;
-      const stageW = previewStage.clientWidth  - (z > 1 ? 40 : 0);
-      const stageH = previewStage.clientHeight - (z > 1 ? 40 : 0);
-      const fitW = Math.min(stageW, stageH * (pd.w / pd.h));
-      canvasWrap.classList.add('zoomed');
-      previewStage.classList.toggle('zoomed', z > 1);
-      previewCanvas.style.width  = (fitW * z) + 'px';
-      previewCanvas.style.height = 'auto';
-    }
+  function syncPreviewStageHeight() {
+    if (!leftPanel) return;
+    if (previewHeightRaf) cancelAnimationFrame(previewHeightRaf);
+    previewHeightRaf = requestAnimationFrame(() => {
+      previewHeightRaf = null;
+      const minHeight = window.matchMedia('(max-width: 900px)').matches ? 480 : 560;
+      const leftHeight = Math.ceil(leftPanel.getBoundingClientRect().height);
+      previewStage.style.setProperty('--preview-stage-height', Math.max(minHeight, leftHeight) + 'px');
+      if (state.pdfDoc) applyZoom();
+    });
   }
 
-  $('zoomIn').addEventListener('click', () => {
+  function getStagePadding() {
+    const cs = getComputedStyle(previewStage);
+    return {
+      x: parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight),
+      y: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom),
+    };
+  }
+
+  function getFitCanvasWidth(pd) {
+    const pad = getStagePadding();
+    const stageW = Math.max(1, previewStage.clientWidth - pad.x);
+    const stageH = Math.max(1, Math.min(previewStage.clientHeight - pad.y, window.innerHeight * 0.78));
+    return Math.max(1, Math.min(stageW, stageH * (pd.w / pd.h), pd.w));
+  }
+
+  function getScrollCenter() {
+    return {
+      x: previewStage.scrollWidth ? (previewStage.scrollLeft + previewStage.clientWidth / 2) / previewStage.scrollWidth : 0.5,
+      y: previewStage.scrollHeight ? (previewStage.scrollTop + previewStage.clientHeight / 2) / previewStage.scrollHeight : 0.5,
+    };
+  }
+
+  function restoreScrollCenter(center) {
+    const maxLeft = Math.max(0, previewStage.scrollWidth - previewStage.clientWidth);
+    const maxTop = Math.max(0, previewStage.scrollHeight - previewStage.clientHeight);
+    previewStage.scrollLeft = Math.max(0, Math.min(maxLeft, previewStage.scrollWidth * center.x - previewStage.clientWidth / 2));
+    previewStage.scrollTop = Math.max(0, Math.min(maxTop, previewStage.scrollHeight * center.y - previewStage.clientHeight / 2));
+  }
+
+  function canPanPreview() {
+    return ZOOM_STEPS[zoomIdx] > 1 &&
+      (previewStage.scrollWidth > previewStage.clientWidth + 1 ||
+       previewStage.scrollHeight > previewStage.clientHeight + 1);
+  }
+
+  function updatePanCursor() {
+    const canPan = state.pdfDoc && canPanPreview();
+    previewStage.classList.toggle('pannable', canPan);
+    if (!canPan) previewStage.classList.remove('panning');
+  }
+
+  function applyZoom(opts = {}) {
+    const preserveCenter = opts.preserveCenter !== false;
+    const pd = state.pages[state.curPage - 1];
+    const z = ZOOM_STEPS[zoomIdx];
+    const center = preserveCenter ? getScrollCenter() : { x: 0.5, y: 0.5 };
+    const isZoomedIn = z > 1;
+
+    zoomOutBtn.disabled = !state.pdfDoc || zoomIdx === 0;
+    zoomInBtn.disabled  = !state.pdfDoc || zoomIdx === ZOOM_STEPS.length - 1;
+    zoomValEl.textContent = z === 1 ? 'fit' : Math.round(z * 100) + '%';
+
+    if (!pd) {
+      canvasWrap.classList.remove('zoomed');
+      previewStage.classList.remove('zoomed', 'pannable', 'panning');
+      previewCanvas.style.width = '';
+      previewCanvas.style.height = '';
+      return;
+    }
+
+    canvasWrap.classList.toggle('zoomed', isZoomedIn);
+    previewStage.classList.toggle('zoomed', isZoomedIn);
+    previewCanvas.style.width = (getFitCanvasWidth(pd) * z) + 'px';
+    previewCanvas.style.height = 'auto';
+
+    requestAnimationFrame(() => {
+      if (isZoomedIn) restoreScrollCenter(center);
+      else { previewStage.scrollLeft = 0; previewStage.scrollTop = 0; }
+      updatePanCursor();
+    });
+  }
+
+  zoomInBtn.addEventListener('click', () => {
     if (zoomIdx < ZOOM_STEPS.length - 1) { zoomIdx++; applyZoom(); }
   });
-  $('zoomOut').addEventListener('click', () => {
+  zoomOutBtn.addEventListener('click', () => {
     if (zoomIdx > 0) { zoomIdx--; applyZoom(); }
   });
-  $('zoomVal').addEventListener('click', () => {
-    zoomIdx = 2; applyZoom();
+  zoomValEl.addEventListener('click', () => {
+    zoomIdx = FIT_ZOOM_INDEX; applyZoom({ preserveCenter: false });
   });
 
-  // reset zoom when page changes or new file loaded
+  previewStage.addEventListener('pointerdown', e => {
+    if (!canPanPreview() || e.button !== 0 || loader.classList.contains('on')) return;
+    panState.active = true;
+    panState.pointerId = e.pointerId;
+    panState.x = e.clientX;
+    panState.y = e.clientY;
+    panState.scrollLeft = previewStage.scrollLeft;
+    panState.scrollTop = previewStage.scrollTop;
+    previewStage.classList.add('panning');
+    previewStage.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  previewStage.addEventListener('pointermove', e => {
+    if (!panState.active || e.pointerId !== panState.pointerId) return;
+    previewStage.scrollLeft = panState.scrollLeft - (e.clientX - panState.x);
+    previewStage.scrollTop = panState.scrollTop - (e.clientY - panState.y);
+    e.preventDefault();
+  });
+
+  function stopPanning(e) {
+    if (!panState.active || e.pointerId !== panState.pointerId) return;
+    panState.active = false;
+    previewStage.classList.remove('panning');
+    if (previewStage.hasPointerCapture(e.pointerId)) previewStage.releasePointerCapture(e.pointerId);
+  }
+
+  previewStage.addEventListener('pointerup', stopPanning);
+  previewStage.addEventListener('pointercancel', stopPanning);
+  previewStage.addEventListener('lostpointercapture', () => {
+    panState.active = false;
+    previewStage.classList.remove('panning');
+  });
+  previewStage.addEventListener('scroll', updatePanCursor);
+  window.addEventListener('resize', syncPreviewStageHeight);
+
+  if ('ResizeObserver' in window && leftPanel) {
+    leftPanelResizeObserver = new ResizeObserver(syncPreviewStageHeight);
+    leftPanelResizeObserver.observe(leftPanel);
+  }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(syncPreviewStageHeight);
+  }
+  syncPreviewStageHeight();
+
   const _origDrawPreview = drawPreview;
   drawPreview = function() { _origDrawPreview(); applyZoom(); };
 
