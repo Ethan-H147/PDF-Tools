@@ -745,7 +745,7 @@ The header lede and meta lines also swap when you switch tabs. -->
       }
       fileStatusEl.textContent = 'ready';
       downloadBtn.disabled = false;
-      zoomIdx = FIT_ZOOM_INDEX;
+      zoomLevel = 1;
       zoomInBtn.disabled = false;
       zoomOutBtn.disabled = false;
       updatePageButtons();
@@ -977,9 +977,13 @@ The header lede and meta lines also swap when you switch tabs. -->
   });
 
   // ── Zoom ──
-  const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4];
-  const FIT_ZOOM_INDEX = 2;
-  let zoomIdx = FIT_ZOOM_INDEX;
+  const ZOOM_MIN = 0.25, ZOOM_MAX = 8, ZOOM_STEP = 1.25;
+  let zoomLevel = 1; // 1 = fit
+
+  function setZoom(z, opts) {
+    zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+    applyZoom(opts);
+  }
   let previewHeightRaf = null;
   let leftPanelResizeObserver = null;
   const panState = { active: false, pointerId: null, x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
@@ -1026,7 +1030,7 @@ The header lede and meta lines also swap when you switch tabs. -->
   }
 
   function canPanPreview() {
-    return ZOOM_STEPS[zoomIdx] > 1 &&
+    return zoomLevel > 1.001 &&
       (previewStage.scrollWidth > previewStage.clientWidth + 1 ||
        previewStage.scrollHeight > previewStage.clientHeight + 1);
   }
@@ -1040,13 +1044,13 @@ The header lede and meta lines also swap when you switch tabs. -->
   function applyZoom(opts = {}) {
     const preserveCenter = opts.preserveCenter !== false;
     const pd = state.pages[state.curPage - 1];
-    const z = ZOOM_STEPS[zoomIdx];
+    const z = zoomLevel;
     const center = preserveCenter ? getScrollCenter() : { x: 0.5, y: 0.5 };
-    const isZoomedIn = z > 1;
+    const isZoomedIn = z > 1.001;
 
-    zoomOutBtn.disabled = !state.pdfDoc || zoomIdx === 0;
-    zoomInBtn.disabled  = !state.pdfDoc || zoomIdx === ZOOM_STEPS.length - 1;
-    zoomValEl.textContent = z === 1 ? 'fit' : Math.round(z * 100) + '%';
+    zoomOutBtn.disabled = !state.pdfDoc || z <= ZOOM_MIN + 0.001;
+    zoomInBtn.disabled  = !state.pdfDoc || z >= ZOOM_MAX - 0.001;
+    zoomValEl.textContent = Math.abs(z - 1) < 0.005 ? 'fit' : Math.round(z * 100) + '%';
 
     if (!pd) {
       canvasWrap.classList.remove('zoomed');
@@ -1068,15 +1072,43 @@ The header lede and meta lines also swap when you switch tabs. -->
     });
   }
 
-  zoomInBtn.addEventListener('click', () => {
-    if (zoomIdx < ZOOM_STEPS.length - 1) { zoomIdx++; applyZoom(); }
-  });
-  zoomOutBtn.addEventListener('click', () => {
-    if (zoomIdx > 0) { zoomIdx--; applyZoom(); }
-  });
+  zoomInBtn.addEventListener('click', () => setZoom(zoomLevel * ZOOM_STEP));
+  zoomOutBtn.addEventListener('click', () => setZoom(zoomLevel / ZOOM_STEP));
+
+  // click the % readout to type any zoom level (Enter commits, Esc cancels, "fit" or 100 = fit)
   zoomValEl.addEventListener('click', () => {
-    zoomIdx = FIT_ZOOM_INDEX; applyZoom({ preserveCenter: false });
+    if (!state.pdfDoc || zoomValEl.querySelector('input')) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = Math.round(zoomLevel * 100);
+    input.style.cssText = 'width:100%;height:100%;border:none;background:transparent;font:inherit;letter-spacing:inherit;color:inherit;text-align:center;outline:none;padding:0';
+    zoomValEl.textContent = '';
+    zoomValEl.appendChild(input);
+    input.focus(); input.select();
+    let done = false;
+    const finish = commit => {
+      if (done) return; done = true;
+      const raw = input.value.trim().toLowerCase().replace('%', '');
+      if (commit && raw === 'fit') setZoom(1, { preserveCenter: false });
+      else if (commit && raw !== '' && !isNaN(+raw) && +raw > 0) setZoom(+raw / 100);
+      else applyZoom(); // restore readout
+    };
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') finish(true);
+      else if (e.key === 'Escape') finish(false);
+    });
+    input.addEventListener('blur', () => finish(true));
   });
+
+  // ctrl/cmd + scroll (or trackpad pinch) = continuous zoom
+  previewStage.addEventListener('wheel', e => {
+    if (!state.pdfDoc || (!e.ctrlKey && !e.metaKey)) return;
+    e.preventDefault();
+    const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 100 : 1);
+    let z = zoomLevel * Math.exp(-dy * 0.0015);
+    if (Math.abs(z - 1) < 0.02) z = 1; // gentle snap back to fit
+    setZoom(z);
+  }, { passive: false });
 
   previewStage.addEventListener('pointerdown', e => {
     if (!canPanPreview() || e.button !== 0 || loader.classList.contains('on')) return;
