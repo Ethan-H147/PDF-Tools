@@ -1974,6 +1974,9 @@ Ethan Hu -->
   const LARGE_PDF_SAFE_MODE_BYTES = 35 * 1024 * 1024;
   const LARGE_PDF_SAFE_MODE_PAGES = 80;
   const SAFE_FULL_PAGE_CACHE_LIMIT = (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4 : 3;
+  const RASTER_PREVIEW_MAX_PIXELS = (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4200000 : 2200000;
+  const RASTER_PREVIEW_KEY = 'preview-raster';
+  const PREVIEW_META_KEY = 'preview-meta';
 
   const TOOLS = {
     preview: {
@@ -2198,8 +2201,8 @@ Ethan Hu -->
     updatePreviewMode();
     updateToolIndicator();
     syncPreviewStageHeight();
-    if (state.pdfDoc && id !== 'organize' && id !== 'edit') { drawPreview(); drawHistogram(); }
-    if (state.pdfDoc && id === 'edit') { syncEditControls(); drawEditedPagePreview(); }
+    if (state.pdfDoc && id !== 'organize' && id !== 'edit') requestPreviewRender(isRasterTool(id));
+    if (state.pdfDoc && id === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
   }
 
   function isRasterTool(id) {
@@ -2304,8 +2307,8 @@ Ethan Hu -->
     return fileSize >= LARGE_PDF_SAFE_MODE_BYTES || pageCount >= LARGE_PDF_SAFE_MODE_PAGES;
   }
 
-  function pageHasFullData(pd) {
-    return !!(pd && pd.lum && pd.histo && pd.renderKey === state.resolution);
+  function pageHasFullData(pd, renderKey = state.resolution) {
+    return !!(pd && pd.lum && pd.histo && pd.renderKey === renderKey);
   }
 
   function resetRenderCaches() {
@@ -2534,7 +2537,7 @@ Ethan Hu -->
     updatePreviewMode();
     if (activeTool === 'edit') {
       syncEditControls();
-      drawEditedPagePreview();
+      requestEditedPreviewRender();
     }
   }
 
@@ -2779,9 +2782,11 @@ Ethan Hu -->
     state.splitPoints = [];
     state.splitNames = [];
     updatePageState();
-    if (state.largePdfSafeMode) {
-      setLoader(true, 'Opening large PDF safely…', 45);
+    const lazyOpen = state.largePdfSafeMode || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit';
+    if (lazyOpen) {
+      setLoader(true, state.largePdfSafeMode ? 'Opening large PDF safely…' : 'Opening PDF…', 45);
       await ensurePageMeta(0);
+      if (activeTool === 'edit') await ensureRasterPreviewData(0);
     } else {
       for (let i = 1; i <= pdf.numPages; i++) {
         setLoader(true, 'Rendering page ' + i + ' of ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
@@ -2826,10 +2831,15 @@ Ethan Hu -->
     return Math.min(2.5, 2200 / Math.max(baseVp.width, baseVp.height));
   }
 
+  function getRasterPreviewScale(baseVp) {
+    const pagePixels = Math.max(1, baseVp.width * baseVp.height);
+    return Math.max(0.35, Math.min(2.4, Math.sqrt(RASTER_PREVIEW_MAX_PIXELS / pagePixels)));
+  }
+
   async function ensurePageMeta(sourceIndex) {
     if (!state.pdfDoc || sourceIndex == null) return null;
     const existing = state.pages[sourceIndex];
-    if (existing && existing.w && existing.h && existing.scale) return existing;
+    if (existing && existing.w && existing.h && existing.scale && existing.metaKey === PREVIEW_META_KEY) return existing;
     const page = await state.pdfDoc.getPage(sourceIndex + 1);
     const baseVp = page.getViewport({ scale: 1 });
     const scale = getPreviewRenderScale(baseVp);
@@ -2843,17 +2853,19 @@ Ethan Hu -->
       histo: existing?.histo || null,
       thumbUrl: existing?.thumbUrl || null,
       renderKey: existing?.renderKey || null,
+      metaKey: PREVIEW_META_KEY,
     };
     state.pages[sourceIndex] = pd;
     return pd;
   }
 
-  async function renderPageToLuminance(pageNum) {
+  async function renderPageToLuminance(pageNum, opts = {}) {
     const sourceIndex = pageNum - 1;
     const existing = state.pages[sourceIndex];
     const page = await state.pdfDoc.getPage(pageNum);
     const baseVp = page.getViewport({ scale: 1 });
-    const scale = getRenderScale(baseVp);
+    const renderKey = opts.renderKey || state.resolution;
+    const scale = opts.scale || getRenderScale(baseVp);
     const vp = page.getViewport({ scale });
     const c = document.createElement('canvas');
     c.width = Math.floor(vp.width);
@@ -2863,7 +2875,7 @@ Ethan Hu -->
     ctx.fillRect(0, 0, c.width, c.height);
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
     const img = ctx.getImageData(0, 0, c.width, c.height);
-    const thumbUrl = makeThumbnailUrl(c);
+    const thumbUrl = opts.skipThumb ? null : makeThumbnailUrl(c);
     const d = img.data;
     const lum = new Uint8ClampedArray(c.width * c.height);
     const histo = new Uint32Array(256);
@@ -2875,24 +2887,35 @@ Ethan Hu -->
       ...(existing || {}),
       lum, w: c.width, h: c.height, histo, scale,
       thumbUrl: existing?.thumbUrl || thumbUrl,
-      renderKey: state.resolution,
+      renderKey,
+      metaKey: renderKey === RASTER_PREVIEW_KEY ? PREVIEW_META_KEY : null,
     };
     touchFullPageCache(sourceIndex);
+    c.width = 0;
+    c.height = 0;
     return state.pages[sourceIndex];
   }
 
-  async function ensurePageData(sourceIndex) {
+  async function ensurePageData(sourceIndex, opts = {}) {
     if (!state.pdfDoc || sourceIndex == null) return null;
+    const renderKey = opts.renderKey || state.resolution;
     const existing = state.pages[sourceIndex];
-    if (pageHasFullData(existing)) {
+    if (pageHasFullData(existing, renderKey)) {
       touchFullPageCache(sourceIndex);
       return existing;
     }
-    const jobKey = state.renderGeneration + ':full:' + sourceIndex + ':' + state.resolution;
+    const jobKey = state.renderGeneration + ':full:' + sourceIndex + ':' + renderKey;
     if (pageRenderJobs.has(jobKey)) return pageRenderJobs.get(jobKey);
-    const job = renderPageToLuminance(sourceIndex + 1).finally(() => pageRenderJobs.delete(jobKey));
+    const job = renderPageToLuminance(sourceIndex + 1, { ...opts, renderKey }).finally(() => pageRenderJobs.delete(jobKey));
     pageRenderJobs.set(jobKey, job);
     return job;
+  }
+
+  async function ensureRasterPreviewData(sourceIndex) {
+    if (!state.pdfDoc || sourceIndex == null) return null;
+    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const scale = getRasterPreviewScale(page.getViewport({ scale: 1 }));
+    return ensurePageData(sourceIndex, { renderKey: RASTER_PREVIEW_KEY, scale, skipThumb: true });
   }
 
   function makeThumbnailUrl(sourceCanvas, maxW = 520, maxH = 720) {
@@ -3094,7 +3117,9 @@ Ethan Hu -->
       proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · page ' + state.curPage + '/' + activePageCount();
       return;
     }
-    const pd = await ensurePageData(sourceIndex);
+    const pd = isRasterTool(activeTool)
+      ? await ensureRasterPreviewData(sourceIndex)
+      : await ensurePageData(sourceIndex);
     if (!pd || token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool === 'organize' || activeTool === 'edit') return;
     if (processTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas);
     else applyGreyscaleToCanvas(pd, previewCanvas);
@@ -3105,7 +3130,7 @@ Ethan Hu -->
   async function drawHistogram() {
     if (!isRasterTool(activeTool)) return;
     const sourceIndex = currentSourceIndex();
-    const pd = await ensurePageData(sourceIndex);
+    const pd = await ensureRasterPreviewData(sourceIndex);
     if (!pd || sourceIndex !== currentSourceIndex() || !isRasterTool(activeTool)) return;
     const cw = histoCanvas.clientWidth || 300;
     const ch = histoCanvas.clientHeight || 56;
@@ -3123,6 +3148,28 @@ Ethan Hu -->
       const h = Math.min(ch, (pd.histo[i] / max) * (ch - 2));
       ctx.fillRect(i * barW, ch - h, Math.max(barW, 1), h);
     }
+  }
+
+  let previewRenderFrame = null;
+  let previewNeedsHistogram = false;
+  function requestPreviewRender(withHistogram = false) {
+    previewNeedsHistogram = previewNeedsHistogram || withHistogram;
+    if (previewRenderFrame) return;
+    previewRenderFrame = requestAnimationFrame(() => {
+      previewRenderFrame = null;
+      drawPreview();
+      if (previewNeedsHistogram) drawHistogram();
+      previewNeedsHistogram = false;
+    });
+  }
+
+  let editPreviewFrame = null;
+  function requestEditedPreviewRender() {
+    if (editPreviewFrame) return;
+    editPreviewFrame = requestAnimationFrame(() => {
+      editPreviewFrame = null;
+      drawEditedPagePreview();
+    });
   }
 
   function drawThumbnail(canvas, pd) {
@@ -3198,7 +3245,7 @@ Ethan Hu -->
         state.curPage = outputIndex + 1;
         updatePageState();
         syncEditControls();
-        drawEditedPagePreview();
+        requestEditedPreviewRender();
       });
       pageEditorStrip.appendChild(card);
     }
@@ -3254,8 +3301,7 @@ Ethan Hu -->
     edit.crop[side] = Math.max(0, Math.min(45, Math.round(+value || 0)));
     clampCropPair(edit, side === 'left' || side === 'right' ? 'x' : 'y', side);
     syncEditControls();
-    renderPageEditor();
-    drawEditedPagePreview();
+    requestEditedPreviewRender();
   }
 
   function renderEditedLuminanceToCanvas(pd, edit, canvas) {
@@ -3306,7 +3352,7 @@ Ethan Hu -->
   async function drawEditedPagePreview() {
     const sourceIndex = currentSourceIndex();
     const token = ++editedPreviewRenderToken;
-    const pd = await ensurePageData(sourceIndex);
+    const pd = await ensureRasterPreviewData(sourceIndex);
     if (!pd || token !== editedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'edit') return;
     renderEditedLuminanceToCanvas(pd, currentPageEdit(), pageEditorCanvas);
     pageEditorCanvasWrap.style.display = 'block';
@@ -3741,7 +3787,7 @@ Ethan Hu -->
     state.curPage = state.pageOrder.indexOf(sourceIndex) + 1;
     updatePageState();
     animateOrganizerFrom(firstRects);
-    if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+    if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
   }
 
   function cancelOrganizerDrag() {
@@ -3761,7 +3807,7 @@ Ethan Hu -->
     applyOrganizerFlow(nextFlow);
     if (state.curPage > activePageCount()) state.curPage = Math.max(1, activePageCount());
     updatePageState();
-    if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+    if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
   }
 
   async function exportPageOrderAsPdf(pageOrder, fileBase) {
@@ -3878,12 +3924,12 @@ Ethan Hu -->
     threshPct.textContent = Math.round((v / 255) * 100) + '%';
     threshHint.textContent = threshHintText(v);
     threshNeedle.style.left = ((v / 255) * 100) + '%';
-    if (state.pdfDoc) drawPreview();
+    if (state.pdfDoc) requestPreviewRender(false);
   });
   invertToggle.addEventListener('click', () => {
     state.invert = !state.invert;
     invertToggle.classList.toggle('on', state.invert);
-    if (state.pdfDoc) drawPreview();
+    if (state.pdfDoc) requestPreviewRender(false);
   });
 
   // ── Greyscale controls ──
@@ -3893,7 +3939,7 @@ Ethan Hu -->
     brightNum.textContent = v > 0 ? '+' + v : String(v);
     brightTag.textContent = v < -50 ? 'dark' : v < -10 ? 'reduced' : v <= 10 ? 'neutral' : v <= 50 ? 'bright' : 'maximum';
     $('greyHint').textContent = greyHintText();
-    if (state.pdfDoc) drawPreview();
+    if (state.pdfDoc) requestPreviewRender(false);
   });
   contrastSlider.addEventListener('input', e => {
     const v = +e.target.value;
@@ -3901,19 +3947,19 @@ Ethan Hu -->
     contrastNum.textContent = v;
     contrastTag.textContent = contrastHintText(v);
     $('greyHint').textContent = greyHintText();
-    if (state.pdfDoc) drawPreview();
+    if (state.pdfDoc) requestPreviewRender(false);
   });
   greyInvertToggle.addEventListener('click', () => {
     state.greyInvert = !state.greyInvert;
     greyInvertToggle.classList.toggle('on', state.greyInvert);
     $('greyHint').textContent = greyHintText();
-    if (state.pdfDoc) drawPreview();
+    if (state.pdfDoc) requestPreviewRender(false);
   });
   sepiaToggle.addEventListener('click', () => {
     state.sepia = !state.sepia;
     sepiaToggle.classList.toggle('on', state.sepia);
     $('greyHint').textContent = greyHintText();
-    if (state.pdfDoc) drawPreview();
+    if (state.pdfDoc) requestPreviewRender(false);
   });
 
   function setFineRotation(value) {
@@ -3921,8 +3967,7 @@ Ethan Hu -->
     const edit = currentPageEdit();
     edit.fineRotation = Math.round((+value || 0) * 10) / 10;
     syncEditControls();
-    renderPageEditor();
-    drawEditedPagePreview();
+    requestEditedPreviewRender();
   }
 
   function rotateSelectedPage90(delta) {
@@ -3989,8 +4034,8 @@ Ethan Hu -->
     state.pageOrder = Array.from({ length: state.numPages }, (_, i) => i);
     state.curPage = 1;
     updatePageState();
-    if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
-    else if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+    if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
+    else if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
   });
 
   // ── Resolution toggles ──
@@ -4007,7 +4052,9 @@ Ethan Hu -->
       if (state.largePdfSafeMode) {
         forgetFullPageData();
         setLoader(true, 'Resolution set · rendering current page…', 35);
-        if (activeTool === 'edit' || isRasterTool(activeTool)) {
+        if (isRasterTool(activeTool)) {
+          await ensureRasterPreviewData(currentSourceIndex());
+        } else if (activeTool === 'edit') {
           await ensurePageData(currentSourceIndex());
         }
       } else {
@@ -4018,8 +4065,8 @@ Ethan Hu -->
         }
       }
       updatePageState();
-      if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
-      else if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+      if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
+      else if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
       setLoader(false);
     });
   });
@@ -4032,16 +4079,16 @@ Ethan Hu -->
     if (state.curPage > 1) {
       state.curPage--;
       updatePageButtons();
-      if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
-      else { drawPreview(); drawHistogram(); }
+      if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
+      else requestPreviewRender(isRasterTool(activeTool));
     }
   });
   nextBtn.addEventListener('click', () => {
     if (state.curPage < activePageCount()) {
       state.curPage++;
       updatePageButtons();
-      if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
-      else { drawPreview(); drawHistogram(); }
+      if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
+      else requestPreviewRender(isRasterTool(activeTool));
     }
   });
 
@@ -4351,13 +4398,6 @@ Ethan Hu -->
   syncEditControls();
   updatePreviewMode();
   updateToolIndicator();
-
-  const _origDrawPreview = drawPreview;
-  drawPreview = function() {
-    const result = _origDrawPreview();
-    if (result && typeof result.then === 'function') result.then(() => applyZoom());
-    else applyZoom();
-  };
 
   // init display
   threshNum.textContent = '128';
