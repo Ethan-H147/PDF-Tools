@@ -109,9 +109,9 @@ The header lede and meta lines also swap when you switch tabs. -->
 
   .subhead {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 36px;
-    align-items: end;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 18px;
+    align-items: center;
     border-top: 1px solid var(--ink);
     padding-top: 14px;
     margin-top: 8px;
@@ -122,8 +122,12 @@ The header lede and meta lines also swap when you switch tabs. -->
     font-size: 19px;
     line-height: 1.4;
     color: var(--ink-soft);
-    max-width: 50ch;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     transition: opacity .2s;
+    white-space: nowrap;
   }
   .subhead .meta {
     font-family: 'JetBrains Mono', monospace;
@@ -349,8 +353,8 @@ The header lede and meta lines also swap when you switch tabs. -->
   .preview-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-width: 0; border-bottom: 1px solid var(--ink); padding-bottom: 10px; margin-bottom: 16px; }
   .preview-bar .title { font-family: 'Bodoni Moda', serif; font-size: 26px; font-weight: 700; flex: 1 1 auto; min-width: 0; }
   .preview-bar .title em { font-style: italic; font-weight: 400; color: var(--ink-mute); }
-  .preview-stage { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 100%; min-width: 0; height: var(--preview-stage-height, 620px); min-height: 480px; position: relative; overflow: auto; overscroll-behavior: contain; }
-  .preview-stage.zoomed { align-items: flex-start; justify-content: flex-start; padding: 20px; }
+  .preview-stage { background: #fff; box-sizing: border-box; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 100%; min-width: 0; height: var(--preview-stage-height, clamp(620px, 82vh, 1100px)); min-height: 520px; padding: 20px 24px; position: relative; overflow: auto; overscroll-behavior: auto; }
+  .preview-stage.zoomed { align-items: flex-start; justify-content: center; padding: 20px 24px; }
   .preview-stage.pannable { cursor: grab; touch-action: none; user-select: none; }
   .preview-stage.panning { cursor: grabbing; }
   .preview-stage .empty { text-align: center; color: var(--ink-mute); }
@@ -509,6 +513,59 @@ The header lede and meta lines also swap when you switch tabs. -->
     color: var(--ink-soft);
   }
 
+  .subhead .meta {
+    align-items: center;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    color: var(--accent);
+    cursor: help;
+    display: inline-flex;
+    font-size: 0;
+    font-weight: 700;
+    height: 26px;
+    justify-content: center;
+    line-height: 1;
+    position: relative;
+    text-align: center;
+    text-transform: none;
+    width: 26px;
+    z-index: 5;
+  }
+
+  .subhead .meta::before {
+    content: "i";
+    font-size: 14px;
+  }
+
+  .subhead .meta::after {
+    background: rgba(29, 29, 31, .94);
+    border-radius: 12px;
+    bottom: calc(100% + 10px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+    color: #fff;
+    content: attr(data-tooltip);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.45;
+    opacity: 0;
+    padding: 10px 12px;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    text-align: left;
+    transform: translateY(4px);
+    transition: opacity .16s, transform .16s;
+    white-space: pre-line;
+    width: max-content;
+    max-width: min(340px, 80vw);
+  }
+
+  .subhead .meta:hover::after,
+  .subhead .meta:focus::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   .tool-nav {
     margin: 18px 0 0;
     border: 1px solid var(--line);
@@ -562,10 +619,12 @@ The header lede and meta lines also swap when you switch tabs. -->
   .panel-left {
     border-right-color: var(--line);
     background: rgba(250, 250, 252, 0.92);
+    align-self: stretch;
   }
 
   .panel-right {
-    background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+    background: #fff;
+    align-self: stretch;
   }
 
   .section-label {
@@ -765,7 +824,7 @@ The header lede and meta lines also swap when you switch tabs. -->
 
   .preview-canvas-wrap {
     border-radius: var(--radius-sm);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 24px 60px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 18px 46px rgba(0, 0, 0, 0.13), 0 0 38px rgba(0, 0, 0, 0.06);
     max-height: none;
     overflow: hidden;
   }
@@ -1007,13 +1066,9 @@ The header lede and meta lines also swap when you switch tabs. -->
     <div class="title-sub">PDF Tools</div>
     <div class="subhead">
       <div class="lede" id="masterLede">
-        Convert any PDF to black and white with adjustable threshold control.
+        Convert PDFs to black and white with threshold control.
       </div>
-      <div class="meta" id="masterMeta">
-        Two values · zero shades<br/>
-        Client-side only · no upload<br/>
-        Threshold · 0 → 255
-      </div>
+      <div class="meta" id="masterMeta" tabindex="0" aria-label="Tool details" data-tooltip="Black and white output&#10;Client-side only · no upload&#10;Threshold · 0 → 255"></div>
     </div>
   </header>
 
@@ -1191,21 +1246,21 @@ The header lede and meta lines also swap when you switch tabs. -->
   // ── Tool registry: add a new entry here to add a new tool ──
   const TOOLS = {
     threshold: {
-      lede: 'Convert any PDF to black and white with adjustable threshold control.',
+      lede: 'Convert PDFs to black and white with threshold control.',
       meta: 'Black and white output<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
       downloadLabel: 'Export PDF',
       downloadSub: 'render and download all pages',
       suffix: '_bw',
     },
     greyscale: {
-      lede: 'Convert any PDF to grayscale with brightness and contrast controls.',
+      lede: 'Convert PDFs to grayscale with brightness and contrast.',
       meta: 'Grayscale output<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
       downloadLabel: 'Export Grayscale PDF',
       downloadSub: 'render and download all pages',
       suffix: '_grey',
     },
     organize: {
-      lede: 'Reorder pages or remove pages before exporting the PDF.',
+      lede: 'Reorder or remove pages before export.',
       meta: 'Drag pages to reorder<br/>Click × to remove a page<br/>Original PDF pages are preserved',
       downloadLabel: 'Export Organized PDF',
       downloadSub: 'preserve original page content',
@@ -1299,6 +1354,12 @@ The header lede and meta lines also swap when you switch tabs. -->
     toolIndicator.style.transform = 'translateX(' + (tabRect.left - navRect.left + activeTab.parentElement.scrollLeft) + 'px)';
   }
 
+  function toolTipText(meta) {
+    const div = document.createElement('div');
+    div.innerHTML = meta.replace(/<br\s*\/?>/gi, '\n');
+    return div.textContent.trim();
+  }
+
   function switchTool(id) {
     if (id === activeTool) return;
     activeTool = id;
@@ -1309,7 +1370,8 @@ The header lede and meta lines also swap when you switch tabs. -->
       p.classList.toggle('active', p.id === 'tool-' + id));
     const tool = TOOLS[id];
     $('masterLede').innerHTML = tool.lede;
-    $('masterMeta').innerHTML = tool.meta;
+    $('masterMeta').dataset.tooltip = toolTipText(tool.meta);
+    $('masterMeta').setAttribute('aria-label', toolTipText(tool.meta));
     downloadLabel.innerHTML = tool.downloadLabel;
     downloadSub.innerHTML = tool.downloadSub;
     resolutionOptions.classList.toggle('hidden', id === 'organize');
@@ -1931,17 +1993,16 @@ The header lede and meta lines also swap when you switch tabs. -->
     applyZoom(opts);
   }
   let previewHeightRaf = null;
-  let leftPanelResizeObserver = null;
   const panState = { active: false, pointerId: null, x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
 
   function syncPreviewStageHeight() {
-    if (!leftPanel) return;
     if (previewHeightRaf) cancelAnimationFrame(previewHeightRaf);
     previewHeightRaf = requestAnimationFrame(() => {
       previewHeightRaf = null;
-      const minHeight = window.matchMedia('(max-width: 900px)').matches ? 480 : 560;
-      const leftHeight = Math.ceil(leftPanel.getBoundingClientRect().height);
-      previewStage.style.setProperty('--preview-stage-height', Math.max(minHeight, leftHeight) + 'px');
+      const minHeight = window.matchMedia('(max-width: 900px)').matches ? 520 : 620;
+      const maxHeight = window.matchMedia('(max-width: 900px)').matches ? 820 : 1100;
+      const targetHeight = Math.max(minHeight, Math.min(maxHeight, window.innerHeight * 0.82));
+      previewStage.style.setProperty('--preview-stage-height', Math.round(targetHeight) + 'px');
       if (state.pdfDoc) applyZoom();
     });
   }
@@ -1958,7 +2019,9 @@ The header lede and meta lines also swap when you switch tabs. -->
     const pad = getStagePadding();
     const stageW = Math.max(1, previewStage.clientWidth - pad.x);
     const stageH = Math.max(1, previewStage.clientHeight - pad.y);
-    return Math.max(1, Math.min(stageW, stageH * (pd.w / pd.h), pd.w));
+    const heightFit = stageH * (pd.w / pd.h);
+    const readableWidth = stageW * 0.82;
+    return Math.max(1, Math.min(stageW, Math.max(heightFit, readableWidth), pd.w));
   }
 
   function getScrollCenter() {
@@ -2104,10 +2167,6 @@ The header lede and meta lines also swap when you switch tabs. -->
   });
   document.querySelector('.tool-nav').addEventListener('scroll', updateToolIndicator);
 
-  if ('ResizeObserver' in window && leftPanel) {
-    leftPanelResizeObserver = new ResizeObserver(syncPreviewStageHeight);
-    leftPanelResizeObserver.observe(leftPanel);
-  }
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(syncPreviewStageHeight);
   }
