@@ -934,6 +934,109 @@ The header lede and meta lines also swap when you switch tabs. -->
     padding: 13px 14px;
   }
 
+  .split-panel {
+    background: #fff;
+    border: 1px solid rgba(0, 113, 227, 0.18);
+    border-radius: var(--radius-md);
+    box-shadow: 0 18px 38px rgba(0, 113, 227, 0.10);
+    margin: 0 0 12px;
+    overflow: hidden;
+    padding: 14px;
+  }
+
+  .split-panel[hidden] {
+    display: none;
+  }
+
+  .split-panel-head {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .split-panel-head span {
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 750;
+  }
+
+  .split-panel-head button {
+    background: var(--accent-soft);
+    border: 0;
+    border-radius: 999px;
+    color: var(--accent);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+  }
+
+  .split-summary {
+    color: var(--ink-mute);
+    font-size: 13px;
+    line-height: 1.45;
+    margin-bottom: 12px;
+  }
+
+  .split-parts-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .split-part-row {
+    background: #f8fbff;
+    border: 1px solid rgba(0, 113, 227, 0.12);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+  }
+
+  .split-part-top {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .split-part-label {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 750;
+  }
+
+  .split-part-pages {
+    color: var(--ink-mute);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .split-name-input {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 650;
+    margin-bottom: 8px;
+    outline: none;
+    padding: 10px 11px;
+    transition: border-color .16s, box-shadow .16s;
+    width: 100%;
+  }
+
+  .split-name-input:focus {
+    border-color: rgba(0, 113, 227, 0.45);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
+  .split-export-btn {
+    padding: 9px 12px;
+  }
+
   .resolution-options.hidden {
     display: none;
   }
@@ -960,6 +1063,9 @@ The header lede and meta lines also swap when you switch tabs. -->
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
     gap: 24px;
     align-items: start;
+    position: relative;
+    touch-action: none;
+    user-select: none;
     width: 100%;
   }
 
@@ -984,21 +1090,98 @@ The header lede and meta lines also swap when you switch tabs. -->
     cursor: grab;
     overflow: hidden;
     transform: translateZ(0);
-    transition: opacity .16s, transform .16s, box-shadow .16s;
+    transition: box-shadow .16s, opacity .16s, transform .18s cubic-bezier(.2, .8, .2, 1);
+    will-change: transform;
   }
 
-  .page-card:hover {
+  .page-card:hover:not(.page-placeholder) {
     box-shadow: 0 18px 44px rgba(0, 0, 0, 0.14);
     transform: translateY(-2px);
   }
 
-  .page-card.dragging {
-    opacity: .45;
+  .page-card:active {
+    cursor: grabbing;
   }
 
-  .page-card.drop-target {
-    outline: 3px solid rgba(100, 210, 255, 0.72);
-    outline-offset: 5px;
+  .page-card.page-placeholder {
+    align-items: stretch;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    cursor: default;
+    display: flex;
+    justify-content: center;
+    min-height: 260px;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .page-insert-marker {
+    align-self: stretch;
+    background: var(--accent);
+    border-radius: 999px;
+    box-shadow: 0 0 0 5px var(--accent-soft), 0 12px 24px rgba(0, 113, 227, .22);
+    margin: 8px 0;
+    width: 5px;
+  }
+
+  .page-split-divider {
+    align-items: center;
+    color: var(--ink-mute);
+    display: flex;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 14px;
+    grid-column: 1 / -1;
+    margin: 4px 0 2px;
+    min-height: 34px;
+    pointer-events: auto;
+  }
+
+  .page-split-divider::before,
+  .page-split-divider::after {
+    background: linear-gradient(90deg, rgba(0, 113, 227, 0), rgba(0, 113, 227, 0.55));
+    border-radius: 999px;
+    content: "";
+    flex: 1;
+    height: 2px;
+  }
+
+  .page-split-divider::after {
+    background: linear-gradient(90deg, rgba(0, 113, 227, 0.55), rgba(0, 113, 227, 0));
+  }
+
+  .page-split-label {
+    align-items: center;
+    background: var(--accent-soft);
+    border: 1px solid rgba(0, 113, 227, 0.16);
+    border-radius: 999px;
+    color: var(--accent);
+    display: inline-flex;
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  .page-split-remove {
+    align-items: center;
+    background: rgba(0, 113, 227, 0.12);
+    border: 0;
+    border-radius: 50%;
+    color: var(--accent);
+    cursor: pointer;
+    display: inline-flex;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 800;
+    height: 18px;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+    width: 18px;
+  }
+
+  .page-split-remove:hover {
+    background: rgba(0, 113, 227, 0.2);
   }
 
   .page-thumb {
@@ -1044,6 +1227,66 @@ The header lede and meta lines also swap when you switch tabs. -->
   .page-delete:hover {
     background: #e8f7ff;
     border-color: rgba(41, 151, 189, 0.72);
+  }
+
+  .page-drag-clone {
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+    cursor: grabbing;
+    left: 0;
+    opacity: .98;
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    transform: translate3d(0, 0, 0) scale(1.02);
+    transform-origin: top left;
+    z-index: 9999;
+  }
+
+  .page-drag-clone .page-delete {
+    pointer-events: none;
+  }
+
+  .page-context-menu {
+    background: rgba(255, 255, 255, .92);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .16);
+    min-width: 190px;
+    padding: 6px;
+    position: fixed;
+    z-index: 10000;
+    backdrop-filter: blur(20px) saturate(1.25);
+  }
+
+  .page-context-menu[hidden] {
+    display: none;
+  }
+
+  .page-context-menu button {
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    color: var(--ink);
+    cursor: pointer;
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 650;
+    padding: 10px 11px;
+    text-align: left;
+    width: 100%;
+  }
+
+  .page-context-menu button:hover:not(:disabled) {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .page-context-menu button:disabled {
+    color: var(--ink-mute);
+    cursor: not-allowed;
+    opacity: .55;
   }
 
   @media (max-width: 700px) {
@@ -1170,6 +1413,14 @@ The header lede and meta lines also swap when you switch tabs. -->
         <div style="margin-top:26px">
           <div class="section-label"><span>II. Organize Pages</span><span id="organizeHint">ready</span></div>
           <div class="organize-summary" id="organizeSummary">Upload a PDF to reorder or remove pages.</div>
+          <div class="split-panel" id="splitPanel" hidden>
+            <div class="split-panel-head">
+              <span>Split Export</span>
+              <button type="button" id="clearSplitBtn">Clear</button>
+            </div>
+            <div class="split-summary" id="splitSummary">Choose a split point.</div>
+            <div class="split-parts-list" id="splitPartsList"></div>
+          </div>
           <button class="btn-secondary" id="resetPagesBtn" disabled>Restore original order</button>
         </div>
       </div>
@@ -1239,6 +1490,10 @@ The header lede and meta lines also swap when you switch tabs. -->
 
 </div>
 
+<div class="page-context-menu" id="pageContextMenu" role="menu" hidden>
+  <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
+</div>
+
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1280,7 +1535,7 @@ The header lede and meta lines also swap when you switch tabs. -->
     // output
     resolution: 'fast',
     // cache
-    pages: [], pageOrder: [], fileName: '', fileSize: 0, pdfBytes: null,
+    pages: [], pageOrder: [], splitPoints: [], splitNames: [], fileName: '', fileSize: 0, pdfBytes: null,
   };
 
   const $ = id => document.getElementById(id);
@@ -1320,6 +1575,10 @@ The header lede and meta lines also swap when you switch tabs. -->
   const resetPagesBtn = $('resetPagesBtn');
   const organizeHint  = $('organizeHint');
   const organizeSummary = $('organizeSummary');
+  const splitPanel    = $('splitPanel');
+  const splitSummary  = $('splitSummary');
+  const clearSplitBtn = $('clearSplitBtn');
+  const splitPartsList = $('splitPartsList');
   const leftPanel     = document.querySelector('.panel-left');
   const previewCanvas = $('previewCanvas');
   const previewStage  = $('previewStage');
@@ -1339,6 +1598,13 @@ The header lede and meta lines also swap when you switch tabs. -->
   const loaderLabel   = $('loaderLabel');
   const loaderPct     = $('loaderPct');
   const loaderBar     = $('loaderBar');
+  const pageContextMenu = $('pageContextMenu');
+  const contextSplitBtn = $('contextSplitBtn');
+
+  const contextMenuState = {
+    outputIndex: null,
+    sourceIndex: null,
+  };
 
   // ── Tool switching ──
   document.querySelectorAll('.tool-tab').forEach(tab => {
@@ -1428,6 +1694,14 @@ The header lede and meta lines also swap when you switch tabs. -->
     return clean || 'document';
   }
 
+  function cleanDownloadBase(name, fallback) {
+    const clean = String(name || '')
+      .replace(/\.pdf$/i, '')
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .trim();
+    return clean || fallback;
+  }
+
   function activePageCount() {
     return state.pageOrder.length;
   }
@@ -1445,6 +1719,104 @@ The header lede and meta lines also swap when you switch tabs. -->
     return sourceIndex == null ? null : state.pages[sourceIndex];
   }
 
+  function defaultSplitName(index) {
+    return outputBaseName() + '_part_' + (index + 1);
+  }
+
+  function normalizeSplitState() {
+    const count = activePageCount();
+    if (!state.pdfDoc || count < 2) {
+      state.splitPoints = [];
+      state.splitNames = [];
+      return;
+    }
+    const max = count - 1;
+    const unique = new Set();
+    state.splitPoints = state.splitPoints
+      .map(Number)
+      .filter(point => Number.isInteger(point) && point >= 1 && point <= max && !unique.has(point) && unique.add(point))
+      .sort((a, b) => a - b);
+    const partCount = state.splitPoints.length + 1;
+    while (state.splitNames.length < partCount) {
+      state.splitNames.push(defaultSplitName(state.splitNames.length));
+    }
+    if (state.splitNames.length > partCount) state.splitNames.length = partCount;
+    if (!state.splitPoints.length) state.splitNames = [];
+  }
+
+  function hasActiveSplit() {
+    normalizeSplitState();
+    return state.splitPoints.length > 0;
+  }
+
+  function splitParts() {
+    if (!hasActiveSplit()) return [];
+    const boundaries = [0, ...state.splitPoints, activePageCount()];
+    return boundaries.slice(0, -1).map((start, index) => {
+      const end = boundaries[index + 1];
+      return {
+        index,
+        start,
+        end,
+        name: state.splitNames[index] || defaultSplitName(index),
+        pageOrder: state.pageOrder.slice(start, end),
+      };
+    });
+  }
+
+  function pageRangeText(start, end) {
+    return start + 1 === end ? 'Page ' + (start + 1) : 'Pages ' + (start + 1) + '-' + end;
+  }
+
+  function updateSplitPanel() {
+    const parts = splitParts();
+    const splitActive = parts.length > 0;
+    splitPanel.hidden = !splitActive;
+    clearSplitBtn.disabled = !splitActive;
+    splitPartsList.innerHTML = '';
+    if (!splitActive) {
+      splitSummary.textContent = 'Right-click a page in Organize to create a split.';
+      return;
+    }
+    splitSummary.textContent = parts.length + ' PDFs from ' + state.splitPoints.length + ' split point' +
+      (state.splitPoints.length === 1 ? '.' : 's.');
+    parts.forEach(part => {
+      const row = document.createElement('div');
+      row.className = 'split-part-row';
+
+      const top = document.createElement('div');
+      top.className = 'split-part-top';
+      const label = document.createElement('div');
+      label.className = 'split-part-label';
+      label.textContent = 'Part ' + (part.index + 1);
+      const pages = document.createElement('div');
+      pages.className = 'split-part-pages';
+      pages.textContent = pageRangeText(part.start, part.end);
+      top.appendChild(label);
+      top.appendChild(pages);
+
+      const input = document.createElement('input');
+      input.className = 'split-name-input';
+      input.type = 'text';
+      input.value = part.name;
+      input.setAttribute('aria-label', 'Name for part ' + (part.index + 1));
+      input.addEventListener('input', () => {
+        state.splitNames[part.index] = input.value;
+      });
+
+      const button = document.createElement('button');
+      button.className = 'btn-secondary split-export-btn';
+      button.type = 'button';
+      button.textContent = 'Export part ' + (part.index + 1);
+      button.addEventListener('click', () => exportSplitPart(part.index));
+
+      row.appendChild(top);
+      row.appendChild(input);
+      row.appendChild(button);
+      splitPartsList.appendChild(row);
+    });
+  }
+
   function isOrderChanged() {
     if (!state.pdfDoc || state.pageOrder.length !== state.numPages) return !!state.pdfDoc;
     return state.pageOrder.some((sourceIndex, outputIndex) => sourceIndex !== outputIndex);
@@ -1452,6 +1824,7 @@ The header lede and meta lines also swap when you switch tabs. -->
 
   function updatePageState() {
     const count = activePageCount();
+    normalizeSplitState();
     if (count === 0) state.curPage = 1;
     else state.curPage = Math.max(1, Math.min(state.curPage, count));
     pageCountEl.textContent = state.pdfDoc ? count : '—';
@@ -1461,10 +1834,15 @@ The header lede and meta lines also swap when you switch tabs. -->
     nextBtn.disabled = !state.pdfDoc || state.curPage >= count;
     downloadBtn.disabled = !state.pdfDoc || count === 0;
     resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
-    organizeHint.textContent = state.pdfDoc ? count + ' pages' : 'ready';
+    organizeHint.textContent = state.pdfDoc
+      ? (state.splitPoints.length ? state.splitPoints.length + ' splits' : count + ' pages')
+      : 'ready';
     organizeSummary.textContent = state.pdfDoc
-      ? count + ' of ' + state.numPages + ' original pages will be included in export.'
+      ? (state.splitPoints.length
+        ? (state.splitPoints.length + 1) + ' PDFs are ready. Edit names and export each part from the split panel.'
+        : count + ' of ' + state.numPages + ' original pages will be included in export. Right-click a page to split.')
       : 'Upload a PDF to reorder or remove pages.';
+    updateSplitPanel();
     proofMeta.textContent = state.pdfDoc
       ? (count ? count + ' pages in output' : 'no pages selected')
       : 'awaiting PDF';
@@ -1571,6 +1949,8 @@ The header lede and meta lines also swap when you switch tabs. -->
       state.curPage = 1;
       state.pages = new Array(pdf.numPages).fill(null);
       state.pageOrder = Array.from({ length: pdf.numPages }, (_, i) => i);
+      state.splitPoints = [];
+      state.splitNames = [];
       updatePageState();
       for (let i = 1; i <= pdf.numPages; i++) {
         setLoader(true, 'Rendering page ' + i + ' of ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
@@ -1744,7 +2124,105 @@ The header lede and meta lines also swap when you switch tabs. -->
     ctx.putImageData(img, 0, 0);
   }
 
-  let draggedPageIndex = null;
+  const organizerDrag = {
+    active: false,
+    sourceOutputIndex: null,
+    sourcePageIndex: null,
+    sourceFlowIndex: null,
+    insertIndex: null,
+    clone: null,
+    offsetX: 0,
+    offsetY: 0,
+  };
+
+  function buildOrganizerFlow() {
+    normalizeSplitState();
+    const flow = [];
+    let splitCursor = 0;
+    for (let pageIndex = 0; pageIndex <= state.pageOrder.length; pageIndex++) {
+      while (splitCursor < state.splitPoints.length && state.splitPoints[splitCursor] === pageIndex) {
+        flow.push({ type: 'split', splitIndex: splitCursor });
+        splitCursor += 1;
+      }
+      if (pageIndex < state.pageOrder.length) {
+        flow.push({ type: 'page', sourceIndex: state.pageOrder[pageIndex] });
+      }
+    }
+    return flow;
+  }
+
+  function applyOrganizerFlow(flow) {
+    const nextOrder = [];
+    const nextSplitPoints = [];
+    flow.forEach(item => {
+      if (item.type === 'page') {
+        nextOrder.push(item.sourceIndex);
+      } else if (item.type === 'split') {
+        nextSplitPoints.push(nextOrder.length);
+      }
+    });
+    state.pageOrder = nextOrder;
+    state.splitPoints = nextSplitPoints;
+    normalizeSplitState();
+  }
+
+  function captureOrganizerRects() {
+    const rects = new Map();
+    if (!organizerGrid) return rects;
+    organizerGrid.querySelectorAll('.page-card[data-source-index], .page-placeholder, .page-split-divider').forEach(el => {
+      const key = el.classList.contains('page-placeholder')
+        ? '__placeholder__'
+        : el.classList.contains('page-split-divider')
+          ? '__split_' + el.dataset.splitIndex
+        : el.dataset.sourceIndex;
+      rects.set(key, el.getBoundingClientRect());
+    });
+    return rects;
+  }
+
+  function animateOrganizerFrom(firstRects) {
+    if (!firstRects || !firstRects.size || !organizerGrid) return;
+    const moving = [];
+    organizerGrid.querySelectorAll('.page-card[data-source-index], .page-placeholder, .page-split-divider').forEach(el => {
+      const key = el.classList.contains('page-placeholder')
+        ? '__placeholder__'
+        : el.classList.contains('page-split-divider')
+          ? '__split_' + el.dataset.splitIndex
+        : el.dataset.sourceIndex;
+      const first = firstRects.get(key);
+      if (!first) return;
+      const last = el.getBoundingClientRect();
+      const dx = first.left - last.left;
+      const dy = first.top - last.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+      el.style.transition = 'none';
+      el.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+      moving.push(el);
+    });
+    if (!moving.length) return;
+    organizerGrid.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      moving.forEach(el => {
+        let cleared = false;
+        const clear = () => {
+          if (cleared) return;
+          cleared = true;
+          el.style.transition = '';
+          el.removeEventListener('transitionend', clear);
+        };
+        el.addEventListener('transitionend', clear, { once: true });
+        setTimeout(clear, 260);
+        el.style.transition = 'transform .2s cubic-bezier(.2, .8, .2, 1), box-shadow .16s, opacity .16s';
+        el.style.transform = '';
+      });
+    });
+  }
+
+  function rerenderOrganizerAnimated() {
+    const firstRects = captureOrganizerRects();
+    renderOrganizer();
+    animateOrganizerFrom(firstRects);
+  }
 
   function renderOrganizer() {
     if (!organizerGrid || activeTool !== 'organize') return;
@@ -1756,19 +2234,46 @@ The header lede and meta lines also swap when you switch tabs. -->
       : 'Upload a PDF to organize pages.';
     if (!state.pdfDoc || count === 0) return;
 
-    state.pageOrder.forEach((sourceIndex, outputIndex) => {
+    const isDragging = organizerDrag.active;
+    const flow = buildOrganizerFlow();
+    const visibleFlow = isDragging
+      ? flow.filter(item => item.type !== 'page' || item.sourceIndex !== organizerDrag.sourcePageIndex)
+      : flow;
+    const hasInsertSlot = isDragging && organizerDrag.insertIndex != null;
+    const insertIndex = hasInsertSlot
+      ? Math.max(0, Math.min(organizerDrag.insertIndex, visibleFlow.length))
+      : -1;
+
+    for (let slot = 0; slot <= visibleFlow.length; slot++) {
+      if (hasInsertSlot && slot === insertIndex) {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'page-card page-placeholder';
+        const marker = document.createElement('div');
+        marker.className = 'page-insert-marker';
+        placeholder.appendChild(marker);
+        organizerGrid.appendChild(placeholder);
+      }
+      if (slot === visibleFlow.length) break;
+      const item = visibleFlow[slot];
+      if (item.type === 'split') {
+        appendSplitDivider(item.splitIndex, slot);
+        continue;
+      }
+      const sourceIndex = item.sourceIndex;
       const pd = state.pages[sourceIndex];
-      if (!pd) return;
+      if (!pd) continue;
+      const outputIndex = state.pageOrder.indexOf(sourceIndex);
       const card = document.createElement('div');
-      card.className = 'page-card';
-      card.draggable = true;
+      card.className = 'page-card organizer-flow-item';
+      card.dataset.flowIndex = slot;
       card.dataset.outputIndex = outputIndex;
+      card.dataset.sourceIndex = sourceIndex;
 
       const thumb = pd.thumbUrl ? document.createElement('img') : document.createElement('canvas');
       thumb.className = 'page-thumb';
       if (pd.thumbUrl) {
         thumb.src = pd.thumbUrl;
-        thumb.alt = 'Page ' + (outputIndex + 1);
+        thumb.alt = 'Original page ' + (sourceIndex + 1);
         thumb.draggable = false;
       } else {
         drawThumbnail(thumb, pd);
@@ -1782,6 +2287,7 @@ The header lede and meta lines also swap when you switch tabs. -->
       del.className = 'page-delete';
       del.setAttribute('aria-label', 'Delete original page ' + (sourceIndex + 1));
       del.textContent = '×';
+      del.addEventListener('pointerdown', e => e.stopPropagation());
       del.addEventListener('click', e => {
         e.stopPropagation();
         deleteOutputPage(outputIndex);
@@ -1793,67 +2299,279 @@ The header lede and meta lines also swap when you switch tabs. -->
       actions.appendChild(num);
       card.appendChild(actions);
 
-      card.addEventListener('dragstart', e => {
-        draggedPageIndex = outputIndex;
-        card.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', String(outputIndex));
-      });
-      card.addEventListener('dragend', () => {
-        draggedPageIndex = null;
-        document.querySelectorAll('.page-card').forEach(el => el.classList.remove('dragging', 'drop-target'));
-      });
-      card.addEventListener('dragover', e => {
-        e.preventDefault();
-        card.classList.add('drop-target');
-      });
-      card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
-      card.addEventListener('drop', e => {
-        e.preventDefault();
-        card.classList.remove('drop-target');
-        const from = draggedPageIndex ?? Number(e.dataTransfer.getData('text/plain'));
-        reorderOutputPages(from, outputIndex);
-      });
+      card.addEventListener('pointerdown', e => beginOrganizerDrag(e, card, sourceIndex));
+      card.addEventListener('contextmenu', e => showPageContextMenu(e, outputIndex, sourceIndex));
 
       organizerGrid.appendChild(card);
+    }
+  }
+
+  function appendSplitDivider(splitIndex, flowIndex) {
+    const divider = document.createElement('div');
+    divider.className = 'page-split-divider organizer-flow-item';
+    divider.dataset.flowIndex = flowIndex;
+    divider.dataset.splitIndex = splitIndex;
+    const label = document.createElement('span');
+    label.className = 'page-split-label';
+    label.append('Split ' + (splitIndex + 1));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'page-split-remove';
+    remove.setAttribute('aria-label', 'Remove split ' + (splitIndex + 1));
+    remove.textContent = '×';
+    remove.addEventListener('pointerdown', e => e.stopPropagation());
+    remove.addEventListener('click', e => {
+      e.stopPropagation();
+      removeSplit(splitIndex);
     });
+    label.appendChild(remove);
+    divider.appendChild(label);
+    organizerGrid.appendChild(divider);
+  }
+
+  function positionPageContextMenu(x, y) {
+    pageContextMenu.hidden = false;
+    pageContextMenu.style.left = x + 'px';
+    pageContextMenu.style.top = y + 'px';
+    const rect = pageContextMenu.getBoundingClientRect();
+    const left = Math.min(x, window.innerWidth - rect.width - 10);
+    const top = Math.min(y, window.innerHeight - rect.height - 10);
+    pageContextMenu.style.left = Math.max(10, left) + 'px';
+    pageContextMenu.style.top = Math.max(10, top) + 'px';
+  }
+
+  function hidePageContextMenu() {
+    pageContextMenu.hidden = true;
+    contextMenuState.outputIndex = null;
+    contextMenuState.sourceIndex = null;
+  }
+
+  function showPageContextMenu(e, outputIndex, sourceIndex) {
+    if (!state.pdfDoc || activeTool !== 'organize' || organizerDrag.active) return;
+    e.preventDefault();
+    normalizeSplitState();
+    contextMenuState.outputIndex = outputIndex;
+    contextMenuState.sourceIndex = sourceIndex;
+    const canSplit = outputIndex >= 0 && outputIndex < activePageCount() - 1;
+    const boundary = outputIndex + 1;
+    const splitExists = state.splitPoints.includes(boundary);
+    contextSplitBtn.disabled = !canSplit;
+    contextSplitBtn.textContent = canSplit
+      ? (splitExists ? 'Remove split after page ' : 'Split after page ') + (sourceIndex + 1)
+      : 'Cannot split after final page';
+    positionPageContextMenu(e.clientX, e.clientY);
+  }
+
+  function toggleSplitAfter(outputIndex) {
+    if (!state.pdfDoc || typeof outputIndex !== 'number' || outputIndex < 0 || outputIndex >= activePageCount() - 1) return;
+    normalizeSplitState();
+    const boundary = outputIndex + 1;
+    const existingIndex = state.splitPoints.indexOf(boundary);
+    if (existingIndex >= 0) {
+      state.splitPoints.splice(existingIndex, 1);
+      state.splitNames.splice(existingIndex + 1, 1);
+    } else {
+      const insertAt = state.splitPoints.findIndex(point => point > boundary);
+      const pointIndex = insertAt === -1 ? state.splitPoints.length : insertAt;
+      while (state.splitNames.length < state.splitPoints.length + 1) {
+        state.splitNames.push(defaultSplitName(state.splitNames.length));
+      }
+      state.splitPoints.splice(pointIndex, 0, boundary);
+      state.splitNames.splice(pointIndex + 1, 0, defaultSplitName(pointIndex + 1));
+    }
+    updatePageState();
+  }
+
+  function removeSplit(splitIndex) {
+    normalizeSplitState();
+    if (splitIndex < 0 || splitIndex >= state.splitPoints.length) return;
+    state.splitPoints.splice(splitIndex, 1);
+    state.splitNames.splice(splitIndex + 1, 1);
+    updatePageState();
+  }
+
+  function beginOrganizerDrag(e, card, sourceIndex) {
+    if (!state.pdfDoc || organizerDrag.active || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (e.target.closest('.page-delete')) return;
+    hidePageContextMenu();
+    const outputIndex = state.pageOrder.indexOf(sourceIndex);
+    if (outputIndex < 0) return;
+    const sourceFlowIndex = buildOrganizerFlow().findIndex(item =>
+      item.type === 'page' && item.sourceIndex === sourceIndex);
+    const rect = card.getBoundingClientRect();
+    const clone = card.cloneNode(true);
+    clone.classList.add('page-drag-clone');
+    clone.style.width = rect.width + 'px';
+    clone.style.height = rect.height + 'px';
+    clone.querySelectorAll('button').forEach(button => button.tabIndex = -1);
+    document.body.appendChild(clone);
+
+    organizerDrag.active = true;
+    organizerDrag.sourceOutputIndex = outputIndex;
+    organizerDrag.sourcePageIndex = sourceIndex;
+    organizerDrag.sourceFlowIndex = sourceFlowIndex;
+    organizerDrag.insertIndex = null;
+    organizerDrag.clone = clone;
+    organizerDrag.offsetX = e.clientX - rect.left;
+    organizerDrag.offsetY = e.clientY - rect.top;
+
+    moveOrganizerClone(e.clientX, e.clientY);
+    window.addEventListener('pointermove', onOrganizerPointerMove, { passive: false });
+    window.addEventListener('pointerup', finishOrganizerDrag, { once: true });
+    window.addEventListener('pointercancel', cancelOrganizerDrag, { once: true });
+    e.preventDefault();
+    rerenderOrganizerAnimated();
+  }
+
+  function moveOrganizerClone(x, y) {
+    if (!organizerDrag.clone) return;
+    organizerDrag.clone.style.transform = 'translate3d(' +
+      (x - organizerDrag.offsetX) + 'px, ' +
+      (y - organizerDrag.offsetY) + 'px, 0) scale(1.02)';
+  }
+
+  function organizerRows() {
+    const items = Array.from(organizerGrid.querySelectorAll('.organizer-flow-item'));
+    const rows = [];
+    items.forEach(el => {
+      const rect = el.getBoundingClientRect();
+      const flowIndex = Number(el.dataset.flowIndex);
+      const fullWidth = el.classList.contains('page-split-divider');
+      let row = fullWidth ? null : rows.find(item => !item.fullWidth && Math.abs(item.top - rect.top) < 28);
+      if (!row) {
+        row = { top: rect.top, bottom: rect.bottom, fullWidth, items: [] };
+        rows.push(row);
+      }
+      row.top = Math.min(row.top, rect.top);
+      row.bottom = Math.max(row.bottom, rect.bottom);
+      row.items.push({ index: flowIndex, rect, fullWidth });
+    });
+    rows.sort((a, b) => a.top - b.top);
+    rows.forEach(row => row.items.sort((a, b) => a.rect.left - b.rect.left));
+    return rows;
+  }
+
+  function getOrganizerInsertIndex(x, y) {
+    const rows = organizerRows();
+    if (!rows.length) return 0;
+    if (y < rows[0].top) return 0;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const nextRow = rows[i + 1];
+      const rowBreak = nextRow ? row.bottom + ((nextRow.top - row.bottom) / 2) : Infinity;
+      if (y <= rowBreak) {
+        if (row.fullWidth) {
+          const item = row.items[0];
+          return y < item.rect.top + item.rect.height / 2 ? item.index : item.index + 1;
+        }
+        for (const item of row.items) {
+          if (x < item.rect.left + item.rect.width / 2) return item.index;
+        }
+        return row.items[row.items.length - 1].index + 1;
+      }
+    }
+    return rows[rows.length - 1].items.at(-1).index + 1;
+  }
+
+  function onOrganizerPointerMove(e) {
+    if (!organizerDrag.active) return;
+    e.preventDefault();
+    moveOrganizerClone(e.clientX, e.clientY);
+    const nextIndex = getOrganizerInsertIndex(e.clientX, e.clientY);
+    if (nextIndex !== organizerDrag.insertIndex) {
+      organizerDrag.insertIndex = nextIndex;
+      rerenderOrganizerAnimated();
+    }
+  }
+
+  function cleanupOrganizerDrag() {
+    window.removeEventListener('pointermove', onOrganizerPointerMove);
+    if (organizerDrag.clone) organizerDrag.clone.remove();
+    organizerDrag.active = false;
+    organizerDrag.sourceOutputIndex = null;
+    organizerDrag.sourcePageIndex = null;
+    organizerDrag.sourceFlowIndex = null;
+    organizerDrag.insertIndex = null;
+    organizerDrag.clone = null;
+  }
+
+  function finishOrganizerDrag() {
+    if (!organizerDrag.active) return;
+    const firstRects = captureOrganizerRects();
+    const sourceIndex = organizerDrag.sourcePageIndex;
+    const nextFlow = buildOrganizerFlow().filter(item =>
+      item.type !== 'page' || item.sourceIndex !== sourceIndex);
+    const insertionIndex = organizerDrag.insertIndex == null
+      ? Math.max(0, Math.min(organizerDrag.sourceFlowIndex ?? 0, nextFlow.length))
+      : Math.max(0, Math.min(organizerDrag.insertIndex, nextFlow.length));
+    cleanupOrganizerDrag();
+    nextFlow.splice(insertionIndex, 0, { type: 'page', sourceIndex });
+    applyOrganizerFlow(nextFlow);
+    state.curPage = state.pageOrder.indexOf(sourceIndex) + 1;
+    updatePageState();
+    animateOrganizerFrom(firstRects);
+    if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+  }
+
+  function cancelOrganizerDrag() {
+    if (!organizerDrag.active) return;
+    const firstRects = captureOrganizerRects();
+    cleanupOrganizerDrag();
+    renderOrganizer();
+    animateOrganizerFrom(firstRects);
   }
 
   function deleteOutputPage(outputIndex) {
     if (!state.pdfDoc || outputIndex < 0 || outputIndex >= activePageCount()) return;
-    state.pageOrder.splice(outputIndex, 1);
+    hidePageContextMenu();
+    const sourceIndex = state.pageOrder[outputIndex];
+    const nextFlow = buildOrganizerFlow().filter(item =>
+      item.type !== 'page' || item.sourceIndex !== sourceIndex);
+    applyOrganizerFlow(nextFlow);
     if (state.curPage > activePageCount()) state.curPage = Math.max(1, activePageCount());
     updatePageState();
     if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
   }
 
-  function reorderOutputPages(from, to) {
-    if (!state.pdfDoc || from == null || to == null || from === to) return;
-    if (from < 0 || to < 0 || from >= activePageCount() || to >= activePageCount()) return;
-    const [moved] = state.pageOrder.splice(from, 1);
-    state.pageOrder.splice(to, 0, moved);
-    state.curPage = to + 1;
-    updatePageState();
-    if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
-  }
-
-  async function exportOrganizedPdf() {
+  async function exportPageOrderAsPdf(pageOrder, fileBase) {
     if (!window.PDFLib) throw new Error('PDF library did not load. Check your connection and try again.');
     if (!state.pdfBytes) throw new Error('Original PDF data is not available.');
+    if (!pageOrder.length) throw new Error('There are no pages to export.');
     const src = await PDFLib.PDFDocument.load(state.pdfBytes);
     const out = await PDFLib.PDFDocument.create();
-    const copiedPages = await out.copyPages(src, state.pageOrder);
+    const copiedPages = await out.copyPages(src, pageOrder);
     copiedPages.forEach(page => out.addPage(page));
     const bytes = await out.save();
     const blob = new Blob([bytes], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = outputBaseName() + TOOLS.organize.suffix + '.pdf';
+    a.download = cleanDownloadBase(fileBase, outputBaseName()) + '.pdf';
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  async function exportOrganizedPdf() {
+    await exportPageOrderAsPdf(state.pageOrder, outputBaseName() + TOOLS.organize.suffix);
+  }
+
+  async function exportSplitPart(partIndex) {
+    const part = splitParts()[partIndex];
+    if (!part || !part.pageOrder.length) return;
+    splitPartsList.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    setLoader(true, 'Exporting part ' + (partIndex + 1) + '…', 35);
+    try {
+      await exportPageOrderAsPdf(part.pageOrder, part.name || defaultSplitName(partIndex));
+      setLoader(false);
+    } catch (err) {
+      console.error(err);
+      showError('Split export failed: ' + (err.message || err));
+      setLoader(false);
+    } finally {
+      updatePageState();
+    }
   }
 
   // ── Threshold controls ──
@@ -1902,8 +2620,31 @@ The header lede and meta lines also swap when you switch tabs. -->
     if (state.pdfDoc) drawPreview();
   });
 
+  contextSplitBtn.addEventListener('click', () => {
+    const outputIndex = contextMenuState.outputIndex;
+    hidePageContextMenu();
+    toggleSplitAfter(outputIndex);
+  });
+
+  clearSplitBtn.addEventListener('click', () => {
+    state.splitPoints = [];
+    state.splitNames = [];
+    updatePageState();
+  });
+
+  document.addEventListener('click', e => {
+    if (!pageContextMenu.hidden && !pageContextMenu.contains(e.target)) hidePageContextMenu();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') hidePageContextMenu();
+  });
+
+  window.addEventListener('scroll', hidePageContextMenu, true);
+
   resetPagesBtn.addEventListener('click', () => {
     if (!state.pdfDoc) return;
+    hidePageContextMenu();
     state.pageOrder = Array.from({ length: state.numPages }, (_, i) => i);
     state.curPage = 1;
     updatePageState();
