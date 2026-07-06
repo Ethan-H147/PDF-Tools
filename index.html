@@ -2300,7 +2300,6 @@ The header lede and meta lines also swap when you switch tabs. -->
       card.appendChild(actions);
 
       card.addEventListener('pointerdown', e => beginOrganizerDrag(e, card, sourceIndex));
-      card.addEventListener('contextmenu', e => showPageContextMenu(e, outputIndex, sourceIndex));
 
       organizerGrid.appendChild(card);
     }
@@ -2349,6 +2348,7 @@ The header lede and meta lines also swap when you switch tabs. -->
   function showPageContextMenu(e, outputIndex, sourceIndex) {
     if (!state.pdfDoc || activeTool !== 'organize' || organizerDrag.active) return;
     e.preventDefault();
+    e.stopPropagation();
     normalizeSplitState();
     contextMenuState.outputIndex = outputIndex;
     contextMenuState.sourceIndex = sourceIndex;
@@ -2361,6 +2361,12 @@ The header lede and meta lines also swap when you switch tabs. -->
       : 'Cannot split after final page';
     positionPageContextMenu(e.clientX, e.clientY);
   }
+
+  organizerGrid.addEventListener('contextmenu', e => {
+    const card = e.target.closest('.page-card[data-source-index]');
+    if (!card || !organizerGrid.contains(card)) return;
+    showPageContextMenu(e, Number(card.dataset.outputIndex), Number(card.dataset.sourceIndex));
+  }, true);
 
   function toggleSplitAfter(outputIndex) {
     if (!state.pdfDoc || typeof outputIndex !== 'number' || outputIndex < 0 || outputIndex >= activePageCount() - 1) return;
