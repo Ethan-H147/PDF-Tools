@@ -92,7 +92,7 @@ Ethan Hu -->
   h1.title {
     font-family: 'Bodoni Moda', serif;
     font-weight: 900;
-    font-size: clamp(64px, 13vw, 188px);
+    font-size: clamp(41px, 8vw, 115px);
     letter-spacing: -0.04em;
     line-height: 0.86;
     margin: 22px 0 6px;
@@ -924,6 +924,18 @@ Ethan Hu -->
     opacity: .5;
   }
 
+  .btn-secondary-accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .btn-secondary-accent:hover:not(:disabled) {
+    background: #0077ed;
+    border-color: #0077ed;
+    color: #fff;
+  }
+
   .organize-summary {
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
@@ -933,6 +945,201 @@ Ethan Hu -->
     line-height: 1.45;
     margin-bottom: 12px;
     padding: 13px 14px;
+  }
+
+  .merge-list {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .merge-file-row {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    display: grid;
+    gap: 10px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 10px;
+  }
+
+  .merge-file-index {
+    align-items: center;
+    background: var(--accent-soft);
+    border-radius: 999px;
+    color: var(--accent);
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 800;
+    height: 28px;
+    justify-content: center;
+    width: 28px;
+  }
+
+  .merge-file-name {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .merge-file-meta {
+    color: var(--ink-mute);
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  .merge-file-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .merge-file-actions button {
+    align-items: center;
+    background: #f5f5f7;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 14px;
+    font-weight: 800;
+    height: 28px;
+    justify-content: center;
+    padding: 0;
+    width: 28px;
+  }
+
+  .merge-file-actions button:hover:not(:disabled) {
+    background: var(--accent-soft);
+    border-color: rgba(0, 113, 227, 0.22);
+    color: var(--accent);
+  }
+
+  .merge-file-actions button:disabled {
+    cursor: not-allowed;
+    opacity: .35;
+  }
+
+  .merge-actions,
+  .edit-button-row {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .edit-controls {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+    padding: 13px 14px;
+  }
+
+  .quality-toggle {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 13px 14px;
+  }
+
+  .quality-copy {
+    min-width: 0;
+  }
+
+  .quality-copy span {
+    color: var(--ink);
+    display: block;
+    font-size: 13px;
+    font-weight: 750;
+  }
+
+  .quality-copy b {
+    color: var(--ink-mute);
+    display: block;
+    font-size: 12px;
+    font-weight: 650;
+    margin-top: 2px;
+  }
+
+  .circle-switch {
+    align-items: center;
+    background: #e9e9ed;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 34px;
+    padding: 3px;
+    transition: background .18s;
+    width: 58px;
+  }
+
+  .circle-switch::before {
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
+    content: "";
+    height: 28px;
+    transform: translateX(0);
+    transition: transform .18s;
+    width: 28px;
+  }
+
+  .circle-switch.on {
+    background: var(--accent);
+  }
+
+  .circle-switch.on::before {
+    transform: translateX(24px);
+  }
+
+  .edit-control-head {
+    align-items: baseline;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .edit-control-head span {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 750;
+  }
+
+  .edit-control-head b,
+  .crop-row b {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .edit-slider {
+    margin-bottom: 2px;
+  }
+
+  .crop-row {
+    align-items: center;
+    color: var(--ink-soft);
+    display: grid;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 8px;
+    grid-template-columns: 48px minmax(0, 1fr) 34px;
+    margin-top: 10px;
+  }
+
+  .crop-slider {
+    height: 20px !important;
   }
 
   .split-panel {
@@ -1054,9 +1261,158 @@ Ethan Hu -->
     padding: 28px;
   }
 
+  .preview-stage.editing {
+    align-items: stretch;
+    justify-content: flex-start;
+    background: #fff;
+    border-radius: var(--radius-md);
+    padding: 22px;
+  }
+
   .organizer {
     width: 100%;
     min-height: 100%;
+  }
+
+  .page-editor {
+    display: flex;
+    gap: 20px;
+    min-height: 100%;
+    width: 100%;
+  }
+
+  .page-editor-strip {
+    display: grid;
+    flex: 0 0 168px;
+    gap: 12px;
+    max-height: 100%;
+    overflow: auto;
+    padding: 2px 8px 2px 2px;
+  }
+
+  .page-editor-main {
+    align-items: center;
+    background: #f5f5f7;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    gap: 16px;
+    justify-content: center;
+    min-width: 0;
+    overflow: auto;
+    padding: 24px;
+  }
+
+  .page-editor-canvas-wrap {
+    background: #fff;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 18px 46px rgba(0, 0, 0, 0.13);
+    display: none;
+    flex-shrink: 0;
+    max-height: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .page-editor-canvas-wrap canvas {
+    display: block;
+    height: auto;
+    max-height: calc(var(--preview-stage-height, 760px) - 96px);
+    max-width: 100%;
+    width: auto;
+  }
+
+  .page-editor-canvas-wrap.zoomed,
+  .page-editor-canvas-wrap.zoomed canvas {
+    max-height: none;
+    max-width: none;
+  }
+
+  .page-editor-bottom {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    display: none;
+    gap: 12px;
+    max-width: 760px;
+    padding: 9px 12px;
+    width: min(100%, 760px);
+  }
+
+  .page-editor-bottom .slider {
+    flex: 1 1 auto;
+    height: 22px;
+    min-width: 120px;
+  }
+
+  .page-editor-bottom button {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 42px;
+    font-size: 15px;
+    font-weight: 800;
+    height: 34px;
+    justify-content: center;
+  }
+
+  .page-editor-bottom button:hover:not(:disabled) {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .page-editor-bottom button:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+  }
+
+  .page-editor-bottom b {
+    color: var(--accent);
+    flex: 0 0 48px;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .page-edit-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    cursor: pointer;
+    overflow: hidden;
+    text-align: left;
+    transition: box-shadow .16s, border-color .16s, transform .16s;
+  }
+
+  .page-edit-card:hover {
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12);
+    transform: translateY(-1px);
+  }
+
+  .page-edit-card.active {
+    border-color: rgba(0, 113, 227, 0.72);
+    box-shadow: 0 0 0 4px var(--accent-soft), 0 14px 34px rgba(0, 113, 227, 0.16);
+  }
+
+  .page-edit-card .page-card-actions {
+    gap: 8px;
+  }
+
+  .page-edit-card .page-number {
+    font-size: 22px;
+  }
+
+  .page-edit-badge {
+    color: var(--ink-mute);
+    font-size: 11px;
+    font-weight: 750;
   }
 
   .organizer-grid {
@@ -1299,6 +1655,26 @@ Ethan Hu -->
     .preview-stage.organizing {
       padding: 18px;
     }
+
+    .preview-stage.editing {
+      padding: 16px;
+    }
+
+    .page-editor {
+      flex-direction: column;
+    }
+
+    .page-editor-strip {
+      display: flex;
+      flex: 0 0 auto;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 2px 2px 8px;
+    }
+
+    .page-edit-card {
+      flex: 0 0 136px;
+    }
   }
 </style>
 </head>
@@ -1310,9 +1686,9 @@ Ethan Hu -->
     <div class="title-sub">PDF Tools</div>
     <div class="subhead">
       <div class="lede" id="masterLede">
-        Convert PDFs to black and white with threshold control.
+        Merge multiple PDFs into one organized document.
       </div>
-      <div class="meta" id="masterMeta" tabindex="0" aria-label="Tool details" data-tooltip="Black and white output&#10;Client-side only · no upload&#10;Threshold · 0 → 255"></div>
+      <div class="meta" id="masterMeta" tabindex="0" aria-label="Tool details" data-tooltip="Select any number of PDFs&#10;Reorder files before merging&#10;Merged output opens in Organize"></div>
     </div>
   </header>
 
@@ -1320,14 +1696,20 @@ Ethan Hu -->
   <nav class="tool-nav">
     <div class="tool-nav-label">Tools</div>
     <div class="tool-indicator" id="toolIndicator" aria-hidden="true"></div>
-    <div class="tool-tab active" data-tool="threshold">
-      <span class="tab-num">I.</span> Threshold
-    </div>
-    <div class="tool-tab" data-tool="greyscale">
-      <span class="tab-num">II.</span> Grayscale
+    <div class="tool-tab active" data-tool="merge">
+      <span class="tab-num">I.</span> Merge
     </div>
     <div class="tool-tab" data-tool="organize">
-      <span class="tab-num">III.</span> Organize
+      <span class="tab-num">II.</span> Organize
+    </div>
+    <div class="tool-tab" data-tool="edit">
+      <span class="tab-num">III.</span> Crop/Rotate
+    </div>
+    <div class="tool-tab" data-tool="threshold">
+      <span class="tab-num">IV.</span> Threshold
+    </div>
+    <div class="tool-tab" data-tool="greyscale">
+      <span class="tab-num">V.</span> Grayscale
     </div>
   </nav>
 
@@ -1337,9 +1719,9 @@ Ethan Hu -->
       <!-- SHARED: Source -->
       <div class="section-label"><span>I. Source PDF</span><span>—</span></div>
       <div class="drop" id="dropZone">
-        <div class="glyph">¶</div>
-        <div class="lbl">Upload PDF</div>
-        <div class="sub">PDF · click or drop</div>
+        <div class="glyph" id="dropGlyph">¶</div>
+        <div class="lbl" id="dropLabel">Upload PDF</div>
+        <div class="sub" id="dropSub">PDF · click or drop</div>
       </div>
       <input type="file" id="fileInput" accept="application/pdf">
       <div class="err" id="errBox"></div>
@@ -1354,7 +1736,7 @@ Ethan Hu -->
       </div>
 
       <!-- ═══ THRESHOLD PANEL ═══ -->
-      <div class="tool-panel active" id="tool-threshold">
+      <div class="tool-panel" id="tool-threshold">
         <div style="margin-top:26px">
           <div class="section-label"><span>II. Threshold</span><span id="threshHint">mid range</span></div>
           <div class="big-display">
@@ -1409,6 +1791,19 @@ Ethan Hu -->
         </div>
       </div>
 
+      <!-- ═══ MERGE PANEL ═══ -->
+      <div class="tool-panel active" id="tool-merge">
+        <div style="margin-top:26px">
+          <div class="section-label"><span>II. Merge PDFs</span><span id="mergeHint">ready</span></div>
+          <div class="organize-summary" id="mergeSummary">Choose multiple PDFs, arrange their order, then merge into the organizer.</div>
+          <div class="merge-list" id="mergeList"></div>
+          <div class="merge-actions">
+            <button class="btn-secondary" id="mergeClearBtn" disabled>Clear list</button>
+            <button class="btn-secondary btn-secondary-accent" id="mergeRunBtn" disabled>Merge into Organize</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ ORGANIZE PANEL ═══ -->
       <div class="tool-panel" id="tool-organize">
         <div style="margin-top:26px">
@@ -1426,6 +1821,44 @@ Ethan Hu -->
         </div>
       </div>
 
+      <!-- ═══ CROP / ROTATE PANEL ═══ -->
+      <div class="tool-panel" id="tool-edit">
+        <div style="margin-top:26px">
+          <div class="section-label"><span>II. Crop & Rotate</span><span id="editHint">select page</span></div>
+          <div class="organize-summary" id="editSummary">Upload a PDF, then choose a page from the editor to crop or rotate it.</div>
+          <div class="edit-controls">
+            <div class="edit-control-head">
+              <span>Fine Rotation</span>
+              <b id="editRotateNum">0.0°</b>
+            </div>
+            <input type="range" min="-5" max="5" value="0" step="0.1" class="slider edit-slider" id="editRotateSlider">
+            <div class="slider-tags"><span>-5°</span><span>+5°</span></div>
+            <div class="edit-button-row">
+              <button class="btn-secondary" id="rotateLeftBtn" disabled>↺ 90°</button>
+              <button class="btn-secondary" id="rotateRightBtn" disabled>↻ 90°</button>
+            </div>
+          </div>
+          <div class="edit-controls">
+            <div class="edit-control-head">
+              <span>Crop Margins</span>
+              <b id="cropHint">0%</b>
+            </div>
+            <label class="crop-row">Left <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropLeftSlider"><b id="cropLeftNum">0%</b></label>
+            <label class="crop-row">Top <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropTopSlider"><b id="cropTopNum">0%</b></label>
+            <label class="crop-row">Right <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropRightSlider"><b id="cropRightNum">0%</b></label>
+            <label class="crop-row">Bottom <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropBottomSlider"><b id="cropBottomNum">0%</b></label>
+          </div>
+          <div class="quality-toggle">
+            <div class="quality-copy">
+              <span>Fine Rotation Quality</span>
+              <b id="fineQualityLabel">High · 600 dpi</b>
+            </div>
+            <button type="button" class="circle-switch" id="fineQualityToggle" aria-label="Use ultra 900 dpi for fine rotation export" aria-pressed="false"></button>
+          </div>
+          <button class="btn-secondary" id="resetEditBtn" disabled>Reset selected page</button>
+        </div>
+      </div>
+
       <!-- SHARED: Pages -->
       <div class="section-label" style="margin-top:26px"><span>III. Pages</span><span>—</span></div>
       <div class="pagenav">
@@ -1436,14 +1869,14 @@ Ethan Hu -->
 
       <!-- SHARED: Download -->
       <div class="actions">
-        <div class="toggles resolution-options" id="resolutionOptions" style="margin-bottom:14px">
-          <div class="toggle on" id="resFast">Fast</div>
+        <div class="toggles resolution-options hidden" id="resolutionOptions" style="margin-bottom:14px">
+          <div class="toggle" id="resFast">Fast</div>
           <div class="toggle" id="res300">300 dpi</div>
-          <div class="toggle" id="res600">600 dpi</div>
+          <div class="toggle on" id="res600">600 dpi</div>
         </div>
         <button class="btn-print" id="downloadBtn" disabled>
-          <span id="downloadLabel">Export PDF</span>
-          <span class="small" id="downloadSub">render and download all pages</span>
+          <span id="downloadLabel">Merge PDFs</span>
+          <span class="small" id="downloadSub">combine selected files into organize</span>
         </button>
       </div>
 
@@ -1474,6 +1907,21 @@ Ethan Hu -->
           <div class="organizer-empty" id="organizerEmpty">Upload a PDF to organize pages.</div>
           <div class="organizer-grid" id="organizerGrid"></div>
         </div>
+        <div class="page-editor" id="pageEditor" style="display:none">
+          <div class="page-editor-strip" id="pageEditorStrip"></div>
+          <div class="page-editor-main" id="pageEditorMain">
+            <div class="organizer-empty" id="pageEditorEmpty">Upload a PDF to crop or rotate pages.</div>
+            <div class="page-editor-canvas-wrap" id="pageEditorCanvasWrap">
+              <canvas id="pageEditorCanvas"></canvas>
+            </div>
+            <div class="page-editor-bottom" id="pageEditorBottom">
+              <button type="button" id="bottomRotateLeftBtn" disabled>↺</button>
+              <input type="range" min="-5" max="5" value="0" step="0.1" class="slider" id="bottomRotateSlider">
+              <b id="bottomRotateNum">0.0°</b>
+              <button type="button" id="bottomRotateRightBtn" disabled>↻</button>
+            </div>
+          </div>
+        </div>
         <div class="loader" id="loader">
           <div class="lab" id="loaderLabel">Processing…</div>
           <div class="pct" id="loaderPct">0%</div>
@@ -1500,6 +1948,8 @@ Ethan Hu -->
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   // ── Tool registry: add a new entry here to add a new tool ──
+  const FINE_ROTATION_EXPORT_DPI = { high: 600, ultra: 900 };
+
   const TOOLS = {
     threshold: {
       lede: 'Convert PDFs to black and white with threshold control.',
@@ -1515,6 +1965,13 @@ Ethan Hu -->
       downloadSub: 'render and download all pages',
       suffix: '_grey',
     },
+    merge: {
+      lede: 'Merge multiple PDFs into one organized document.',
+      meta: 'Select any number of PDFs<br/>Reorder files before merging<br/>Merged output opens in Organize',
+      downloadLabel: 'Merge PDFs',
+      downloadSub: 'combine selected files into organize',
+      suffix: '_merged',
+    },
     organize: {
       lede: 'Reorder or remove pages before export.',
       meta: 'Drag pages to reorder<br/>Click × to remove a page<br/>Right-click a page to split after it<br/>Drag pages across split lines freely<br/>Click a split × to remove it<br/>Name and export each part separately<br/>Original PDF pages are preserved',
@@ -1522,9 +1979,16 @@ Ethan Hu -->
       downloadSub: 'preserve original page content',
       suffix: '_organized',
     },
+    edit: {
+      lede: 'Crop and rotate individual pages before export.',
+      meta: 'Select one page at a time<br/>Crop page margins<br/>Fine rotate with a low-sensitivity slider<br/>Use 90° rotate buttons for page turns',
+      downloadLabel: 'Export Edited PDF',
+      downloadSub: 'apply page crops and rotations',
+      suffix: '_edited',
+    },
   };
 
-  let activeTool = 'threshold';
+  let activeTool = 'merge';
   let processTool = 'threshold';
 
   const state = {
@@ -1534,15 +1998,20 @@ Ethan Hu -->
     // greyscale
     brightness: 0, contrast: 100, greyInvert: false, sepia: false,
     // output
-    resolution: 'fast',
+    resolution: '600',
     // cache
     pages: [], pageOrder: [], splitPoints: [], splitNames: [], fileName: '', fileSize: 0, pdfBytes: null,
+    mergeFiles: [], pageEdits: [],
+    fineRotationQuality: 'high',
   };
 
   const $ = id => document.getElementById(id);
 
   // element refs
   const dropZone      = $('dropZone');
+  const dropGlyph     = $('dropGlyph');
+  const dropLabel     = $('dropLabel');
+  const dropSub       = $('dropSub');
   const fileInput     = $('fileInput');
   const fileCard      = $('fileCard');
   const fileNameEl    = $('fileName');
@@ -1574,6 +2043,11 @@ Ethan Hu -->
   const downloadSub   = $('downloadSub');
   const resolutionOptions = $('resolutionOptions');
   const resetPagesBtn = $('resetPagesBtn');
+  const mergeHint     = $('mergeHint');
+  const mergeSummary  = $('mergeSummary');
+  const mergeList     = $('mergeList');
+  const mergeClearBtn = $('mergeClearBtn');
+  const mergeRunBtn   = $('mergeRunBtn');
   const organizeHint  = $('organizeHint');
   const organizeSummary = $('organizeSummary');
   const splitPanel    = $('splitPanel');
@@ -1588,6 +2062,39 @@ Ethan Hu -->
   const organizer     = $('organizer');
   const organizerGrid = $('organizerGrid');
   const organizerEmpty = $('organizerEmpty');
+  const pageEditor    = $('pageEditor');
+  const pageEditorStrip = $('pageEditorStrip');
+  const pageEditorMain = $('pageEditorMain');
+  const pageEditorEmpty = $('pageEditorEmpty');
+  const pageEditorCanvasWrap = $('pageEditorCanvasWrap');
+  const pageEditorCanvas = $('pageEditorCanvas');
+  const pageEditorBottom = $('pageEditorBottom');
+  const editHint      = $('editHint');
+  const editSummary   = $('editSummary');
+  const editRotateSlider = $('editRotateSlider');
+  const editRotateNum = $('editRotateNum');
+  const bottomRotateSlider = $('bottomRotateSlider');
+  const bottomRotateNum = $('bottomRotateNum');
+  const rotateLeftBtn = $('rotateLeftBtn');
+  const rotateRightBtn = $('rotateRightBtn');
+  const bottomRotateLeftBtn = $('bottomRotateLeftBtn');
+  const bottomRotateRightBtn = $('bottomRotateRightBtn');
+  const cropHint      = $('cropHint');
+  const cropSliders   = {
+    left: $('cropLeftSlider'),
+    top: $('cropTopSlider'),
+    right: $('cropRightSlider'),
+    bottom: $('cropBottomSlider'),
+  };
+  const cropNums      = {
+    left: $('cropLeftNum'),
+    top: $('cropTopNum'),
+    right: $('cropRightNum'),
+    bottom: $('cropBottomNum'),
+  };
+  const fineQualityLabel = $('fineQualityLabel');
+  const fineQualityToggle = $('fineQualityToggle');
+  const resetEditBtn  = $('resetEditBtn');
   const previewTitle  = $('previewTitle');
   const previewTools  = $('previewTools');
   const toolIndicator = $('toolIndicator');
@@ -1641,30 +2148,58 @@ Ethan Hu -->
     $('masterMeta').setAttribute('aria-label', toolTipText(tool.meta));
     downloadLabel.innerHTML = tool.downloadLabel;
     downloadSub.innerHTML = tool.downloadSub;
-    resolutionOptions.classList.toggle('hidden', id === 'organize');
+    resolutionOptions.classList.toggle('hidden', !isRasterTool(id));
+    updateSourceDropMode();
+    if (id === 'merge') updateMergeState();
+    else updatePageState();
     updatePreviewMode();
     updateToolIndicator();
     syncPreviewStageHeight();
-    if (state.pdfDoc && id !== 'organize') { drawPreview(); drawHistogram(); }
+    if (state.pdfDoc && id !== 'organize' && id !== 'edit') { drawPreview(); drawHistogram(); }
+    if (state.pdfDoc && id === 'edit') { syncEditControls(); drawEditedPagePreview(); }
+  }
+
+  function isRasterTool(id) {
+    return id === 'threshold' || id === 'greyscale';
   }
 
   function updatePreviewMode() {
     const organizing = activeTool === 'organize';
+    const editing = activeTool === 'edit';
     previewStage.classList.toggle('organizing', organizing);
-    previewTools.classList.toggle('preview-tools-hidden', organizing);
+    previewStage.classList.toggle('editing', editing);
+    previewTools.classList.toggle('preview-tools-hidden', organizing || editing);
     previewTitle.innerHTML = organizing
       ? 'Rearrange <em>— drag pages to reorder</em>'
-      : 'Preview <em>— processed output</em>';
+      : editing
+        ? 'Crop & Rotate <em>— select one page</em>'
+        : 'Preview <em>— processed output</em>';
     organizer.style.display = organizing ? 'block' : 'none';
+    pageEditor.style.display = editing ? 'flex' : 'none';
     if (organizing) {
       emptyState.style.display = 'none';
       canvasWrap.style.display = 'none';
+      pageEditor.style.display = 'none';
       renderOrganizer();
+      return;
+    }
+    if (editing) {
+      emptyState.style.display = 'none';
+      canvasWrap.style.display = 'none';
+      renderPageEditor();
       return;
     }
     const hasPages = state.pdfDoc && activePageCount() > 0;
     emptyState.style.display = hasPages ? 'none' : 'block';
     canvasWrap.style.display = hasPages ? 'block' : 'none';
+  }
+
+  function updateSourceDropMode() {
+    const merging = activeTool === 'merge';
+    fileInput.multiple = merging;
+    dropGlyph.textContent = merging ? '∑' : '¶';
+    dropLabel.textContent = merging ? 'Upload PDFs' : 'Upload PDF';
+    dropSub.textContent = merging ? 'Multiple PDFs · click or drop' : 'PDF · click or drop';
   }
 
   // ── Helpers ──
@@ -1718,6 +2253,66 @@ Ethan Hu -->
   function currentPageData() {
     const sourceIndex = currentSourceIndex();
     return sourceIndex == null ? null : state.pages[sourceIndex];
+  }
+
+  function defaultPageEdit() {
+    return { crop: { left: 0, top: 0, right: 0, bottom: 0 }, fineRotation: 0, quarterTurns: 0 };
+  }
+
+  function clonePageEdit(edit) {
+    const src = edit || defaultPageEdit();
+    return {
+      crop: {
+        left: +(src.crop?.left || 0),
+        top: +(src.crop?.top || 0),
+        right: +(src.crop?.right || 0),
+        bottom: +(src.crop?.bottom || 0),
+      },
+      fineRotation: +(src.fineRotation || 0),
+      quarterTurns: ((src.quarterTurns || 0) % 4 + 4) % 4,
+    };
+  }
+
+  function getPageEdit(sourceIndex) {
+    if (sourceIndex == null) return defaultPageEdit();
+    if (!state.pageEdits[sourceIndex]) state.pageEdits[sourceIndex] = defaultPageEdit();
+    return state.pageEdits[sourceIndex];
+  }
+
+  function currentPageEdit() {
+    return getPageEdit(currentSourceIndex());
+  }
+
+  function editAngle(edit) {
+    const e = clonePageEdit(edit);
+    return e.quarterTurns * 90 + e.fineRotation;
+  }
+
+  function isPageEdited(edit) {
+    if (!edit) return false;
+    const e = clonePageEdit(edit);
+    return Math.abs(e.fineRotation) > 0.001 ||
+      e.quarterTurns !== 0 ||
+      e.crop.left || e.crop.top || e.crop.right || e.crop.bottom;
+  }
+
+  function hasAnyPageEdits() {
+    return state.pageEdits.some(isPageEdited);
+  }
+
+  function hasFineRotation(edit) {
+    return Math.abs(clonePageEdit(edit).fineRotation) > 0.001;
+  }
+
+  function fineRotationExportDpi() {
+    return FINE_ROTATION_EXPORT_DPI[state.fineRotationQuality] || FINE_ROTATION_EXPORT_DPI.high;
+  }
+
+  function syncFineQualityToggle() {
+    const ultra = state.fineRotationQuality === 'ultra';
+    fineQualityToggle.classList.toggle('on', ultra);
+    fineQualityToggle.setAttribute('aria-pressed', ultra ? 'true' : 'false');
+    fineQualityLabel.textContent = ultra ? 'Ultra · 900 dpi' : 'High · 600 dpi';
   }
 
   function defaultSplitName(index) {
@@ -1833,7 +2428,9 @@ Ethan Hu -->
     curPageEl.textContent = state.pdfDoc && count ? padPage(state.curPage) : '—';
     prevBtn.disabled = !state.pdfDoc || state.curPage <= 1;
     nextBtn.disabled = !state.pdfDoc || state.curPage >= count;
-    downloadBtn.disabled = !state.pdfDoc || count === 0;
+    downloadBtn.disabled = activeTool === 'merge'
+      ? state.mergeFiles.length === 0
+      : !state.pdfDoc || count === 0;
     resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
     organizeHint.textContent = state.pdfDoc
       ? (state.splitPoints.length ? state.splitPoints.length + ' splits' : count + ' pages')
@@ -1848,6 +2445,10 @@ Ethan Hu -->
       ? (count ? count + ' pages in output' : 'no pages selected')
       : 'awaiting PDF';
     updatePreviewMode();
+    if (activeTool === 'edit') {
+      syncEditControls();
+      drawEditedPagePreview();
+    }
   }
 
   function setLoader(on, label, pct) {
@@ -1919,54 +2520,198 @@ Ethan Hu -->
     }
   });
 
+  function renderMergeList() {
+    mergeList.innerHTML = '';
+    state.mergeFiles.forEach((file, index) => {
+      const row = document.createElement('div');
+      row.className = 'merge-file-row';
+
+      const num = document.createElement('div');
+      num.className = 'merge-file-index';
+      num.textContent = index + 1;
+
+      const info = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'merge-file-name';
+      name.textContent = file.name;
+      const meta = document.createElement('div');
+      meta.className = 'merge-file-meta';
+      meta.textContent = fmtBytes(file.size);
+      info.appendChild(name);
+      info.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'merge-file-actions';
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.textContent = '↑';
+      up.disabled = index === 0;
+      up.setAttribute('aria-label', 'Move ' + file.name + ' up');
+      up.addEventListener('click', () => moveMergeFile(index, -1));
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.textContent = '↓';
+      down.disabled = index === state.mergeFiles.length - 1;
+      down.setAttribute('aria-label', 'Move ' + file.name + ' down');
+      down.addEventListener('click', () => moveMergeFile(index, 1));
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', 'Remove ' + file.name);
+      remove.addEventListener('click', () => removeMergeFile(index));
+      actions.appendChild(up);
+      actions.appendChild(down);
+      actions.appendChild(remove);
+
+      row.appendChild(num);
+      row.appendChild(info);
+      row.appendChild(actions);
+      mergeList.appendChild(row);
+    });
+  }
+
+  function updateMergeState() {
+    const count = state.mergeFiles.length;
+    const totalSize = state.mergeFiles.reduce((sum, file) => sum + file.size, 0);
+    mergeHint.textContent = count ? count + ' PDFs' : 'ready';
+    mergeSummary.textContent = count
+      ? count + ' PDF' + (count === 1 ? '' : 's') + ' selected · ' + fmtBytes(totalSize) + '. Arrange the list, then merge into Organize.'
+      : 'Choose multiple PDFs, arrange their order, then merge into the organizer.';
+    mergeClearBtn.disabled = count === 0;
+    mergeRunBtn.disabled = count === 0;
+    if (activeTool === 'merge') downloadBtn.disabled = count === 0;
+    renderMergeList();
+  }
+
+  function addMergeFiles(fileList) {
+    clearError();
+    const files = Array.from(fileList).filter(file =>
+      file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+    if (!files.length) {
+      showError('Choose one or more PDF files to merge.');
+      return;
+    }
+    state.mergeFiles.push(...files);
+    updateMergeState();
+  }
+
+  function moveMergeFile(index, delta) {
+    const next = index + delta;
+    if (next < 0 || next >= state.mergeFiles.length) return;
+    const [file] = state.mergeFiles.splice(index, 1);
+    state.mergeFiles.splice(next, 0, file);
+    updateMergeState();
+  }
+
+  function removeMergeFile(index) {
+    state.mergeFiles.splice(index, 1);
+    updateMergeState();
+  }
+
+  async function mergeSelectedPdfs() {
+    clearError();
+    if (!window.PDFLib) throw new Error('PDF library did not load. Check your connection and try again.');
+    if (!state.mergeFiles.length) {
+      showError('Choose at least one PDF to merge.');
+      return;
+    }
+    mergeRunBtn.disabled = true;
+    setLoader(true, 'Merging PDFs…', 0);
+    try {
+      const out = await PDFLib.PDFDocument.create();
+      let totalPages = 0;
+      for (let i = 0; i < state.mergeFiles.length; i++) {
+        const file = state.mergeFiles[i];
+        setLoader(true, 'Merging ' + file.name, (i / state.mergeFiles.length) * 70);
+        const src = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+        const pageIndices = src.getPageIndices();
+        const pages = await out.copyPages(src, pageIndices);
+        pages.forEach(page => out.addPage(page));
+        totalPages += pageIndices.length;
+      }
+      const bytes = await out.save();
+      const mergedName = cleanDownloadBase(state.mergeFiles[0].name, 'merged') +
+        (state.mergeFiles.length > 1 ? '_merged.pdf' : '_copy.pdf');
+      const mergedBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      await loadPdfBytes(mergedBuffer, mergedName, bytes.byteLength, 'Rendering merged PDF…');
+      state.mergeFiles = [];
+      updateMergeState();
+      switchTool('organize');
+      setLoader(false);
+      proofMeta.textContent = totalPages + ' merged pages';
+    } catch (err) {
+      console.error(err);
+      showError('Merge failed: ' + (err.message || err));
+      setLoader(false);
+      updateMergeState();
+    }
+  }
+
+  mergeClearBtn.addEventListener('click', () => {
+    state.mergeFiles = [];
+    updateMergeState();
+  });
+  mergeRunBtn.addEventListener('click', () => mergeSelectedPdfs());
+
   dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
   dropZone.addEventListener('drop', e => {
     e.preventDefault(); dropZone.classList.remove('drag');
-    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    if (!e.dataTransfer.files.length) return;
+    if (activeTool === 'merge') addMergeFiles(e.dataTransfer.files);
+    else handleFile(e.dataTransfer.files[0]);
   });
-  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+  fileInput.addEventListener('change', e => {
+    if (!e.target.files.length) return;
+    if (activeTool === 'merge') addMergeFiles(e.target.files);
+    else handleFile(e.target.files[0]);
+    fileInput.value = '';
+  });
+
+  async function loadPdfBytes(buf, fileName, fileSize, loadingLabel = 'Loading PDF…') {
+    state.fileName = normalizePdfName(fileName);
+    fileNameEl.textContent = state.fileName;
+    fileNameEl.title = 'Click to rename';
+    fileNameEl.tabIndex = 0;
+    fileSizeEl.textContent = fmtBytes(fileSize);
+    fileStatusEl.textContent = 'loading';
+    fileCard.classList.add('on');
+    setLoader(true, loadingLabel, 0);
+    state.pdfBytes = buf.slice(0);
+    const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+    state.pdfDoc = pdf;
+    state.numPages = pdf.numPages;
+    state.curPage = 1;
+    state.pages = new Array(pdf.numPages).fill(null);
+    state.pageOrder = Array.from({ length: pdf.numPages }, (_, i) => i);
+    state.pageEdits = new Array(pdf.numPages).fill(null);
+    state.splitPoints = [];
+    state.splitNames = [];
+    updatePageState();
+    for (let i = 1; i <= pdf.numPages; i++) {
+      setLoader(true, 'Rendering page ' + i + ' of ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
+      await renderPageToLuminance(i);
+    }
+    fileStatusEl.textContent = 'ready';
+    downloadBtn.disabled = false;
+    zoomLevel = 1;
+    zoomInBtn.disabled = false;
+    zoomOutBtn.disabled = false;
+    updatePageState();
+    syncPreviewStageHeight();
+    drawPreview();
+    drawHistogram();
+    setLoader(false);
+  }
 
   async function handleFile(file) {
     clearError();
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
       showError('That doesn’t look like a PDF.'); return;
     }
-    state.fileName = file.name;
-    fileNameEl.textContent = file.name;
-    fileNameEl.title = 'Click to rename';
-    fileNameEl.tabIndex = 0;
-    fileSizeEl.textContent = fmtBytes(file.size);
-    fileStatusEl.textContent = 'loading';
-    fileCard.classList.add('on');
-    setLoader(true, 'Loading PDF…', 0);
     try {
-      const buf = await file.arrayBuffer();
-      state.pdfBytes = buf.slice(0);
-      const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
-      state.pdfDoc = pdf;
-      state.numPages = pdf.numPages;
-      state.curPage = 1;
-      state.pages = new Array(pdf.numPages).fill(null);
-      state.pageOrder = Array.from({ length: pdf.numPages }, (_, i) => i);
-      state.splitPoints = [];
-      state.splitNames = [];
-      updatePageState();
-      for (let i = 1; i <= pdf.numPages; i++) {
-        setLoader(true, 'Rendering page ' + i + ' of ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
-        await renderPageToLuminance(i);
-      }
-      fileStatusEl.textContent = 'ready';
-      downloadBtn.disabled = false;
-      zoomLevel = 1;
-      zoomInBtn.disabled = false;
-      zoomOutBtn.disabled = false;
-      updatePageState();
-      syncPreviewStageHeight();
-      drawPreview();
-      drawHistogram();
-      setLoader(false);
+      await loadPdfBytes(await file.arrayBuffer(), file.name, file.size);
     } catch (err) {
       console.error(err);
       showError('Could not read this PDF: ' + (err.message || err));
@@ -2123,6 +2868,222 @@ Ethan Hu -->
       }
     }
     ctx.putImageData(img, 0, 0);
+  }
+
+  function editedLabel(edit) {
+    if (!isPageEdited(edit)) return 'Original';
+    const parts = [];
+    const angle = editAngle(edit);
+    if (Math.abs(angle) > 0.001) parts.push((Math.round(angle * 10) / 10) + '°');
+    const cropTotal = edit.crop.left + edit.crop.top + edit.crop.right + edit.crop.bottom;
+    if (cropTotal) parts.push('crop');
+    return parts.join(' · ');
+  }
+
+  function renderPageEditor() {
+    if (!pageEditorStrip || activeTool !== 'edit') return;
+    pageEditorStrip.innerHTML = '';
+    const count = activePageCount();
+    pageEditorEmpty.classList.toggle('on', !state.pdfDoc || count === 0);
+    pageEditorCanvasWrap.style.display = state.pdfDoc && count ? 'block' : 'none';
+    pageEditorBottom.style.display = state.pdfDoc && count ? 'flex' : 'none';
+    if (!state.pdfDoc || count === 0) {
+      pageEditorEmpty.textContent = 'Upload a PDF to crop or rotate pages.';
+      return;
+    }
+    for (let outputIndex = 0; outputIndex < count; outputIndex++) {
+      const sourceIndex = state.pageOrder[outputIndex];
+      const pd = state.pages[sourceIndex];
+      if (!pd) continue;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'page-edit-card' + (state.curPage === outputIndex + 1 ? ' active' : '');
+      card.dataset.outputIndex = outputIndex;
+      card.dataset.sourceIndex = sourceIndex;
+
+      const thumb = pd.thumbUrl ? document.createElement('img') : document.createElement('canvas');
+      thumb.className = 'page-thumb';
+      if (pd.thumbUrl) {
+        thumb.src = pd.thumbUrl;
+        thumb.alt = 'Page ' + (outputIndex + 1);
+        thumb.draggable = false;
+      } else {
+        drawThumbnail(thumb, pd);
+      }
+      card.appendChild(thumb);
+
+      const actions = document.createElement('div');
+      actions.className = 'page-card-actions';
+      const badge = document.createElement('span');
+      badge.className = 'page-edit-badge';
+      badge.textContent = editedLabel(getPageEdit(sourceIndex));
+      const num = document.createElement('div');
+      num.className = 'page-number';
+      num.textContent = outputIndex + 1;
+      actions.appendChild(badge);
+      actions.appendChild(num);
+      card.appendChild(actions);
+
+      card.addEventListener('click', () => {
+        state.curPage = outputIndex + 1;
+        updatePageState();
+        syncEditControls();
+        drawEditedPagePreview();
+      });
+      pageEditorStrip.appendChild(card);
+    }
+  }
+
+  function syncCropLabels(edit) {
+    cropNums.left.textContent = edit.crop.left + '%';
+    cropNums.top.textContent = edit.crop.top + '%';
+    cropNums.right.textContent = edit.crop.right + '%';
+    cropNums.bottom.textContent = edit.crop.bottom + '%';
+    const total = edit.crop.left + edit.crop.top + edit.crop.right + edit.crop.bottom;
+    cropHint.textContent = total ? total + '% total' : '0%';
+  }
+
+  function syncEditControls() {
+    const hasPages = !!state.pdfDoc && activePageCount() > 0;
+    rotateLeftBtn.disabled = !hasPages;
+    rotateRightBtn.disabled = !hasPages;
+    bottomRotateLeftBtn.disabled = !hasPages;
+    bottomRotateRightBtn.disabled = !hasPages;
+    resetEditBtn.disabled = !hasPages || !isPageEdited(currentPageEdit());
+    editHint.textContent = hasPages ? 'page ' + state.curPage : 'select page';
+    editSummary.textContent = hasPages
+      ? 'Editing page ' + state.curPage + ' of ' + activePageCount() + '. Changes apply only to this page.'
+      : 'Upload a PDF, then choose a page from the editor to crop or rotate it.';
+    Object.values(cropSliders).forEach(slider => { slider.disabled = !hasPages; });
+    editRotateSlider.disabled = !hasPages;
+    bottomRotateSlider.disabled = !hasPages;
+    if (!hasPages) return;
+    const edit = currentPageEdit();
+    editRotateSlider.value = edit.fineRotation;
+    bottomRotateSlider.value = edit.fineRotation;
+    editRotateNum.textContent = (Math.round(editAngle(edit) * 10) / 10).toFixed(1) + '°';
+    bottomRotateNum.textContent = editRotateNum.textContent;
+    cropSliders.left.value = edit.crop.left;
+    cropSliders.top.value = edit.crop.top;
+    cropSliders.right.value = edit.crop.right;
+    cropSliders.bottom.value = edit.crop.bottom;
+    syncCropLabels(edit);
+  }
+
+  function clampCropPair(edit, axis, changedSide) {
+    const a = axis === 'x' ? 'left' : 'top';
+    const b = axis === 'x' ? 'right' : 'bottom';
+    const total = edit.crop[a] + edit.crop[b];
+    if (total <= 88) return;
+    const other = changedSide === a ? b : a;
+    edit.crop[other] = Math.max(0, 88 - edit.crop[changedSide]);
+  }
+
+  function setCropValue(side, value) {
+    const edit = currentPageEdit();
+    edit.crop[side] = Math.max(0, Math.min(45, Math.round(+value || 0)));
+    clampCropPair(edit, side === 'left' || side === 'right' ? 'x' : 'y', side);
+    syncEditControls();
+    renderPageEditor();
+    drawEditedPagePreview();
+  }
+
+  function renderEditedLuminanceToCanvas(pd, edit, canvas) {
+    const e = clonePageEdit(edit);
+    const cropLeft = Math.round(pd.w * e.crop.left / 100);
+    const cropTop = Math.round(pd.h * e.crop.top / 100);
+    const cropRight = Math.round(pd.w * e.crop.right / 100);
+    const cropBottom = Math.round(pd.h * e.crop.bottom / 100);
+    const cropW = Math.max(1, pd.w - cropLeft - cropRight);
+    const cropH = Math.max(1, pd.h - cropTop - cropBottom);
+    const previewScale = Math.min(1, 1400 / Math.max(cropW, cropH));
+    const srcW = Math.max(1, Math.round(cropW * previewScale));
+    const srcH = Math.max(1, Math.round(cropH * previewScale));
+    const src = document.createElement('canvas');
+    src.width = srcW;
+    src.height = srcH;
+    const sctx = src.getContext('2d');
+    const img = sctx.createImageData(srcW, srcH);
+    const d = img.data;
+    for (let y = 0; y < srcH; y++) {
+      const sy = Math.min(pd.h - 1, cropTop + Math.floor((y / srcH) * cropH));
+      for (let x = 0; x < srcW; x++) {
+        const sx = Math.min(pd.w - 1, cropLeft + Math.floor((x / srcW) * cropW));
+        const v = pd.lum[sy * pd.w + sx];
+        const i = (y * srcW + x) * 4;
+        d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+      }
+    }
+    sctx.putImageData(img, 0, 0);
+
+    const angle = editAngle(e) * Math.PI / 180;
+    const cos = Math.abs(Math.cos(angle));
+    const sin = Math.abs(Math.sin(angle));
+    const outW = Math.ceil(srcW * cos + srcH * sin);
+    const outH = Math.ceil(srcW * sin + srcH * cos);
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.translate(outW / 2, outH / 2);
+    ctx.rotate(angle);
+    ctx.drawImage(src, -srcW / 2, -srcH / 2);
+  }
+
+  function drawEditedPagePreview() {
+    const pd = currentPageData();
+    if (!pd || activeTool !== 'edit') return;
+    renderEditedLuminanceToCanvas(pd, currentPageEdit(), pageEditorCanvas);
+    pageEditorCanvasWrap.style.display = 'block';
+    proofMeta.textContent = 'page ' + state.curPage + '/' + activePageCount() + ' · ' + editedLabel(currentPageEdit());
+    applyZoom({ preserveCenter: false });
+  }
+
+  async function renderEditedPageImageToCanvas(sourceIndex, edit, canvas) {
+    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const pd = state.pages[sourceIndex];
+    const baseScale = hasFineRotation(edit)
+      ? Math.max(pd?.scale || 0, fineRotationExportDpi() / 72)
+      : (pd?.scale || getRenderScale(page.getViewport({ scale: 1 })));
+    const vp = page.getViewport({ scale: baseScale });
+    const base = document.createElement('canvas');
+    base.width = Math.floor(vp.width);
+    base.height = Math.floor(vp.height);
+    const bctx = base.getContext('2d');
+    bctx.fillStyle = '#fff';
+    bctx.fillRect(0, 0, base.width, base.height);
+    await page.render({ canvasContext: bctx, viewport: vp }).promise;
+
+    const e = clonePageEdit(edit);
+    const cropLeft = Math.round(base.width * e.crop.left / 100);
+    const cropTop = Math.round(base.height * e.crop.top / 100);
+    const cropRight = Math.round(base.width * e.crop.right / 100);
+    const cropBottom = Math.round(base.height * e.crop.bottom / 100);
+    const cropW = Math.max(1, base.width - cropLeft - cropRight);
+    const cropH = Math.max(1, base.height - cropTop - cropBottom);
+    const crop = document.createElement('canvas');
+    crop.width = cropW;
+    crop.height = cropH;
+    const cctx = crop.getContext('2d');
+    cctx.fillStyle = '#fff';
+    cctx.fillRect(0, 0, cropW, cropH);
+    cctx.drawImage(base, cropLeft, cropTop, cropW, cropH, 0, 0, cropW, cropH);
+
+    const angle = editAngle(e) * Math.PI / 180;
+    const cos = Math.abs(Math.cos(angle));
+    const sin = Math.abs(Math.sin(angle));
+    const outW = Math.ceil(cropW * cos + cropH * sin);
+    const outH = Math.ceil(cropW * sin + cropH * cos);
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.translate(outW / 2, outH / 2);
+    ctx.rotate(angle);
+    ctx.drawImage(crop, -cropW / 2, -cropH / 2);
+    return { wPt: outW / baseScale, hPt: outH / baseScale };
   }
 
   const organizerDrag = {
@@ -2564,6 +3525,71 @@ Ethan Hu -->
     await exportPageOrderAsPdf(state.pageOrder, outputBaseName() + TOOLS.organize.suffix);
   }
 
+  function applyVectorPageEdit(page, edit) {
+    const e = clonePageEdit(edit);
+    const width = page.getWidth();
+    const height = page.getHeight();
+    const cropLeft = width * e.crop.left / 100;
+    const cropRight = width * e.crop.right / 100;
+    const cropTop = height * e.crop.top / 100;
+    const cropBottom = height * e.crop.bottom / 100;
+    const cropW = Math.max(1, width - cropLeft - cropRight);
+    const cropH = Math.max(1, height - cropTop - cropBottom);
+    if (e.crop.left || e.crop.top || e.crop.right || e.crop.bottom) {
+      page.setCropBox(cropLeft, cropBottom, cropW, cropH);
+    }
+    if (e.quarterTurns) {
+      const currentRotation = page.getRotation().angle || 0;
+      page.setRotation(PDFLib.degrees((currentRotation + e.quarterTurns * 90) % 360));
+    }
+  }
+
+  async function exportEditedPdf() {
+    if (!window.PDFLib) throw new Error('PDF library did not load. Check your connection and try again.');
+    if (!state.pdfBytes) throw new Error('Original PDF data is not available.');
+    if (!activePageCount()) throw new Error('There are no pages to export.');
+    const src = await PDFLib.PDFDocument.load(state.pdfBytes);
+    const out = await PDFLib.PDFDocument.create();
+    const count = activePageCount();
+    for (let i = 0; i < count; i++) {
+      setLoader(true, 'Exporting edited page ' + (i + 1) + ' of ' + count, (i / count) * 100);
+      const sourceIndex = state.pageOrder[i];
+      const edit = clonePageEdit(state.pageEdits[sourceIndex]);
+      if (hasFineRotation(edit)) {
+        setLoader(true, 'Rasterizing fine rotation at ' + fineRotationExportDpi() + ' dpi · page ' + (i + 1) + ' of ' + count, (i / count) * 100);
+      }
+      if (!isPageEdited(edit)) {
+        const [copied] = await out.copyPages(src, [sourceIndex]);
+        out.addPage(copied);
+        continue;
+      }
+
+      if (!hasFineRotation(edit)) {
+        const [copied] = await out.copyPages(src, [sourceIndex]);
+        applyVectorPageEdit(copied, edit);
+        out.addPage(copied);
+        continue;
+      }
+
+      const canvas = document.createElement('canvas');
+      const size = await renderEditedPageImageToCanvas(sourceIndex, edit, canvas);
+      const image = await out.embedPng(canvas.toDataURL('image/png'));
+      const page = out.addPage([size.wPt, size.hPt]);
+      page.drawImage(image, { x: 0, y: 0, width: size.wPt, height: size.hPt });
+      await new Promise(r => setTimeout(r, 0));
+    }
+    const bytes = await out.save();
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = outputBaseName() + TOOLS.edit.suffix + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
   async function exportSplitPart(partIndex) {
     const part = splitParts()[partIndex];
     if (!part || !part.pageOrder.length) return;
@@ -2627,6 +3653,51 @@ Ethan Hu -->
     if (state.pdfDoc) drawPreview();
   });
 
+  function setFineRotation(value) {
+    if (!state.pdfDoc) return;
+    const edit = currentPageEdit();
+    edit.fineRotation = Math.round((+value || 0) * 10) / 10;
+    syncEditControls();
+    renderPageEditor();
+    drawEditedPagePreview();
+  }
+
+  function rotateSelectedPage90(delta) {
+    if (!state.pdfDoc) return;
+    const edit = currentPageEdit();
+    edit.quarterTurns = (edit.quarterTurns + delta + 4) % 4;
+    syncEditControls();
+    renderPageEditor();
+    drawEditedPagePreview();
+  }
+
+  editRotateSlider.addEventListener('input', e => setFineRotation(e.target.value));
+  bottomRotateSlider.addEventListener('input', e => setFineRotation(e.target.value));
+
+  rotateLeftBtn.addEventListener('click', () => rotateSelectedPage90(-1));
+  bottomRotateLeftBtn.addEventListener('click', () => rotateSelectedPage90(-1));
+
+  rotateRightBtn.addEventListener('click', () => rotateSelectedPage90(1));
+  bottomRotateRightBtn.addEventListener('click', () => rotateSelectedPage90(1));
+
+  Object.entries(cropSliders).forEach(([side, slider]) => {
+    slider.addEventListener('input', e => setCropValue(side, e.target.value));
+  });
+
+  fineQualityToggle.addEventListener('click', () => {
+    state.fineRotationQuality = state.fineRotationQuality === 'ultra' ? 'high' : 'ultra';
+    syncFineQualityToggle();
+  });
+
+  resetEditBtn.addEventListener('click', () => {
+    const sourceIndex = currentSourceIndex();
+    if (sourceIndex == null) return;
+    state.pageEdits[sourceIndex] = defaultPageEdit();
+    syncEditControls();
+    renderPageEditor();
+    drawEditedPagePreview();
+  });
+
   contextSplitBtn.addEventListener('click', () => {
     const outputIndex = contextMenuState.outputIndex;
     hidePageContextMenu();
@@ -2655,7 +3726,8 @@ Ethan Hu -->
     state.pageOrder = Array.from({ length: state.numPages }, (_, i) => i);
     state.curPage = 1;
     updatePageState();
-    if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+    if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
+    else if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
   });
 
   // ── Resolution toggles ──
@@ -2675,7 +3747,8 @@ Ethan Hu -->
         await renderPageToLuminance(i);
       }
       updatePageState();
-      if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+      if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
+      else if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
       setLoader(false);
     });
   });
@@ -2685,14 +3758,28 @@ Ethan Hu -->
     updatePageState();
   }
   prevBtn.addEventListener('click', () => {
-    if (state.curPage > 1) { state.curPage--; updatePageButtons(); drawPreview(); drawHistogram(); }
+    if (state.curPage > 1) {
+      state.curPage--;
+      updatePageButtons();
+      if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
+      else { drawPreview(); drawHistogram(); }
+    }
   });
   nextBtn.addEventListener('click', () => {
-    if (state.curPage < activePageCount()) { state.curPage++; updatePageButtons(); drawPreview(); drawHistogram(); }
+    if (state.curPage < activePageCount()) {
+      state.curPage++;
+      updatePageButtons();
+      if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
+      else { drawPreview(); drawHistogram(); }
+    }
   });
 
   // ── Download ──
   downloadBtn.addEventListener('click', async () => {
+    if (activeTool === 'merge') {
+      await mergeSelectedPdfs();
+      return;
+    }
     if (!state.pdfDoc || activePageCount() === 0) return;
     downloadBtn.disabled = true;
     setLoader(true, 'Exporting pages…', 0);
@@ -2700,6 +3787,12 @@ Ethan Hu -->
       if (activeTool === 'organize') {
         setLoader(true, 'Exporting original pages…', 35);
         await exportOrganizedPdf();
+        setLoader(false);
+        return;
+      }
+      if (activeTool === 'edit') {
+        setLoader(true, 'Exporting page edits…', 15);
+        await exportEditedPdf();
         setLoader(false);
         return;
       }
@@ -2734,7 +3827,7 @@ Ethan Hu -->
 
   // ── Zoom ──
   const ZOOM_MIN = 0.25, ZOOM_MAX = 8, ZOOM_STEP = 1.25;
-  let zoomLevel = 1; // 1 = fit
+  let zoomLevel = 1; // 1 = largest fit without preview scrollbars
 
   function setZoom(z, opts) {
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
@@ -2749,7 +3842,14 @@ Ethan Hu -->
       previewHeightRaf = null;
       const minHeight = window.matchMedia('(max-width: 900px)').matches ? 520 : 620;
       const maxHeight = window.matchMedia('(max-width: 900px)').matches ? 820 : 1100;
-      const targetHeight = Math.max(minHeight, Math.min(maxHeight, window.innerHeight * 0.82));
+      const mainPanel = previewStage.closest('main');
+      const stageRect = previewStage.getBoundingClientRect();
+      const mainRect = mainPanel ? mainPanel.getBoundingClientRect() : null;
+      const panelStyle = getComputedStyle(previewStage.parentElement);
+      const panelBottomInset = parseFloat(panelStyle.paddingBottom) || 0;
+      const panelBottom = mainRect ? Math.max(0, mainRect.bottom - stageRect.top - panelBottomInset) : 0;
+      const viewportHeight = window.innerHeight * 0.82;
+      const targetHeight = Math.max(minHeight, Math.min(maxHeight, Math.max(viewportHeight, panelBottom)));
       previewStage.style.setProperty('--preview-stage-height', Math.round(targetHeight) + 'px');
       if (state.pdfDoc) applyZoom();
     });
@@ -2765,11 +3865,10 @@ Ethan Hu -->
 
   function getFitCanvasWidth(pd) {
     const pad = getStagePadding();
-    const stageW = Math.max(1, previewStage.clientWidth - pad.x);
-    const stageH = Math.max(1, previewStage.clientHeight - pad.y);
-    const heightFit = stageH * (pd.w / pd.h);
-    const readableWidth = stageW * 0.82;
-    return Math.max(1, Math.min(stageW, Math.max(heightFit, readableWidth), pd.w));
+    const stageW = Math.max(1, previewStage.clientWidth - pad.x - 1);
+    const stageH = Math.max(1, previewStage.clientHeight - pad.y - 1);
+    const heightFitWidth = stageH * (pd.w / pd.h);
+    return Math.max(1, Math.min(stageW, heightFitWidth, pd.w));
   }
 
   function getScrollCenter() {
@@ -2784,6 +3883,34 @@ Ethan Hu -->
     const maxTop = Math.max(0, previewStage.scrollHeight - previewStage.clientHeight);
     previewStage.scrollLeft = Math.max(0, Math.min(maxLeft, previewStage.scrollWidth * center.x - previewStage.clientWidth / 2));
     previewStage.scrollTop = Math.max(0, Math.min(maxTop, previewStage.scrollHeight * center.y - previewStage.clientHeight / 2));
+  }
+
+  function getEditorScrollCenter() {
+    return {
+      x: pageEditorMain.scrollWidth ? (pageEditorMain.scrollLeft + pageEditorMain.clientWidth / 2) / pageEditorMain.scrollWidth : 0.5,
+      y: pageEditorMain.scrollHeight ? (pageEditorMain.scrollTop + pageEditorMain.clientHeight / 2) / pageEditorMain.scrollHeight : 0.5,
+    };
+  }
+
+  function restoreEditorScrollCenter(center) {
+    const maxLeft = Math.max(0, pageEditorMain.scrollWidth - pageEditorMain.clientWidth);
+    const maxTop = Math.max(0, pageEditorMain.scrollHeight - pageEditorMain.clientHeight);
+    pageEditorMain.scrollLeft = Math.max(0, Math.min(maxLeft, pageEditorMain.scrollWidth * center.x - pageEditorMain.clientWidth / 2));
+    pageEditorMain.scrollTop = Math.max(0, Math.min(maxTop, pageEditorMain.scrollHeight * center.y - pageEditorMain.clientHeight / 2));
+  }
+
+  function getEditorFitCanvasWidth() {
+    const cs = getComputedStyle(pageEditorMain);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const bottomH = pageEditorBottom.offsetHeight || 0;
+    const gap = parseFloat(cs.gap) || 0;
+    const viewW = Math.max(1, pageEditorMain.clientWidth - padX - 1);
+    const viewH = Math.max(1, pageEditorMain.clientHeight - padY - bottomH - gap - 1);
+    const naturalW = pageEditorCanvas.width || 1;
+    const naturalH = pageEditorCanvas.height || 1;
+    const heightFitWidth = viewH * (naturalW / naturalH);
+    return Math.max(1, Math.min(viewW, heightFitWidth, naturalW));
   }
 
   function canPanPreview() {
@@ -2801,6 +3928,7 @@ Ethan Hu -->
   function applyZoom(opts = {}) {
     if (activeTool === 'organize') {
       canvasWrap.classList.remove('zoomed');
+      pageEditorCanvasWrap.classList.remove('zoomed');
       previewStage.classList.remove('zoomed', 'pannable', 'panning');
       zoomOutBtn.disabled = true;
       zoomInBtn.disabled = true;
@@ -2810,12 +3938,31 @@ Ethan Hu -->
     const preserveCenter = opts.preserveCenter !== false;
     const pd = currentPageData();
     const z = zoomLevel;
-    const center = preserveCenter ? getScrollCenter() : { x: 0.5, y: 0.5 };
     const isZoomedIn = z > 1.001;
 
     zoomOutBtn.disabled = !state.pdfDoc || z <= ZOOM_MIN + 0.001;
     zoomInBtn.disabled  = !state.pdfDoc || z >= ZOOM_MAX - 0.001;
-    zoomValEl.textContent = Math.abs(z - 1) < 0.005 ? 'fit' : Math.round(z * 100) + '%';
+    zoomValEl.textContent = Math.round(z * 100) + '%';
+
+    if (activeTool === 'edit') {
+      const center = preserveCenter ? getEditorScrollCenter() : { x: 0.5, y: 0.5 };
+      if (!pd || !pageEditorCanvas.width) {
+        pageEditorCanvasWrap.classList.remove('zoomed');
+        pageEditorCanvas.style.width = '';
+        pageEditorCanvas.style.height = '';
+        return;
+      }
+      pageEditorCanvasWrap.classList.toggle('zoomed', isZoomedIn);
+      pageEditorCanvas.style.width = (getEditorFitCanvasWidth() * z) + 'px';
+      pageEditorCanvas.style.height = 'auto';
+      requestAnimationFrame(() => {
+        if (isZoomedIn) restoreEditorScrollCenter(center);
+        else { pageEditorMain.scrollLeft = 0; pageEditorMain.scrollTop = 0; }
+      });
+      return;
+    }
+
+    const center = preserveCenter ? getScrollCenter() : { x: 0.5, y: 0.5 };
 
     if (!pd) {
       canvasWrap.classList.remove('zoomed');
@@ -2840,7 +3987,7 @@ Ethan Hu -->
   zoomInBtn.addEventListener('click', () => setZoom(zoomLevel * ZOOM_STEP));
   zoomOutBtn.addEventListener('click', () => setZoom(zoomLevel / ZOOM_STEP));
 
-  // click the % readout to type any zoom level (Enter commits, Esc cancels, "fit" or 100 = fit)
+  // click the % readout to type any zoom level (Enter commits, Esc cancels, "fit" = calibrated 100%)
   zoomValEl.addEventListener('click', () => {
     if (!state.pdfDoc || zoomValEl.querySelector('input')) return;
     const input = document.createElement('input');
@@ -2867,7 +4014,9 @@ Ethan Hu -->
 
   // ctrl/cmd + scroll (or trackpad pinch) = continuous zoom
   previewStage.addEventListener('wheel', e => {
-    if (!state.pdfDoc || (!e.ctrlKey && !e.metaKey)) return;
+    const canZoomTool = isRasterTool(activeTool) || activeTool === 'edit';
+    const overPdf = e.target.closest('.preview-canvas-wrap, .page-editor-canvas-wrap');
+    if (!state.pdfDoc || !canZoomTool || !overPdf || (!e.ctrlKey && !e.metaKey)) return;
     e.preventDefault();
     const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 100 : 1);
     let z = zoomLevel * Math.exp(-dy * 0.0015);
@@ -2919,6 +4068,11 @@ Ethan Hu -->
     document.fonts.ready.then(syncPreviewStageHeight);
   }
   syncPreviewStageHeight();
+  updateSourceDropMode();
+  resolutionOptions.classList.toggle('hidden', !isRasterTool(activeTool));
+  updateMergeState();
+  syncFineQualityToggle();
+  syncEditControls();
   updatePreviewMode();
   updateToolIndicator();
 
