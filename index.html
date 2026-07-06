@@ -5,7 +5,7 @@ Add a <div class="tool-tab" data-tool="yourkey"> in the nav
 Add a <div class="tool-panel" id="tool-yourkey"> in the left panel with your controls — the switchTool() function handles the rest automatically
 Greyscale tool has:
 
-Brightness slider (−100 → +100) with the same big Bodoni number treatment
+Brightness slider (−100 → +100) with the same big number treatment
 Contrast slider (50% → 200%)
 Invert and Sepia toggles (sepia gives a warm amber tint over the greyscale)
 Hint label in the section header updates dynamically ("neutral", "sepia", "dark", etc.)
@@ -21,9 +21,10 @@ The header lede and meta lines also swap when you switch tabs. -->
 <title>PDF Atelier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;0,6..96,900;1,6..96,400&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js'"></script>
 <style>
   :root {
     --paper: #ece6d8;
@@ -384,22 +385,629 @@ The header lede and meta lines also swap when you switch tabs. -->
 
   .err { margin-top: 12px; padding: 10px 12px; border-left: 3px solid var(--accent); background: rgba(138,29,24,0.08); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-soft); display: none; }
   .err.on { display: block; }
+
+  /* ── APPLE-LIKE REFRESH ── */
+  :root {
+    --paper: #f5f5f7;
+    --paper-2: #ffffff;
+    --ink: #1d1d1f;
+    --ink-soft: #424245;
+    --ink-mute: #6e6e73;
+    --accent: #0071e3;
+    --accent-soft: #e8f2ff;
+    --line: rgba(0, 0, 0, 0.1);
+    --line-strong: rgba(0, 0, 0, 0.18);
+    --shadow-soft: 0 18px 50px rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.06);
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --radius-sm: 12px;
+    --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { letter-spacing: 0 !important; }
+
+  html, body {
+    background:
+      radial-gradient(circle at 50% -20%, rgba(255, 255, 255, 0.95), rgba(245, 245, 247, 0) 34%),
+      var(--paper);
+    font-family: var(--font-ui);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  body::before { display: none; }
+
+  .mono,
+  .kicker,
+  .title-sub,
+  .subhead .meta,
+  .tool-nav-label,
+  .tool-tab,
+  .section-label,
+  .drop .sub,
+  .filecard .stats,
+  .big-display .tag,
+  .slider-tags,
+  .toggle,
+  .res-label,
+  .res-note,
+  .pagenav .num,
+  .btn-print .small,
+  .preview-stage .empty .small,
+  .zoom-val,
+  .loader .pct,
+  footer,
+  .err {
+    font-family: var(--font-ui);
+  }
+
+  h1.title,
+  h1.title em,
+  .subhead .lede,
+  .drop .glyph,
+  .drop .lbl,
+  .filecard .name,
+  .big-display .num,
+  .big-display .denom,
+  .pagenav button,
+  .btn-print,
+  .preview-bar .title,
+  .preview-bar .title em,
+  .preview-stage .empty .big,
+  .zoom-btn,
+  .loader .lab,
+  footer em {
+    font-family: var(--font-ui);
+    font-style: normal;
+  }
+
+  .frame { padding-top: 36px; }
+
+  header.masthead {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.76);
+    box-shadow: var(--shadow-soft);
+    padding: 22px 28px;
+    backdrop-filter: blur(22px) saturate(1.3);
+  }
+
+  .kicker,
+  .subhead {
+    border-color: var(--line);
+  }
+
+  h1.title {
+    font-weight: 800;
+    letter-spacing: 0 !important;
+  }
+
+  h1.title em {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .title-sub,
+  .section-label,
+  .tool-nav-label,
+  .tool-tab,
+  .slider-tags,
+  .toggle,
+  .res-label,
+  .res-note,
+  .btn-print .small,
+  .preview-stage .empty .small,
+  .zoom-val,
+  footer {
+    text-transform: none;
+  }
+
+  .subhead .lede {
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+
+  .tool-nav {
+    margin: 18px 0 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.045);
+    padding: 5px;
+  }
+
+  .tool-nav-label {
+    border-right: 0;
+    padding: 0 14px;
+  }
+
+  .tool-nav-label::before,
+  .section-label::before {
+    content: "";
+    display: none;
+  }
+
+  .tool-tab {
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-weight: 600;
+  }
+
+  .tool-tab:hover:not(.active) {
+    background: rgba(0, 0, 0, 0.045);
+  }
+
+  .tool-tab.active {
+    background: var(--ink);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  }
+
+  main {
+    margin-top: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--paper-2);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+  }
+
+  @media (max-width: 900px) {
+    .panel-left { border-bottom-color: var(--line) !important; }
+  }
+
+  .panel-left {
+    border-right-color: var(--line);
+    background: rgba(250, 250, 252, 0.92);
+  }
+
+  .panel-right {
+    background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+  }
+
+  .section-label {
+    color: var(--ink-mute);
+    font-weight: 600;
+  }
+
+  .drop {
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-md);
+    background: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
+  .drop:hover,
+  .drop.drag {
+    background: var(--accent-soft);
+    border-color: rgba(0, 113, 227, 0.42);
+  }
+
+  .drop .glyph {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .drop .lbl,
+  .filecard .name,
+  .preview-bar .title {
+    font-weight: 700;
+  }
+
+  .filecard {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    padding: 14px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .filecard .name {
+    border-radius: 8px;
+    cursor: text;
+    margin: -4px -6px 4px;
+    padding: 4px 6px;
+    transition: background .16s, box-shadow .16s;
+  }
+
+  .filecard .name:hover,
+  .filecard .name:focus {
+    background: #f5f5f7;
+    box-shadow: inset 0 0 0 1px var(--line);
+    outline: none;
+  }
+
+  .file-name-input {
+    background: #f5f5f7;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    color: var(--ink);
+    display: block;
+    font: inherit;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: -4px -6px 4px;
+    padding: 4px 6px;
+    width: calc(100% + 12px);
+  }
+
+  .big-display .num {
+    font-weight: 800;
+    letter-spacing: 0 !important;
+  }
+
+  .big-display .denom {
+    color: var(--ink-mute);
+    font-weight: 600;
+  }
+
+  .big-display .tag {
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 700;
+    padding: 5px 10px;
+  }
+
+  .histo {
+    border-color: var(--line);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.04);
+  }
+
+  .histo .needle,
+  .histo .needle::before {
+    background: var(--accent);
+  }
+
+  input[type=range].slider::-webkit-slider-runnable-track,
+  input[type=range].slider::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), #8cc7ff);
+  }
+
+  input[type=range].slider::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+    margin-top: -9px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  input[type=range].slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .toggle {
+    border-color: var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  .toggle:hover {
+    background: #f1f1f3;
+  }
+
+  .toggle.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .res-box {
+    border-color: var(--line-strong);
+    border-radius: 4px;
+    background: #fff;
+  }
+
+  .res-label input:checked + .res-box {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .pagenav,
+  .zoom-bar {
+    border-color: var(--line);
+    border-radius: 999px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .pagenav button,
+  .zoom-btn {
+    background: transparent;
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .pagenav button,
+  .pagenav button:last-child,
+  .zoom-btn:first-child,
+  .zoom-btn:last-child {
+    border-color: var(--line);
+  }
+
+  .pagenav button:hover:not(:disabled),
+  .zoom-btn:hover:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-print {
+    border-radius: var(--radius-md);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 12px 28px rgba(0, 113, 227, 0.24);
+  }
+
+  .btn-print:hover:not(:disabled) {
+    background: #0077ed;
+  }
+
+  .preview-bar {
+    border-bottom-color: var(--line);
+  }
+
+  .preview-canvas-wrap {
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 24px 60px rgba(0, 0, 0, 0.16);
+    max-height: none;
+    overflow: hidden;
+  }
+
+  .preview-canvas-wrap canvas {
+    max-height: none;
+  }
+
+  .loader {
+    background: rgba(245, 245, 247, 0.84);
+    backdrop-filter: blur(18px) saturate(1.25);
+  }
+
+  .loader .lab {
+    font-weight: 700;
+  }
+
+  .loader .bar {
+    height: 8px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  .loader .bar > div {
+    border-radius: 999px;
+    background: var(--accent);
+  }
+
+  footer {
+    border-top-color: var(--line);
+  }
+
+  footer em {
+    color: var(--ink-mute);
+  }
+
+  .err {
+    border-left: 0;
+    border-radius: var(--radius-sm);
+    background: #fff2f2;
+    color: #b42318;
+  }
+
+  .tool-nav {
+    position: relative;
+  }
+
+  .tool-indicator {
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 0;
+    height: calc(100% - 10px);
+    border-radius: 999px;
+    background: var(--ink);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+    transform: translateX(0);
+    transition: transform 260ms cubic-bezier(.2, .8, .2, 1), width 260ms cubic-bezier(.2, .8, .2, 1);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .tool-tab {
+    position: relative;
+    z-index: 1;
+  }
+
+  .tool-tab.active {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .btn-secondary {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 11px 14px;
+    transition: background .18s, border-color .18s, color .18s;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: #f1f1f3;
+    border-color: var(--line-strong);
+  }
+
+  .btn-secondary:disabled {
+    color: var(--ink-mute);
+    cursor: not-allowed;
+    opacity: .5;
+  }
+
+  .organize-summary {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.45;
+    margin-bottom: 12px;
+    padding: 13px 14px;
+  }
+
+  .resolution-options.hidden {
+    display: none;
+  }
+
+  .preview-tools-hidden .zoom-bar {
+    display: none;
+  }
+
+  .preview-stage.organizing {
+    align-items: stretch;
+    justify-content: flex-start;
+    background: #fff;
+    border-radius: var(--radius-md);
+    padding: 28px;
+  }
+
+  .organizer {
+    width: 100%;
+    min-height: 100%;
+  }
+
+  .organizer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 24px;
+    align-items: start;
+    width: 100%;
+  }
+
+  .organizer-empty {
+    color: var(--ink-mute);
+    display: none;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 80px 24px;
+    text-align: center;
+  }
+
+  .organizer-empty.on {
+    display: block;
+  }
+
+  .page-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.10);
+    cursor: grab;
+    overflow: hidden;
+    transform: translateZ(0);
+    transition: opacity .16s, transform .16s, box-shadow .16s;
+  }
+
+  .page-card:hover {
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.14);
+    transform: translateY(-2px);
+  }
+
+  .page-card.dragging {
+    opacity: .45;
+  }
+
+  .page-card.drop-target {
+    outline: 3px solid rgba(100, 210, 255, 0.72);
+    outline-offset: 5px;
+  }
+
+  .page-thumb {
+    background: #fff;
+    display: block;
+    width: 100%;
+    aspect-ratio: 0.72;
+    height: auto;
+    object-fit: contain;
+  }
+
+  .page-card-actions {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.94);
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 10px;
+  }
+
+  .page-number {
+    color: #2997bd;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .page-delete {
+    align-items: center;
+    background: #fff;
+    border: 2px solid rgba(41, 151, 189, 0.45);
+    border-radius: 50%;
+    color: #2997bd;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 20px;
+    font-weight: 700;
+    height: 34px;
+    justify-content: center;
+    line-height: 1;
+    width: 34px;
+  }
+
+  .page-delete:hover {
+    background: #e8f7ff;
+    border-color: rgba(41, 151, 189, 0.72);
+  }
+
+  @media (max-width: 700px) {
+    .organizer-grid {
+      grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+      gap: 18px;
+    }
+
+    .preview-stage.organizing {
+      padding: 18px;
+    }
+  }
 </style>
 </head>
 <body>
 <div class="frame">
 
   <header class="masthead">
-    <div class="kicker">
-      <span>VOL. I — No. 01</span>
-      <span>·  ·  ·</span>
-      <span id="headerDate"></span>
-    </div>
-    <h1 class="title">PDF<em> atelier</em></h1>
+    <h1 class="title">PDF<em> Atelier</em></h1>
     <div class="title-sub">PDF Tools</div>
     <div class="subhead">
       <div class="lede" id="masterLede">
-        Render any PDF in black and white, with threshold control for a true press-style finish.
+        Convert any PDF to black and white with adjustable threshold control.
       </div>
       <div class="meta" id="masterMeta">
         Two values · zero shades<br/>
@@ -411,12 +1019,16 @@ The header lede and meta lines also swap when you switch tabs. -->
 
   <!-- TOOL NAVIGATION -->
   <nav class="tool-nav">
-    <div class="tool-nav-label">Editions</div>
+    <div class="tool-nav-label">Tools</div>
+    <div class="tool-indicator" id="toolIndicator" aria-hidden="true"></div>
     <div class="tool-tab active" data-tool="threshold">
       <span class="tab-num">I.</span> Threshold
     </div>
     <div class="tool-tab" data-tool="greyscale">
-      <span class="tab-num">II.</span> Greyscale
+      <span class="tab-num">II.</span> Grayscale
+    </div>
+    <div class="tool-tab" data-tool="organize">
+      <span class="tab-num">III.</span> Organize
     </div>
   </nav>
 
@@ -424,7 +1036,7 @@ The header lede and meta lines also swap when you switch tabs. -->
     <section class="panel panel-left">
 
       <!-- SHARED: Source -->
-      <div class="section-label"><span>I. Source Manuscript</span><span>—</span></div>
+      <div class="section-label"><span>I. Source PDF</span><span>—</span></div>
       <div class="drop" id="dropZone">
         <div class="glyph">¶</div>
         <div class="lbl">Upload PDF</div>
@@ -436,7 +1048,7 @@ The header lede and meta lines also swap when you switch tabs. -->
       <div class="filecard" id="fileCard">
         <div class="name" id="fileName">—</div>
         <div class="stats">
-          <span>Pp. <b id="pageCount">—</b></span>
+          <span>Pages <b id="pageCount">—</b></span>
           <span>Size <b id="fileSize">—</b></span>
           <span>Status <b id="fileStatus">ready</b></span>
         </div>
@@ -445,7 +1057,7 @@ The header lede and meta lines also swap when you switch tabs. -->
       <!-- ═══ THRESHOLD PANEL ═══ -->
       <div class="tool-panel active" id="tool-threshold">
         <div style="margin-top:26px">
-          <div class="section-label"><span>II. Threshold</span><span id="threshHint">midtone</span></div>
+          <div class="section-label"><span>II. Threshold</span><span id="threshHint">mid range</span></div>
           <div class="big-display">
             <span class="num" id="threshNum">128</span>
             <span class="denom">/255</span>
@@ -457,8 +1069,8 @@ The header lede and meta lines also swap when you switch tabs. -->
           </div>
           <input type="range" min="0" max="255" value="128" class="slider" id="threshSlider">
           <div class="slider-tags">
-            <span>0 · pure white</span>
-            <span>255 · pure black</span>
+            <span>0 · white</span>
+            <span>255 · black</span>
           </div>
           <div class="toggles">
             <div class="toggle" id="invertToggle">↻ Invert</div>
@@ -469,12 +1081,12 @@ The header lede and meta lines also swap when you switch tabs. -->
       <!-- ═══ GREYSCALE PANEL ═══ -->
       <div class="tool-panel" id="tool-greyscale">
         <div style="margin-top:26px">
-          <div class="section-label"><span>II. Greyscale</span><span id="greyHint">neutral</span></div>
+          <div class="section-label"><span>II. Grayscale</span><span id="greyHint">neutral</span></div>
 
           <div class="grey-row">
             <div class="big-display">
               <span class="num md" id="brightNum">0</span>
-              <span class="denom">bright</span>
+              <span class="denom">brightness</span>
               <span class="tag" id="brightTag">neutral</span>
             </div>
             <input type="range" min="-100" max="100" value="0" class="slider" id="brightSlider">
@@ -488,7 +1100,7 @@ The header lede and meta lines also swap when you switch tabs. -->
               <span class="tag" id="contrastTag">normal</span>
             </div>
             <input type="range" min="50" max="200" value="100" class="slider" id="contrastSlider">
-            <div class="slider-tags"><span>50% · flat</span><span>200% · punchy</span></div>
+            <div class="slider-tags"><span>50% · low</span><span>200% · high</span></div>
           </div>
 
           <div class="toggles">
@@ -498,8 +1110,17 @@ The header lede and meta lines also swap when you switch tabs. -->
         </div>
       </div>
 
-      <!-- SHARED: Folio -->
-      <div class="section-label" style="margin-top:26px"><span>III. Folio</span><span>—</span></div>
+      <!-- ═══ ORGANIZE PANEL ═══ -->
+      <div class="tool-panel" id="tool-organize">
+        <div style="margin-top:26px">
+          <div class="section-label"><span>II. Organize Pages</span><span id="organizeHint">ready</span></div>
+          <div class="organize-summary" id="organizeSummary">Upload a PDF to reorder or remove pages.</div>
+          <button class="btn-secondary" id="resetPagesBtn" disabled>Restore original order</button>
+        </div>
+      </div>
+
+      <!-- SHARED: Pages -->
+      <div class="section-label" style="margin-top:26px"><span>III. Pages</span><span>—</span></div>
       <div class="pagenav">
         <button id="prevPage" disabled>‹</button>
         <div class="num">Page <b id="curPage">—</b> / <b id="totPage">—</b></div>
@@ -508,14 +1129,14 @@ The header lede and meta lines also swap when you switch tabs. -->
 
       <!-- SHARED: Download -->
       <div class="actions">
-        <div class="toggles" style="margin-bottom:14px">
+        <div class="toggles resolution-options" id="resolutionOptions" style="margin-bottom:14px">
           <div class="toggle on" id="resFast">Fast</div>
           <div class="toggle" id="res300">300 dpi</div>
           <div class="toggle" id="res600">600 dpi</div>
         </div>
         <button class="btn-print" id="downloadBtn" disabled>
-          <span id="downloadLabel">Print to PDF</span>
-          <span class="small" id="downloadSub">— render &amp; download all pages</span>
+          <span id="downloadLabel">Export PDF</span>
+          <span class="small" id="downloadSub">render and download all pages</span>
         </button>
       </div>
 
@@ -524,9 +1145,9 @@ The header lede and meta lines also swap when you switch tabs. -->
     <!-- RIGHT: PREVIEW -->
     <section class="panel panel-right">
       <div class="preview-bar">
-        <div class="title">Proof <em>— preview impression</em></div>
-        <div style="display:flex;align-items:center;gap:14px;min-width:0">
-          <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="proofMeta">awaiting source</div>
+        <div class="title" id="previewTitle">Preview <em>— processed output</em></div>
+        <div id="previewTools" style="display:flex;align-items:center;gap:14px;min-width:0">
+          <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="proofMeta">awaiting PDF</div>
           <div class="zoom-bar">
             <button class="zoom-btn" id="zoomOut" disabled>−</button>
             <span class="zoom-val" id="zoomVal" title="Click to fit">fit</span>
@@ -536,14 +1157,18 @@ The header lede and meta lines also swap when you switch tabs. -->
       </div>
       <div class="preview-stage" id="previewStage">
         <div class="empty" id="emptyState">
-          <div class="big">— no proof yet —</div>
-          <div class="small">load a pdf to begin</div>
+          <div class="big">No preview yet</div>
+          <div class="small">Upload a PDF to begin</div>
         </div>
         <div class="preview-canvas-wrap" id="canvasWrap" style="display:none">
           <canvas id="previewCanvas"></canvas>
         </div>
+        <div class="organizer" id="organizer" style="display:none">
+          <div class="organizer-empty" id="organizerEmpty">Upload a PDF to organize pages.</div>
+          <div class="organizer-grid" id="organizerGrid"></div>
+        </div>
         <div class="loader" id="loader">
-          <div class="lab" id="loaderLabel">Setting type…</div>
+          <div class="lab" id="loaderLabel">Processing…</div>
           <div class="pct" id="loaderPct">0%</div>
           <div class="bar"><div id="loaderBar"></div></div>
         </div>
@@ -552,8 +1177,8 @@ The header lede and meta lines also swap when you switch tabs. -->
   </main>
 
   <footer>
-    <span>Set in Bodoni Moda &amp; JetBrains Mono</span>
-    <em>Imprimatur — pure ink, no halftone.</em>
+    <span>Set in SF Pro / Inter</span>
+    <em>Client-side PDF processing</em>
     <span>Runs entirely in your browser</span>
   </footer>
 
@@ -566,22 +1191,30 @@ The header lede and meta lines also swap when you switch tabs. -->
   // ── Tool registry: add a new entry here to add a new tool ──
   const TOOLS = {
     threshold: {
-      lede: 'Render any PDF in black and white, with threshold control for a true press-style finish.',
-      meta: 'Two values · zero shades<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
-      downloadLabel: 'Print to PDF',
-      downloadSub: '— render &amp; download all pages',
+      lede: 'Convert any PDF to black and white with adjustable threshold control.',
+      meta: 'Black and white output<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
+      downloadLabel: 'Export PDF',
+      downloadSub: 'render and download all pages',
       suffix: '_bw',
     },
     greyscale: {
-      lede: 'Render any PDF in grayscale with precise brightness and contrast control for smooth tonal depth.',
-      meta: '256 shades of grey<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
-      downloadLabel: 'Export Greyscale PDF',
-      downloadSub: '— render &amp; download all pages',
+      lede: 'Convert any PDF to grayscale with brightness and contrast controls.',
+      meta: 'Grayscale output<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
+      downloadLabel: 'Export Grayscale PDF',
+      downloadSub: 'render and download all pages',
       suffix: '_grey',
+    },
+    organize: {
+      lede: 'Reorder pages or remove pages before exporting the PDF.',
+      meta: 'Drag pages to reorder<br/>Click × to remove a page<br/>Original PDF pages are preserved',
+      downloadLabel: 'Export Organized PDF',
+      downloadSub: 'preserve original page content',
+      suffix: '_organized',
     },
   };
 
   let activeTool = 'threshold';
+  let processTool = 'threshold';
 
   const state = {
     pdfDoc: null, numPages: 0, curPage: 1,
@@ -592,7 +1225,7 @@ The header lede and meta lines also swap when you switch tabs. -->
     // output
     resolution: 'fast',
     // cache
-    pages: [], fileName: '', fileSize: 0,
+    pages: [], pageOrder: [], fileName: '', fileSize: 0, pdfBytes: null,
   };
 
   const $ = id => document.getElementById(id);
@@ -628,11 +1261,21 @@ The header lede and meta lines also swap when you switch tabs. -->
   const downloadBtn   = $('downloadBtn');
   const downloadLabel = $('downloadLabel');
   const downloadSub   = $('downloadSub');
+  const resolutionOptions = $('resolutionOptions');
+  const resetPagesBtn = $('resetPagesBtn');
+  const organizeHint  = $('organizeHint');
+  const organizeSummary = $('organizeSummary');
   const leftPanel     = document.querySelector('.panel-left');
   const previewCanvas = $('previewCanvas');
   const previewStage  = $('previewStage');
   const canvasWrap    = $('canvasWrap');
   const emptyState    = $('emptyState');
+  const organizer     = $('organizer');
+  const organizerGrid = $('organizerGrid');
+  const organizerEmpty = $('organizerEmpty');
+  const previewTitle  = $('previewTitle');
+  const previewTools  = $('previewTools');
+  const toolIndicator = $('toolIndicator');
   const proofMeta     = $('proofMeta');
   const zoomOutBtn    = $('zoomOut');
   const zoomInBtn     = $('zoomIn');
@@ -647,9 +1290,19 @@ The header lede and meta lines also swap when you switch tabs. -->
     tab.addEventListener('click', () => switchTool(tab.dataset.tool));
   });
 
+  function updateToolIndicator() {
+    const activeTab = document.querySelector('.tool-tab.active');
+    if (!activeTab || !toolIndicator) return;
+    const navRect = activeTab.parentElement.getBoundingClientRect();
+    const tabRect = activeTab.getBoundingClientRect();
+    toolIndicator.style.width = tabRect.width + 'px';
+    toolIndicator.style.transform = 'translateX(' + (tabRect.left - navRect.left + activeTab.parentElement.scrollLeft) + 'px)';
+  }
+
   function switchTool(id) {
     if (id === activeTool) return;
     activeTool = id;
+    if (id === 'threshold' || id === 'greyscale') processTool = id;
     document.querySelectorAll('.tool-tab').forEach(t =>
       t.classList.toggle('active', t.dataset.tool === id));
     document.querySelectorAll('.tool-panel').forEach(p =>
@@ -659,8 +1312,30 @@ The header lede and meta lines also swap when you switch tabs. -->
     $('masterMeta').innerHTML = tool.meta;
     downloadLabel.innerHTML = tool.downloadLabel;
     downloadSub.innerHTML = tool.downloadSub;
+    resolutionOptions.classList.toggle('hidden', id === 'organize');
+    updatePreviewMode();
+    updateToolIndicator();
     syncPreviewStageHeight();
-    if (state.pdfDoc) { drawPreview(); drawHistogram(); }
+    if (state.pdfDoc && id !== 'organize') { drawPreview(); drawHistogram(); }
+  }
+
+  function updatePreviewMode() {
+    const organizing = activeTool === 'organize';
+    previewStage.classList.toggle('organizing', organizing);
+    previewTools.classList.toggle('preview-tools-hidden', organizing);
+    previewTitle.innerHTML = organizing
+      ? 'Rearrange <em>— drag pages to reorder</em>'
+      : 'Preview <em>— processed output</em>';
+    organizer.style.display = organizing ? 'block' : 'none';
+    if (organizing) {
+      emptyState.style.display = 'none';
+      canvasWrap.style.display = 'none';
+      renderOrganizer();
+      return;
+    }
+    const hasPages = state.pdfDoc && activePageCount() > 0;
+    emptyState.style.display = hasPages ? 'none' : 'block';
+    canvasWrap.style.display = hasPages ? 'block' : 'none';
   }
 
   // ── Helpers ──
@@ -677,6 +1352,63 @@ The header lede and meta lines also swap when you switch tabs. -->
     return (b / 1048576).toFixed(2) + ' MB';
   }
 
+  function normalizePdfName(name) {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return state.fileName || 'document.pdf';
+    return /\.pdf$/i.test(trimmed) ? trimmed : trimmed + '.pdf';
+  }
+
+  function outputBaseName() {
+    const clean = normalizePdfName(state.fileName)
+      .replace(/\.pdf$/i, '')
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .trim();
+    return clean || 'document';
+  }
+
+  function activePageCount() {
+    return state.pageOrder.length;
+  }
+
+  function padPage(n) {
+    return n ? String(n).padStart(2, '0') : '—';
+  }
+
+  function currentSourceIndex() {
+    return state.pageOrder[state.curPage - 1];
+  }
+
+  function currentPageData() {
+    const sourceIndex = currentSourceIndex();
+    return sourceIndex == null ? null : state.pages[sourceIndex];
+  }
+
+  function isOrderChanged() {
+    if (!state.pdfDoc || state.pageOrder.length !== state.numPages) return !!state.pdfDoc;
+    return state.pageOrder.some((sourceIndex, outputIndex) => sourceIndex !== outputIndex);
+  }
+
+  function updatePageState() {
+    const count = activePageCount();
+    if (count === 0) state.curPage = 1;
+    else state.curPage = Math.max(1, Math.min(state.curPage, count));
+    pageCountEl.textContent = state.pdfDoc ? count : '—';
+    totPageEl.textContent = state.pdfDoc ? padPage(count) : '—';
+    curPageEl.textContent = state.pdfDoc && count ? padPage(state.curPage) : '—';
+    prevBtn.disabled = !state.pdfDoc || state.curPage <= 1;
+    nextBtn.disabled = !state.pdfDoc || state.curPage >= count;
+    downloadBtn.disabled = !state.pdfDoc || count === 0;
+    resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
+    organizeHint.textContent = state.pdfDoc ? count + ' pages' : 'ready';
+    organizeSummary.textContent = state.pdfDoc
+      ? count + ' of ' + state.numPages + ' original pages will be included in export.'
+      : 'Upload a PDF to reorder or remove pages.';
+    proofMeta.textContent = state.pdfDoc
+      ? (count ? count + ' pages in output' : 'no pages selected')
+      : 'awaiting PDF';
+    updatePreviewMode();
+  }
+
   function setLoader(on, label, pct) {
     loader.classList.toggle('on', on);
     if (on && label != null) loaderLabel.textContent = label;
@@ -684,19 +1416,19 @@ The header lede and meta lines also swap when you switch tabs. -->
   }
 
   function threshHintText(v) {
-    if (v < 64) return 'low key';
-    if (v < 110) return 'shadow';
-    if (v < 145) return 'midtone';
-    if (v < 200) return 'highlight';
-    return 'high key';
+    if (v < 64) return 'low';
+    if (v < 110) return 'dark range';
+    if (v < 145) return 'mid range';
+    if (v < 200) return 'light range';
+    return 'high';
   }
 
   function contrastHintText(v) {
-    if (v < 80) return 'flat';
+    if (v < 80) return 'low';
     if (v < 95) return 'soft';
     if (v <= 115) return 'normal';
-    if (v <= 150) return 'punchy';
-    return 'harsh';
+    if (v <= 150) return 'high';
+    return 'maximum';
   }
 
   function greyHintText() {
@@ -704,11 +1436,48 @@ The header lede and meta lines also swap when you switch tabs. -->
     if (state.greyInvert) return 'inverted';
     if (state.brightness > 40) return 'bright';
     if (state.brightness < -40) return 'dark';
-    if (state.contrast > 140) return 'punchy';
+    if (state.contrast > 140) return 'high contrast';
     return 'neutral';
   }
 
   // ── File handling ──
+  function beginFileNameEdit() {
+    if (!state.fileName || fileNameEl.querySelector('input')) return;
+    const currentName = state.fileName;
+    const input = document.createElement('input');
+    input.className = 'file-name-input';
+    input.type = 'text';
+    input.value = currentName;
+    fileNameEl.textContent = '';
+    fileNameEl.appendChild(input);
+    input.focus();
+    input.select();
+
+    let finished = false;
+    const finish = commit => {
+      if (finished) return;
+      finished = true;
+      if (commit) state.fileName = normalizePdfName(input.value);
+      else state.fileName = currentName;
+      fileNameEl.textContent = state.fileName;
+      fileNameEl.title = 'Click to rename';
+    };
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') finish(true);
+      else if (e.key === 'Escape') finish(false);
+    });
+    input.addEventListener('blur', () => finish(true));
+  }
+
+  fileNameEl.addEventListener('click', beginFileNameEdit);
+  fileNameEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      beginFileNameEdit();
+    }
+  });
+
   dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
@@ -725,22 +1494,24 @@ The header lede and meta lines also swap when you switch tabs. -->
     }
     state.fileName = file.name;
     fileNameEl.textContent = file.name;
+    fileNameEl.title = 'Click to rename';
+    fileNameEl.tabIndex = 0;
     fileSizeEl.textContent = fmtBytes(file.size);
     fileStatusEl.textContent = 'loading';
     fileCard.classList.add('on');
-    setLoader(true, 'Loading manuscript…', 0);
+    setLoader(true, 'Loading PDF…', 0);
     try {
       const buf = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      state.pdfBytes = buf.slice(0);
+      const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
       state.pdfDoc = pdf;
       state.numPages = pdf.numPages;
       state.curPage = 1;
       state.pages = new Array(pdf.numPages).fill(null);
-      pageCountEl.textContent = pdf.numPages;
-      totPageEl.textContent = String(pdf.numPages).padStart(2, '0');
-      curPageEl.textContent = '01';
+      state.pageOrder = Array.from({ length: pdf.numPages }, (_, i) => i);
+      updatePageState();
       for (let i = 1; i <= pdf.numPages; i++) {
-        setLoader(true, 'Setting type · pg ' + i + ' / ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
+        setLoader(true, 'Rendering page ' + i + ' of ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
         await renderPageToLuminance(i);
       }
       fileStatusEl.textContent = 'ready';
@@ -748,9 +1519,7 @@ The header lede and meta lines also swap when you switch tabs. -->
       zoomLevel = 1;
       zoomInBtn.disabled = false;
       zoomOutBtn.disabled = false;
-      updatePageButtons();
-      emptyState.style.display = 'none';
-      canvasWrap.style.display = 'block';
+      updatePageState();
       syncPreviewStageHeight();
       drawPreview();
       drawHistogram();
@@ -783,6 +1552,7 @@ The header lede and meta lines also swap when you switch tabs. -->
     ctx.fillRect(0, 0, c.width, c.height);
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
     const img = ctx.getImageData(0, 0, c.width, c.height);
+    const thumbUrl = makeThumbnailUrl(c);
     const d = img.data;
     const lum = new Uint8ClampedArray(c.width * c.height);
     const histo = new Uint32Array(256);
@@ -790,7 +1560,28 @@ The header lede and meta lines also swap when you switch tabs. -->
       const v = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) | 0;
       lum[j] = v; histo[v]++;
     }
-    state.pages[pageNum - 1] = { lum, w: c.width, h: c.height, histo, scale };
+    state.pages[pageNum - 1] = { lum, w: c.width, h: c.height, histo, scale, thumbUrl };
+  }
+
+  function makeThumbnailUrl(sourceCanvas) {
+    const maxW = 520;
+    const maxH = 720;
+    let w = maxW;
+    let h = Math.round(w * (sourceCanvas.height / sourceCanvas.width));
+    if (h > maxH) {
+      h = maxH;
+      w = Math.round(h * (sourceCanvas.width / sourceCanvas.height));
+    }
+    const thumb = document.createElement('canvas');
+    thumb.width = w;
+    thumb.height = h;
+    const tctx = thumb.getContext('2d');
+    tctx.fillStyle = '#fff';
+    tctx.fillRect(0, 0, w, h);
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
+    tctx.drawImage(sourceCanvas, 0, 0, w, h);
+    return thumb.toDataURL('image/png');
   }
 
   // ── Processing functions ──
@@ -833,15 +1624,19 @@ The header lede and meta lines also swap when you switch tabs. -->
   }
 
   function drawPreview() {
-    const pd = state.pages[state.curPage - 1];
-    if (!pd) return;
-    if (activeTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas);
+    const pd = currentPageData();
+    if (!pd) {
+      canvasWrap.style.display = 'none';
+      emptyState.style.display = activeTool === 'organize' ? 'none' : 'block';
+      return;
+    }
+    if (processTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas);
     else applyGreyscaleToCanvas(pd, previewCanvas);
-    proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · pg ' + state.curPage + '/' + state.numPages;
+    proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · page ' + state.curPage + '/' + activePageCount();
   }
 
   function drawHistogram() {
-    const pd = state.pages[state.curPage - 1];
+    const pd = currentPageData();
     if (!pd) return;
     const cw = histoCanvas.clientWidth || 300;
     const ch = histoCanvas.clientHeight || 56;
@@ -859,6 +1654,144 @@ The header lede and meta lines also swap when you switch tabs. -->
       const h = Math.min(ch, (pd.histo[i] / max) * (ch - 2));
       ctx.fillRect(i * barW, ch - h, Math.max(barW, 1), h);
     }
+  }
+
+  function drawThumbnail(canvas, pd) {
+    const maxW = 520;
+    const maxH = 720;
+    let w = maxW;
+    let h = Math.round(w * (pd.h / pd.w));
+    if (h > maxH) {
+      h = maxH;
+      w = Math.round(h * (pd.w / pd.h));
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(w, h);
+    const d = img.data;
+    for (let y = 0; y < h; y++) {
+      const sy = Math.min(pd.h - 1, Math.floor((y / h) * pd.h));
+      for (let x = 0; x < w; x++) {
+        const sx = Math.min(pd.w - 1, Math.floor((x / w) * pd.w));
+        const v = pd.lum[sy * pd.w + sx];
+        const i = (y * w + x) * 4;
+        d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  let draggedPageIndex = null;
+
+  function renderOrganizer() {
+    if (!organizerGrid || activeTool !== 'organize') return;
+    organizerGrid.innerHTML = '';
+    const count = activePageCount();
+    organizerEmpty.classList.toggle('on', !state.pdfDoc || count === 0);
+    organizerEmpty.textContent = state.pdfDoc
+      ? 'All pages have been removed. Restore the original order to continue.'
+      : 'Upload a PDF to organize pages.';
+    if (!state.pdfDoc || count === 0) return;
+
+    state.pageOrder.forEach((sourceIndex, outputIndex) => {
+      const pd = state.pages[sourceIndex];
+      if (!pd) return;
+      const card = document.createElement('div');
+      card.className = 'page-card';
+      card.draggable = true;
+      card.dataset.outputIndex = outputIndex;
+
+      const thumb = pd.thumbUrl ? document.createElement('img') : document.createElement('canvas');
+      thumb.className = 'page-thumb';
+      if (pd.thumbUrl) {
+        thumb.src = pd.thumbUrl;
+        thumb.alt = 'Page ' + (outputIndex + 1);
+        thumb.draggable = false;
+      } else {
+        drawThumbnail(thumb, pd);
+      }
+      card.appendChild(thumb);
+
+      const actions = document.createElement('div');
+      actions.className = 'page-card-actions';
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'page-delete';
+      del.setAttribute('aria-label', 'Delete original page ' + (sourceIndex + 1));
+      del.textContent = '×';
+      del.addEventListener('click', e => {
+        e.stopPropagation();
+        deleteOutputPage(outputIndex);
+      });
+      const num = document.createElement('div');
+      num.className = 'page-number';
+      num.textContent = sourceIndex + 1;
+      actions.appendChild(del);
+      actions.appendChild(num);
+      card.appendChild(actions);
+
+      card.addEventListener('dragstart', e => {
+        draggedPageIndex = outputIndex;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(outputIndex));
+      });
+      card.addEventListener('dragend', () => {
+        draggedPageIndex = null;
+        document.querySelectorAll('.page-card').forEach(el => el.classList.remove('dragging', 'drop-target'));
+      });
+      card.addEventListener('dragover', e => {
+        e.preventDefault();
+        card.classList.add('drop-target');
+      });
+      card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
+      card.addEventListener('drop', e => {
+        e.preventDefault();
+        card.classList.remove('drop-target');
+        const from = draggedPageIndex ?? Number(e.dataTransfer.getData('text/plain'));
+        reorderOutputPages(from, outputIndex);
+      });
+
+      organizerGrid.appendChild(card);
+    });
+  }
+
+  function deleteOutputPage(outputIndex) {
+    if (!state.pdfDoc || outputIndex < 0 || outputIndex >= activePageCount()) return;
+    state.pageOrder.splice(outputIndex, 1);
+    if (state.curPage > activePageCount()) state.curPage = Math.max(1, activePageCount());
+    updatePageState();
+    if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+  }
+
+  function reorderOutputPages(from, to) {
+    if (!state.pdfDoc || from == null || to == null || from === to) return;
+    if (from < 0 || to < 0 || from >= activePageCount() || to >= activePageCount()) return;
+    const [moved] = state.pageOrder.splice(from, 1);
+    state.pageOrder.splice(to, 0, moved);
+    state.curPage = to + 1;
+    updatePageState();
+    if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+  }
+
+  async function exportOrganizedPdf() {
+    if (!window.PDFLib) throw new Error('PDF library did not load. Check your connection and try again.');
+    if (!state.pdfBytes) throw new Error('Original PDF data is not available.');
+    const src = await PDFLib.PDFDocument.load(state.pdfBytes);
+    const out = await PDFLib.PDFDocument.create();
+    const copiedPages = await out.copyPages(src, state.pageOrder);
+    copiedPages.forEach(page => out.addPage(page));
+    const bytes = await out.save();
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = outputBaseName() + TOOLS.organize.suffix + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
 
   // ── Threshold controls ──
@@ -882,7 +1815,7 @@ The header lede and meta lines also swap when you switch tabs. -->
     const v = +e.target.value;
     state.brightness = v;
     brightNum.textContent = v > 0 ? '+' + v : String(v);
-    brightTag.textContent = v < -50 ? 'dark' : v < -10 ? 'dim' : v <= 10 ? 'neutral' : v <= 50 ? 'bright' : 'blown';
+    brightTag.textContent = v < -50 ? 'dark' : v < -10 ? 'reduced' : v <= 10 ? 'neutral' : v <= 50 ? 'bright' : 'maximum';
     $('greyHint').textContent = greyHintText();
     if (state.pdfDoc) drawPreview();
   });
@@ -907,9 +1840,17 @@ The header lede and meta lines also swap when you switch tabs. -->
     if (state.pdfDoc) drawPreview();
   });
 
+  resetPagesBtn.addEventListener('click', () => {
+    if (!state.pdfDoc) return;
+    state.pageOrder = Array.from({ length: state.numPages }, (_, i) => i);
+    state.curPage = 1;
+    updatePageState();
+    if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
+  });
+
   // ── Resolution toggles ──
   const resButtons = { fast: $('resFast'), '300': $('res300'), '600': $('res600') };
-  const resLabels  = { fast: 'Setting type · pg ', '300': 'Pressing at 300 dpi · pg ', '600': 'Pressing at 600 dpi · pg ' };
+  const resLabels  = { fast: 'Rendering page ', '300': 'Rendering at 300 dpi · page ', '600': 'Rendering at 600 dpi · page ' };
 
   Object.entries(resButtons).forEach(([key, btn]) => {
     btn.addEventListener('click', async () => {
@@ -923,38 +1864,43 @@ The header lede and meta lines also swap when you switch tabs. -->
         setLoader(true, resLabels[key] + i + ' / ' + state.numPages, ((i - 1) / state.numPages) * 100);
         await renderPageToLuminance(i);
       }
-      drawPreview();
-      drawHistogram();
+      updatePageState();
+      if (activeTool !== 'organize') { drawPreview(); drawHistogram(); }
       setLoader(false);
     });
   });
 
   // ── Page nav ──
   function updatePageButtons() {
-    prevBtn.disabled = state.curPage <= 1;
-    nextBtn.disabled = state.curPage >= state.numPages;
-    curPageEl.textContent = String(state.curPage).padStart(2, '0');
+    updatePageState();
   }
   prevBtn.addEventListener('click', () => {
     if (state.curPage > 1) { state.curPage--; updatePageButtons(); drawPreview(); drawHistogram(); }
   });
   nextBtn.addEventListener('click', () => {
-    if (state.curPage < state.numPages) { state.curPage++; updatePageButtons(); drawPreview(); drawHistogram(); }
+    if (state.curPage < activePageCount()) { state.curPage++; updatePageButtons(); drawPreview(); drawHistogram(); }
   });
 
   // ── Download ──
   downloadBtn.addEventListener('click', async () => {
-    if (!state.pdfDoc) return;
+    if (!state.pdfDoc || activePageCount() === 0) return;
     downloadBtn.disabled = true;
-    setLoader(true, 'Pressing pages…', 0);
+    setLoader(true, 'Exporting pages…', 0);
     try {
+      if (activeTool === 'organize') {
+        setLoader(true, 'Exporting original pages…', 35);
+        await exportOrganizedPdf();
+        setLoader(false);
+        return;
+      }
       const { jsPDF } = window.jspdf;
       const tmp = document.createElement('canvas');
       let pdf = null;
-      for (let i = 0; i < state.numPages; i++) {
-        setLoader(true, 'Pressing pg ' + (i + 1) + ' / ' + state.numPages, (i / state.numPages) * 100);
-        const pd = state.pages[i];
-        if (activeTool === 'threshold') applyThresholdToCanvas(pd, tmp);
+      const count = activePageCount();
+      for (let i = 0; i < count; i++) {
+        setLoader(true, 'Exporting page ' + (i + 1) + ' of ' + count, (i / count) * 100);
+        const pd = state.pages[state.pageOrder[i]];
+        if (processTool === 'threshold') applyThresholdToCanvas(pd, tmp);
         else applyGreyscaleToCanvas(pd, tmp);
         const wPt = pd.w / pd.scale;
         const hPt = pd.h / pd.scale;
@@ -965,14 +1911,14 @@ The header lede and meta lines also swap when you switch tabs. -->
         pdf.addImage(dataUrl, 'PNG', 0, 0, wPt, hPt, undefined, 'FAST');
         await new Promise(r => setTimeout(r, 0));
       }
-      pdf.save(state.fileName.replace(/\.pdf$/i, '') + TOOLS[activeTool].suffix + '.pdf');
+      pdf.save(outputBaseName() + TOOLS[activeTool].suffix + '.pdf');
       setLoader(false);
     } catch (err) {
       console.error(err);
       showError('Render failed: ' + (err.message || err));
       setLoader(false);
     } finally {
-      downloadBtn.disabled = false;
+      updatePageState();
     }
   });
 
@@ -1011,7 +1957,7 @@ The header lede and meta lines also swap when you switch tabs. -->
   function getFitCanvasWidth(pd) {
     const pad = getStagePadding();
     const stageW = Math.max(1, previewStage.clientWidth - pad.x);
-    const stageH = Math.max(1, Math.min(previewStage.clientHeight - pad.y, window.innerHeight * 0.78));
+    const stageH = Math.max(1, previewStage.clientHeight - pad.y);
     return Math.max(1, Math.min(stageW, stageH * (pd.w / pd.h), pd.w));
   }
 
@@ -1042,8 +1988,16 @@ The header lede and meta lines also swap when you switch tabs. -->
   }
 
   function applyZoom(opts = {}) {
+    if (activeTool === 'organize') {
+      canvasWrap.classList.remove('zoomed');
+      previewStage.classList.remove('zoomed', 'pannable', 'panning');
+      zoomOutBtn.disabled = true;
+      zoomInBtn.disabled = true;
+      zoomValEl.textContent = 'fit';
+      return;
+    }
     const preserveCenter = opts.preserveCenter !== false;
-    const pd = state.pages[state.curPage - 1];
+    const pd = currentPageData();
     const z = zoomLevel;
     const center = preserveCenter ? getScrollCenter() : { x: 0.5, y: 0.5 };
     const isZoomedIn = z > 1.001;
@@ -1144,7 +2098,11 @@ The header lede and meta lines also swap when you switch tabs. -->
     previewStage.classList.remove('panning');
   });
   previewStage.addEventListener('scroll', updatePanCursor);
-  window.addEventListener('resize', syncPreviewStageHeight);
+  window.addEventListener('resize', () => {
+    syncPreviewStageHeight();
+    updateToolIndicator();
+  });
+  document.querySelector('.tool-nav').addEventListener('scroll', updateToolIndicator);
 
   if ('ResizeObserver' in window && leftPanel) {
     leftPanelResizeObserver = new ResizeObserver(syncPreviewStageHeight);
@@ -1154,18 +2112,11 @@ The header lede and meta lines also swap when you switch tabs. -->
     document.fonts.ready.then(syncPreviewStageHeight);
   }
   syncPreviewStageHeight();
+  updatePreviewMode();
+  updateToolIndicator();
 
   const _origDrawPreview = drawPreview;
   drawPreview = function() { _origDrawPreview(); applyZoom(); };
-
-  // ── Live date in header ──
-  (function() {
-    const now = new Date();
-    const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    const d = String(now.getDate()).padStart(2, '0');
-    $('headerDate').textContent = days[now.getDay()] + ' · ' + d + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
-  })();
 
   // init display
   threshNum.textContent = '128';
