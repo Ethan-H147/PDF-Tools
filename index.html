@@ -1550,6 +1550,22 @@ Ethan Hu -->
     object-fit: contain;
   }
 
+  .page-thumb-placeholder {
+    align-items: center;
+    background-color: #fff;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    color: var(--ink-mute);
+    display: flex;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 750;
+    justify-content: center;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
   .page-card-actions {
     align-items: center;
     background: rgba(255, 255, 255, 0.94);
@@ -1686,9 +1702,9 @@ Ethan Hu -->
     <div class="title-sub">PDF Tools</div>
     <div class="subhead">
       <div class="lede" id="masterLede">
-        Merge multiple PDFs into one organized document.
+        View a PDF cleanly with fast page navigation and zoom.
       </div>
-      <div class="meta" id="masterMeta" tabindex="0" aria-label="Tool details" data-tooltip="Select any number of PDFs&#10;Reorder files before merging&#10;Merged output opens in Organize"></div>
+      <div class="meta" id="masterMeta" tabindex="0" aria-label="Tool details" data-tooltip="Open a PDF for viewing&#10;Use page navigation&#10;Zoom without changing the file"></div>
     </div>
   </header>
 
@@ -1696,8 +1712,8 @@ Ethan Hu -->
   <nav class="tool-nav">
     <div class="tool-nav-label">Tools</div>
     <div class="tool-indicator" id="toolIndicator" aria-hidden="true"></div>
-    <div class="tool-tab active" data-tool="merge">
-      <span class="tab-num">I.</span> Merge
+    <div class="tool-tab active" data-tool="preview">
+      <span class="tab-num">I.</span> Preview
     </div>
     <div class="tool-tab" data-tool="organize">
       <span class="tab-num">II.</span> Organize
@@ -1705,11 +1721,14 @@ Ethan Hu -->
     <div class="tool-tab" data-tool="edit">
       <span class="tab-num">III.</span> Crop/Rotate
     </div>
+    <div class="tool-tab" data-tool="merge">
+      <span class="tab-num">IV.</span> Merge
+    </div>
     <div class="tool-tab" data-tool="threshold">
-      <span class="tab-num">IV.</span> Threshold
+      <span class="tab-num">V.</span> Threshold
     </div>
     <div class="tool-tab" data-tool="greyscale">
-      <span class="tab-num">V.</span> Grayscale
+      <span class="tab-num">VI.</span> Grayscale
     </div>
   </nav>
 
@@ -1732,6 +1751,77 @@ Ethan Hu -->
           <span>Pages <b id="pageCount">—</b></span>
           <span>Size <b id="fileSize">—</b></span>
           <span>Status <b id="fileStatus">ready</b></span>
+        </div>
+      </div>
+
+      <!-- ═══ PREVIEW PANEL ═══ -->
+      <div class="tool-panel active" id="tool-preview"></div>
+
+      <!-- ═══ ORGANIZE PANEL ═══ -->
+      <div class="tool-panel" id="tool-organize">
+        <div style="margin-top:26px">
+          <div class="section-label"><span>II. Organize Pages</span><span id="organizeHint">ready</span></div>
+          <div class="organize-summary" id="organizeSummary">Upload a PDF to reorder or remove pages.</div>
+          <div class="split-panel" id="splitPanel" hidden>
+            <div class="split-panel-head">
+              <span>Split Export</span>
+              <button type="button" id="clearSplitBtn">Clear</button>
+            </div>
+            <div class="split-summary" id="splitSummary">Choose a split point.</div>
+            <div class="split-parts-list" id="splitPartsList"></div>
+          </div>
+          <button class="btn-secondary" id="resetPagesBtn" disabled>Restore original order</button>
+        </div>
+      </div>
+
+      <!-- ═══ CROP / ROTATE PANEL ═══ -->
+      <div class="tool-panel" id="tool-edit">
+        <div style="margin-top:26px">
+          <div class="section-label"><span>II. Crop & Rotate</span><span id="editHint">select page</span></div>
+          <div class="organize-summary" id="editSummary">Upload a PDF, then choose a page from the editor to crop or rotate it.</div>
+          <div class="edit-controls">
+            <div class="edit-control-head">
+              <span>Fine Rotation</span>
+              <b id="editRotateNum">0.0°</b>
+            </div>
+            <input type="range" min="-5" max="5" value="0" step="0.1" class="slider edit-slider" id="editRotateSlider">
+            <div class="slider-tags"><span>-5°</span><span>+5°</span></div>
+            <div class="edit-button-row">
+              <button class="btn-secondary" id="rotateLeftBtn" disabled>↺ 90°</button>
+              <button class="btn-secondary" id="rotateRightBtn" disabled>↻ 90°</button>
+            </div>
+          </div>
+          <div class="edit-controls">
+            <div class="edit-control-head">
+              <span>Crop Margins</span>
+              <b id="cropHint">0%</b>
+            </div>
+            <label class="crop-row">Left <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropLeftSlider"><b id="cropLeftNum">0%</b></label>
+            <label class="crop-row">Top <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropTopSlider"><b id="cropTopNum">0%</b></label>
+            <label class="crop-row">Right <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropRightSlider"><b id="cropRightNum">0%</b></label>
+            <label class="crop-row">Bottom <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropBottomSlider"><b id="cropBottomNum">0%</b></label>
+          </div>
+          <div class="quality-toggle">
+            <div class="quality-copy">
+              <span>Fine Rotation Quality</span>
+              <b id="fineQualityLabel">High · 600 dpi</b>
+            </div>
+            <button type="button" class="circle-switch" id="fineQualityToggle" aria-label="Use ultra 900 dpi for fine rotation export" aria-pressed="false"></button>
+          </div>
+          <button class="btn-secondary" id="resetEditBtn" disabled>Reset selected page</button>
+        </div>
+      </div>
+
+      <!-- ═══ MERGE PANEL ═══ -->
+      <div class="tool-panel" id="tool-merge">
+        <div style="margin-top:26px">
+          <div class="section-label"><span>II. Merge PDFs</span><span id="mergeHint">ready</span></div>
+          <div class="organize-summary" id="mergeSummary">Choose multiple PDFs, arrange their order, then merge into the organizer.</div>
+          <div class="merge-list" id="mergeList"></div>
+          <div class="merge-actions">
+            <button class="btn-secondary" id="mergeClearBtn" disabled>Clear list</button>
+            <button class="btn-secondary btn-secondary-accent" id="mergeRunBtn" disabled>Merge into Organize</button>
+          </div>
         </div>
       </div>
 
@@ -1791,74 +1881,6 @@ Ethan Hu -->
         </div>
       </div>
 
-      <!-- ═══ MERGE PANEL ═══ -->
-      <div class="tool-panel active" id="tool-merge">
-        <div style="margin-top:26px">
-          <div class="section-label"><span>II. Merge PDFs</span><span id="mergeHint">ready</span></div>
-          <div class="organize-summary" id="mergeSummary">Choose multiple PDFs, arrange their order, then merge into the organizer.</div>
-          <div class="merge-list" id="mergeList"></div>
-          <div class="merge-actions">
-            <button class="btn-secondary" id="mergeClearBtn" disabled>Clear list</button>
-            <button class="btn-secondary btn-secondary-accent" id="mergeRunBtn" disabled>Merge into Organize</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══ ORGANIZE PANEL ═══ -->
-      <div class="tool-panel" id="tool-organize">
-        <div style="margin-top:26px">
-          <div class="section-label"><span>II. Organize Pages</span><span id="organizeHint">ready</span></div>
-          <div class="organize-summary" id="organizeSummary">Upload a PDF to reorder or remove pages.</div>
-          <div class="split-panel" id="splitPanel" hidden>
-            <div class="split-panel-head">
-              <span>Split Export</span>
-              <button type="button" id="clearSplitBtn">Clear</button>
-            </div>
-            <div class="split-summary" id="splitSummary">Choose a split point.</div>
-            <div class="split-parts-list" id="splitPartsList"></div>
-          </div>
-          <button class="btn-secondary" id="resetPagesBtn" disabled>Restore original order</button>
-        </div>
-      </div>
-
-      <!-- ═══ CROP / ROTATE PANEL ═══ -->
-      <div class="tool-panel" id="tool-edit">
-        <div style="margin-top:26px">
-          <div class="section-label"><span>II. Crop & Rotate</span><span id="editHint">select page</span></div>
-          <div class="organize-summary" id="editSummary">Upload a PDF, then choose a page from the editor to crop or rotate it.</div>
-          <div class="edit-controls">
-            <div class="edit-control-head">
-              <span>Fine Rotation</span>
-              <b id="editRotateNum">0.0°</b>
-            </div>
-            <input type="range" min="-5" max="5" value="0" step="0.1" class="slider edit-slider" id="editRotateSlider">
-            <div class="slider-tags"><span>-5°</span><span>+5°</span></div>
-            <div class="edit-button-row">
-              <button class="btn-secondary" id="rotateLeftBtn" disabled>↺ 90°</button>
-              <button class="btn-secondary" id="rotateRightBtn" disabled>↻ 90°</button>
-            </div>
-          </div>
-          <div class="edit-controls">
-            <div class="edit-control-head">
-              <span>Crop Margins</span>
-              <b id="cropHint">0%</b>
-            </div>
-            <label class="crop-row">Left <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropLeftSlider"><b id="cropLeftNum">0%</b></label>
-            <label class="crop-row">Top <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropTopSlider"><b id="cropTopNum">0%</b></label>
-            <label class="crop-row">Right <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropRightSlider"><b id="cropRightNum">0%</b></label>
-            <label class="crop-row">Bottom <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropBottomSlider"><b id="cropBottomNum">0%</b></label>
-          </div>
-          <div class="quality-toggle">
-            <div class="quality-copy">
-              <span>Fine Rotation Quality</span>
-              <b id="fineQualityLabel">High · 600 dpi</b>
-            </div>
-            <button type="button" class="circle-switch" id="fineQualityToggle" aria-label="Use ultra 900 dpi for fine rotation export" aria-pressed="false"></button>
-          </div>
-          <button class="btn-secondary" id="resetEditBtn" disabled>Reset selected page</button>
-        </div>
-      </div>
-
       <!-- SHARED: Pages -->
       <div class="section-label" style="margin-top:26px"><span>III. Pages</span><span>—</span></div>
       <div class="pagenav">
@@ -1875,8 +1897,8 @@ Ethan Hu -->
           <div class="toggle on" id="res600">600 dpi</div>
         </div>
         <button class="btn-print" id="downloadBtn" disabled>
-          <span id="downloadLabel">Merge PDFs</span>
-          <span class="small" id="downloadSub">combine selected files into organize</span>
+          <span id="downloadLabel">Preview Only</span>
+          <span class="small" id="downloadSub">view and zoom without exporting</span>
         </button>
       </div>
 
@@ -1949,28 +1971,17 @@ Ethan Hu -->
 
   // ── Tool registry: add a new entry here to add a new tool ──
   const FINE_ROTATION_EXPORT_DPI = { high: 600, ultra: 900 };
+  const LARGE_PDF_SAFE_MODE_BYTES = 35 * 1024 * 1024;
+  const LARGE_PDF_SAFE_MODE_PAGES = 80;
+  const SAFE_FULL_PAGE_CACHE_LIMIT = (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4 : 3;
 
   const TOOLS = {
-    threshold: {
-      lede: 'Convert PDFs to black and white with threshold control.',
-      meta: 'Black and white output<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
-      downloadLabel: 'Export PDF',
-      downloadSub: 'render and download all pages',
-      suffix: '_bw',
-    },
-    greyscale: {
-      lede: 'Convert PDFs to grayscale with brightness and contrast.',
-      meta: 'Grayscale output<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
-      downloadLabel: 'Export Grayscale PDF',
-      downloadSub: 'render and download all pages',
-      suffix: '_grey',
-    },
-    merge: {
-      lede: 'Merge multiple PDFs into one organized document.',
-      meta: 'Select any number of PDFs<br/>Reorder files before merging<br/>Merged output opens in Organize',
-      downloadLabel: 'Merge PDFs',
-      downloadSub: 'combine selected files into organize',
-      suffix: '_merged',
+    preview: {
+      lede: 'View a PDF cleanly with fast page navigation and zoom.',
+      meta: 'Open a PDF for viewing<br/>Use page navigation<br/>Zoom without changing the file',
+      downloadLabel: 'Preview Only',
+      downloadSub: 'view and zoom without exporting',
+      suffix: '',
     },
     organize: {
       lede: 'Reorder or remove pages before export.',
@@ -1986,9 +1997,30 @@ Ethan Hu -->
       downloadSub: 'apply page crops and rotations',
       suffix: '_edited',
     },
+    merge: {
+      lede: 'Merge multiple PDFs into one organized document.',
+      meta: 'Select any number of PDFs<br/>Reorder files before merging<br/>Merged output opens in Organize',
+      downloadLabel: 'Merge PDFs',
+      downloadSub: 'combine selected files into organize',
+      suffix: '_merged',
+    },
+    threshold: {
+      lede: 'Convert PDFs to black and white with threshold control.',
+      meta: 'Black and white output<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
+      downloadLabel: 'Export PDF',
+      downloadSub: 'render and download all pages',
+      suffix: '_bw',
+    },
+    greyscale: {
+      lede: 'Convert PDFs to grayscale with brightness and contrast.',
+      meta: 'Grayscale output<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
+      downloadLabel: 'Export Grayscale PDF',
+      downloadSub: 'render and download all pages',
+      suffix: '_grey',
+    },
   };
 
-  let activeTool = 'merge';
+  let activeTool = 'preview';
   let processTool = 'threshold';
 
   const state = {
@@ -2003,7 +2035,17 @@ Ethan Hu -->
     pages: [], pageOrder: [], splitPoints: [], splitNames: [], fileName: '', fileSize: 0, pdfBytes: null,
     mergeFiles: [], pageEdits: [],
     fineRotationQuality: 'high',
+    largePdfSafeMode: false,
+    renderGeneration: 0,
+    fullPageCacheOrder: [],
   };
+
+  const pageRenderJobs = new Map();
+  const thumbnailJobs = new Map();
+  const thumbnailQueue = [];
+  const thumbnailQueued = new Set();
+  let thumbnailQueueRunning = false;
+  let thumbnailObserver = null;
 
   const $ = id => document.getElementById(id);
 
@@ -2149,6 +2191,7 @@ Ethan Hu -->
     downloadLabel.innerHTML = tool.downloadLabel;
     downloadSub.innerHTML = tool.downloadSub;
     resolutionOptions.classList.toggle('hidden', !isRasterTool(id));
+    downloadBtn.parentElement.style.display = id === 'preview' ? 'none' : '';
     updateSourceDropMode();
     if (id === 'merge') updateMergeState();
     else updatePageState();
@@ -2173,7 +2216,9 @@ Ethan Hu -->
       ? 'Rearrange <em>— drag pages to reorder</em>'
       : editing
         ? 'Crop & Rotate <em>— select one page</em>'
-        : 'Preview <em>— processed output</em>';
+        : activeTool === 'preview'
+          ? 'Preview <em>— original PDF</em>'
+          : 'Preview <em>— processed output</em>';
     organizer.style.display = organizing ? 'block' : 'none';
     pageEditor.style.display = editing ? 'flex' : 'none';
     if (organizing) {
@@ -2253,6 +2298,46 @@ Ethan Hu -->
   function currentPageData() {
     const sourceIndex = currentSourceIndex();
     return sourceIndex == null ? null : state.pages[sourceIndex];
+  }
+
+  function shouldUseLargePdfSafeMode(fileSize, pageCount) {
+    return fileSize >= LARGE_PDF_SAFE_MODE_BYTES || pageCount >= LARGE_PDF_SAFE_MODE_PAGES;
+  }
+
+  function pageHasFullData(pd) {
+    return !!(pd && pd.lum && pd.histo && pd.renderKey === state.resolution);
+  }
+
+  function resetRenderCaches() {
+    state.renderGeneration++;
+    state.fullPageCacheOrder = [];
+    pageRenderJobs.clear();
+    thumbnailJobs.clear();
+    thumbnailQueue.length = 0;
+    thumbnailQueued.clear();
+  }
+
+  function touchFullPageCache(sourceIndex) {
+    if (!state.largePdfSafeMode || sourceIndex == null) return;
+    state.fullPageCacheOrder = state.fullPageCacheOrder.filter(index => index !== sourceIndex);
+    state.fullPageCacheOrder.push(sourceIndex);
+    while (state.fullPageCacheOrder.length > SAFE_FULL_PAGE_CACHE_LIMIT) {
+      const evictIndex = state.fullPageCacheOrder.shift();
+      if (evictIndex === sourceIndex) continue;
+      const pd = state.pages[evictIndex];
+      if (!pd) continue;
+      pd.lum = null;
+      pd.histo = null;
+      pd.renderKey = null;
+    }
+  }
+
+  function forgetFullPageData() {
+    state.fullPageCacheOrder = [];
+    state.pages = state.pages.map(pd => {
+      if (!pd) return null;
+      return { ...pd, lum: null, histo: null, renderKey: null };
+    });
   }
 
   function defaultPageEdit() {
@@ -2428,9 +2513,11 @@ Ethan Hu -->
     curPageEl.textContent = state.pdfDoc && count ? padPage(state.curPage) : '—';
     prevBtn.disabled = !state.pdfDoc || state.curPage <= 1;
     nextBtn.disabled = !state.pdfDoc || state.curPage >= count;
-    downloadBtn.disabled = activeTool === 'merge'
-      ? state.mergeFiles.length === 0
-      : !state.pdfDoc || count === 0;
+    downloadBtn.disabled = activeTool === 'preview'
+      ? true
+      : activeTool === 'merge'
+        ? state.mergeFiles.length === 0
+        : !state.pdfDoc || count === 0;
     resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
     organizeHint.textContent = state.pdfDoc
       ? (state.splitPoints.length ? state.splitPoints.length + ' splits' : count + ' pages')
@@ -2670,7 +2757,9 @@ Ethan Hu -->
   });
 
   async function loadPdfBytes(buf, fileName, fileSize, loadingLabel = 'Loading PDF…') {
+    resetRenderCaches();
     state.fileName = normalizePdfName(fileName);
+    state.fileSize = fileSize;
     fileNameEl.textContent = state.fileName;
     fileNameEl.title = 'Click to rename';
     fileNameEl.tabIndex = 0;
@@ -2682,6 +2771,7 @@ Ethan Hu -->
     const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
     state.pdfDoc = pdf;
     state.numPages = pdf.numPages;
+    state.largePdfSafeMode = shouldUseLargePdfSafeMode(fileSize, pdf.numPages);
     state.curPage = 1;
     state.pages = new Array(pdf.numPages).fill(null);
     state.pageOrder = Array.from({ length: pdf.numPages }, (_, i) => i);
@@ -2689,11 +2779,16 @@ Ethan Hu -->
     state.splitPoints = [];
     state.splitNames = [];
     updatePageState();
-    for (let i = 1; i <= pdf.numPages; i++) {
-      setLoader(true, 'Rendering page ' + i + ' of ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
-      await renderPageToLuminance(i);
+    if (state.largePdfSafeMode) {
+      setLoader(true, 'Opening large PDF safely…', 45);
+      await ensurePageMeta(0);
+    } else {
+      for (let i = 1; i <= pdf.numPages; i++) {
+        setLoader(true, 'Rendering page ' + i + ' of ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
+        await renderPageToLuminance(i);
+      }
     }
-    fileStatusEl.textContent = 'ready';
+    fileStatusEl.textContent = state.largePdfSafeMode ? 'ready · safe' : 'ready';
     downloadBtn.disabled = false;
     zoomLevel = 1;
     zoomInBtn.disabled = false;
@@ -2727,7 +2822,35 @@ Ethan Hu -->
     return Math.min(2.5, 1800 / Math.max(baseVp.width, baseVp.height));
   }
 
+  function getPreviewRenderScale(baseVp) {
+    return Math.min(2.5, 2200 / Math.max(baseVp.width, baseVp.height));
+  }
+
+  async function ensurePageMeta(sourceIndex) {
+    if (!state.pdfDoc || sourceIndex == null) return null;
+    const existing = state.pages[sourceIndex];
+    if (existing && existing.w && existing.h && existing.scale) return existing;
+    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const baseVp = page.getViewport({ scale: 1 });
+    const scale = getPreviewRenderScale(baseVp);
+    const vp = page.getViewport({ scale });
+    const pd = {
+      ...(existing || {}),
+      w: Math.floor(vp.width),
+      h: Math.floor(vp.height),
+      scale,
+      lum: existing?.lum || null,
+      histo: existing?.histo || null,
+      thumbUrl: existing?.thumbUrl || null,
+      renderKey: existing?.renderKey || null,
+    };
+    state.pages[sourceIndex] = pd;
+    return pd;
+  }
+
   async function renderPageToLuminance(pageNum) {
+    const sourceIndex = pageNum - 1;
+    const existing = state.pages[sourceIndex];
     const page = await state.pdfDoc.getPage(pageNum);
     const baseVp = page.getViewport({ scale: 1 });
     const scale = getRenderScale(baseVp);
@@ -2748,12 +2871,31 @@ Ethan Hu -->
       const v = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) | 0;
       lum[j] = v; histo[v]++;
     }
-    state.pages[pageNum - 1] = { lum, w: c.width, h: c.height, histo, scale, thumbUrl };
+    state.pages[sourceIndex] = {
+      ...(existing || {}),
+      lum, w: c.width, h: c.height, histo, scale,
+      thumbUrl: existing?.thumbUrl || thumbUrl,
+      renderKey: state.resolution,
+    };
+    touchFullPageCache(sourceIndex);
+    return state.pages[sourceIndex];
   }
 
-  function makeThumbnailUrl(sourceCanvas) {
-    const maxW = 520;
-    const maxH = 720;
+  async function ensurePageData(sourceIndex) {
+    if (!state.pdfDoc || sourceIndex == null) return null;
+    const existing = state.pages[sourceIndex];
+    if (pageHasFullData(existing)) {
+      touchFullPageCache(sourceIndex);
+      return existing;
+    }
+    const jobKey = state.renderGeneration + ':full:' + sourceIndex + ':' + state.resolution;
+    if (pageRenderJobs.has(jobKey)) return pageRenderJobs.get(jobKey);
+    const job = renderPageToLuminance(sourceIndex + 1).finally(() => pageRenderJobs.delete(jobKey));
+    pageRenderJobs.set(jobKey, job);
+    return job;
+  }
+
+  function makeThumbnailUrl(sourceCanvas, maxW = 520, maxH = 720) {
     let w = maxW;
     let h = Math.round(w * (sourceCanvas.height / sourceCanvas.width));
     if (h > maxH) {
@@ -2770,6 +2912,110 @@ Ethan Hu -->
     tctx.imageSmoothingQuality = 'high';
     tctx.drawImage(sourceCanvas, 0, 0, w, h);
     return thumb.toDataURL('image/png');
+  }
+
+  async function renderThumbnail(sourceIndex) {
+    if (!state.pdfDoc || sourceIndex == null) return null;
+    const existing = state.pages[sourceIndex];
+    if (existing?.thumbUrl) return existing.thumbUrl;
+    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const baseVp = page.getViewport({ scale: 1 });
+    const scale = Math.min(0.75, 260 / Math.max(baseVp.width, baseVp.height));
+    const vp = page.getViewport({ scale });
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.floor(vp.width));
+    c.height = Math.max(1, Math.floor(vp.height));
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const thumbUrl = makeThumbnailUrl(c, 220, 310);
+    const pd = await ensurePageMeta(sourceIndex);
+    state.pages[sourceIndex] = { ...(pd || {}), thumbUrl };
+    c.width = 0;
+    c.height = 0;
+    return thumbUrl;
+  }
+
+  function applyThumbnailToElements(sourceIndex, thumbUrl) {
+    document.querySelectorAll('[data-thumb-source="' + sourceIndex + '"]').forEach(el => {
+      el.style.backgroundImage = 'url("' + thumbUrl + '")';
+      el.textContent = '';
+      el.setAttribute('aria-label', 'Page thumbnail ' + (sourceIndex + 1));
+    });
+  }
+
+  async function ensureThumbnail(sourceIndex) {
+    const existing = state.pages[sourceIndex];
+    if (existing?.thumbUrl) return existing.thumbUrl;
+    const jobKey = state.renderGeneration + ':thumb:' + sourceIndex;
+    if (thumbnailJobs.has(jobKey)) return thumbnailJobs.get(jobKey);
+    const job = renderThumbnail(sourceIndex)
+      .then(url => {
+        if (url) applyThumbnailToElements(sourceIndex, url);
+        return url;
+      })
+      .finally(() => thumbnailJobs.delete(jobKey));
+    thumbnailJobs.set(jobKey, job);
+    return job;
+  }
+
+  function runThumbnailQueue() {
+    if (thumbnailQueueRunning) return;
+    thumbnailQueueRunning = true;
+    (async () => {
+      while (thumbnailQueue.length) {
+        const sourceIndex = thumbnailQueue.shift();
+        thumbnailQueued.delete(sourceIndex);
+        if (state.pages[sourceIndex]?.thumbUrl) continue;
+        try { await ensureThumbnail(sourceIndex); }
+        catch (err) { console.warn('Thumbnail render failed', err); }
+        await new Promise(r => setTimeout(r, 0));
+      }
+      thumbnailQueueRunning = false;
+    })();
+  }
+
+  function queueThumbnail(sourceIndex) {
+    if (sourceIndex == null || state.pages[sourceIndex]?.thumbUrl || thumbnailQueued.has(sourceIndex)) return;
+    thumbnailQueued.add(sourceIndex);
+    thumbnailQueue.push(sourceIndex);
+    runThumbnailQueue();
+  }
+
+  function getThumbnailObserver() {
+    if (!('IntersectionObserver' in window)) return null;
+    if (!thumbnailObserver) {
+      thumbnailObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          const sourceIndex = Number(entry.target.dataset.thumbSource);
+          thumbnailObserver.unobserve(entry.target);
+          queueThumbnail(sourceIndex);
+        });
+      }, { root: previewStage, rootMargin: '420px' });
+    }
+    return thumbnailObserver;
+  }
+
+  function createPageThumb(sourceIndex, label) {
+    const pd = state.pages[sourceIndex];
+    if (pd?.thumbUrl) {
+      const thumb = document.createElement('img');
+      thumb.className = 'page-thumb';
+      thumb.src = pd.thumbUrl;
+      thumb.alt = label;
+      thumb.draggable = false;
+      return thumb;
+    }
+    const thumb = document.createElement('div');
+    thumb.className = 'page-thumb page-thumb-placeholder';
+    thumb.dataset.thumbSource = sourceIndex;
+    thumb.textContent = 'Page ' + (sourceIndex + 1);
+    const observer = getThumbnailObserver();
+    if (observer) observer.observe(thumb);
+    else queueThumbnail(sourceIndex);
+    return thumb;
   }
 
   // ── Processing functions ──
@@ -2811,21 +3057,56 @@ Ethan Hu -->
     ctx.putImageData(img, 0, 0);
   }
 
-  function drawPreview() {
-    const pd = currentPageData();
-    if (!pd) {
+  let originalPreviewRenderToken = 0;
+  let processedPreviewRenderToken = 0;
+
+  async function renderOriginalPreview(pd, sourceIndex) {
+    const token = ++originalPreviewRenderToken;
+    previewCanvas.width = pd.w;
+    previewCanvas.height = pd.h;
+    const ctx = previewCanvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+    try {
+      const page = await state.pdfDoc.getPage(sourceIndex + 1);
+      if (token !== originalPreviewRenderToken || activeTool !== 'preview') return;
+      const viewport = page.getViewport({ scale: pd.scale });
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      if (token === originalPreviewRenderToken && activeTool === 'preview') applyZoom();
+    } catch (err) {
+      console.error(err);
+      showError('Preview failed: ' + (err.message || err));
+    }
+  }
+
+  async function drawPreview() {
+    const sourceIndex = currentSourceIndex();
+    if (sourceIndex == null) {
       canvasWrap.style.display = 'none';
       emptyState.style.display = activeTool === 'organize' ? 'none' : 'block';
       return;
     }
+    const token = ++processedPreviewRenderToken;
+    if (activeTool === 'preview' && sourceIndex != null) {
+      const pd = await ensurePageMeta(sourceIndex);
+      if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'preview') return;
+      renderOriginalPreview(pd, sourceIndex);
+      proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · page ' + state.curPage + '/' + activePageCount();
+      return;
+    }
+    const pd = await ensurePageData(sourceIndex);
+    if (!pd || token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool === 'organize' || activeTool === 'edit') return;
     if (processTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas);
     else applyGreyscaleToCanvas(pd, previewCanvas);
     proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · page ' + state.curPage + '/' + activePageCount();
+    applyZoom();
   }
 
-  function drawHistogram() {
-    const pd = currentPageData();
-    if (!pd) return;
+  async function drawHistogram() {
+    if (!isRasterTool(activeTool)) return;
+    const sourceIndex = currentSourceIndex();
+    const pd = await ensurePageData(sourceIndex);
+    if (!pd || sourceIndex !== currentSourceIndex() || !isRasterTool(activeTool)) return;
     const cw = histoCanvas.clientWidth || 300;
     const ch = histoCanvas.clientHeight || 56;
     histoCanvas.width = cw * devicePixelRatio;
@@ -2893,24 +3174,13 @@ Ethan Hu -->
     }
     for (let outputIndex = 0; outputIndex < count; outputIndex++) {
       const sourceIndex = state.pageOrder[outputIndex];
-      const pd = state.pages[sourceIndex];
-      if (!pd) continue;
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'page-edit-card' + (state.curPage === outputIndex + 1 ? ' active' : '');
       card.dataset.outputIndex = outputIndex;
       card.dataset.sourceIndex = sourceIndex;
 
-      const thumb = pd.thumbUrl ? document.createElement('img') : document.createElement('canvas');
-      thumb.className = 'page-thumb';
-      if (pd.thumbUrl) {
-        thumb.src = pd.thumbUrl;
-        thumb.alt = 'Page ' + (outputIndex + 1);
-        thumb.draggable = false;
-      } else {
-        drawThumbnail(thumb, pd);
-      }
-      card.appendChild(thumb);
+      card.appendChild(createPageThumb(sourceIndex, 'Page ' + (outputIndex + 1)));
 
       const actions = document.createElement('div');
       actions.className = 'page-card-actions';
@@ -3031,9 +3301,13 @@ Ethan Hu -->
     ctx.drawImage(src, -srcW / 2, -srcH / 2);
   }
 
-  function drawEditedPagePreview() {
-    const pd = currentPageData();
-    if (!pd || activeTool !== 'edit') return;
+  let editedPreviewRenderToken = 0;
+
+  async function drawEditedPagePreview() {
+    const sourceIndex = currentSourceIndex();
+    const token = ++editedPreviewRenderToken;
+    const pd = await ensurePageData(sourceIndex);
+    if (!pd || token !== editedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'edit') return;
     renderEditedLuminanceToCanvas(pd, currentPageEdit(), pageEditorCanvas);
     pageEditorCanvasWrap.style.display = 'block';
     proofMeta.textContent = 'page ' + state.curPage + '/' + activePageCount() + ' · ' + editedLabel(currentPageEdit());
@@ -3222,8 +3496,6 @@ Ethan Hu -->
         continue;
       }
       const sourceIndex = item.sourceIndex;
-      const pd = state.pages[sourceIndex];
-      if (!pd) continue;
       const outputIndex = state.pageOrder.indexOf(sourceIndex);
       const card = document.createElement('div');
       card.className = 'page-card organizer-flow-item';
@@ -3231,16 +3503,7 @@ Ethan Hu -->
       card.dataset.outputIndex = outputIndex;
       card.dataset.sourceIndex = sourceIndex;
 
-      const thumb = pd.thumbUrl ? document.createElement('img') : document.createElement('canvas');
-      thumb.className = 'page-thumb';
-      if (pd.thumbUrl) {
-        thumb.src = pd.thumbUrl;
-        thumb.alt = 'Original page ' + (sourceIndex + 1);
-        thumb.draggable = false;
-      } else {
-        drawThumbnail(thumb, pd);
-      }
-      card.appendChild(thumb);
+      card.appendChild(createPageThumb(sourceIndex, 'Original page ' + (sourceIndex + 1)));
 
       const actions = document.createElement('div');
       actions.className = 'page-card-actions';
@@ -3741,10 +4004,18 @@ Ethan Hu -->
       Object.values(resButtons).forEach(b => b.classList.remove('on'));
       btn.classList.add('on');
       if (!state.pdfDoc) return;
-      state.pages = new Array(state.numPages).fill(null);
-      for (let i = 1; i <= state.numPages; i++) {
-        setLoader(true, resLabels[key] + i + ' / ' + state.numPages, ((i - 1) / state.numPages) * 100);
-        await renderPageToLuminance(i);
+      if (state.largePdfSafeMode) {
+        forgetFullPageData();
+        setLoader(true, 'Resolution set · rendering current page…', 35);
+        if (activeTool === 'edit' || isRasterTool(activeTool)) {
+          await ensurePageData(currentSourceIndex());
+        }
+      } else {
+        state.pages = new Array(state.numPages).fill(null);
+        for (let i = 1; i <= state.numPages; i++) {
+          setLoader(true, resLabels[key] + i + ' / ' + state.numPages, ((i - 1) / state.numPages) * 100);
+          await renderPageToLuminance(i);
+        }
       }
       updatePageState();
       if (activeTool === 'edit') { syncEditControls(); drawEditedPagePreview(); }
@@ -3776,6 +4047,7 @@ Ethan Hu -->
 
   // ── Download ──
   downloadBtn.addEventListener('click', async () => {
+    if (activeTool === 'preview') return;
     if (activeTool === 'merge') {
       await mergeSelectedPdfs();
       return;
@@ -3802,7 +4074,8 @@ Ethan Hu -->
       const count = activePageCount();
       for (let i = 0; i < count; i++) {
         setLoader(true, 'Exporting page ' + (i + 1) + ' of ' + count, (i / count) * 100);
-        const pd = state.pages[state.pageOrder[i]];
+        const pd = await ensurePageData(state.pageOrder[i]);
+        if (!pd) throw new Error('Could not render page ' + (i + 1));
         if (processTool === 'threshold') applyThresholdToCanvas(pd, tmp);
         else applyGreyscaleToCanvas(pd, tmp);
         const wPt = pd.w / pd.scale;
@@ -3812,6 +4085,8 @@ Ethan Hu -->
         if (i === 0) pdf = new jsPDF({ orientation: orient, unit: 'pt', format: [wPt, hPt] });
         else pdf.addPage([wPt, hPt], orient);
         pdf.addImage(dataUrl, 'PNG', 0, 0, wPt, hPt, undefined, 'FAST');
+        tmp.width = 0;
+        tmp.height = 0;
         await new Promise(r => setTimeout(r, 0));
       }
       pdf.save(outputBaseName() + TOOLS[activeTool].suffix + '.pdf');
@@ -4014,7 +4289,7 @@ Ethan Hu -->
 
   // ctrl/cmd + scroll (or trackpad pinch) = continuous zoom
   previewStage.addEventListener('wheel', e => {
-    const canZoomTool = isRasterTool(activeTool) || activeTool === 'edit';
+    const canZoomTool = activeTool === 'preview' || isRasterTool(activeTool) || activeTool === 'edit';
     const overPdf = e.target.closest('.preview-canvas-wrap, .page-editor-canvas-wrap');
     if (!state.pdfDoc || !canZoomTool || !overPdf || (!e.ctrlKey && !e.metaKey)) return;
     e.preventDefault();
@@ -4070,6 +4345,7 @@ Ethan Hu -->
   syncPreviewStageHeight();
   updateSourceDropMode();
   resolutionOptions.classList.toggle('hidden', !isRasterTool(activeTool));
+  downloadBtn.parentElement.style.display = activeTool === 'preview' ? 'none' : '';
   updateMergeState();
   syncFineQualityToggle();
   syncEditControls();
@@ -4077,7 +4353,11 @@ Ethan Hu -->
   updateToolIndicator();
 
   const _origDrawPreview = drawPreview;
-  drawPreview = function() { _origDrawPreview(); applyZoom(); };
+  drawPreview = function() {
+    const result = _origDrawPreview();
+    if (result && typeof result.then === 'function') result.then(() => applyZoom());
+    else applyZoom();
+  };
 
   // init display
   threshNum.textContent = '128';
