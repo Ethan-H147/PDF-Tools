@@ -1,24 +1,47 @@
-# PDF Tools
+# PDF Atelier
 
-A small browser-based PDF toolkit for the basic jobs I don't want to open a heavy PDF app for.
+PDF Atelier is a privacy-first, browser-based PDF workstation for everyday PDF cleanup and export work. It is designed to feel lighter and cleaner than large online PDF tools while keeping files on your own device.
 
-It currently supports:
+Files are processed locally in the browser. They are not uploaded to a server.
 
-- previewing PDFs with zoom and page navigation
-- merging multiple PDFs
-- reordering, deleting, and splitting pages
-- cropping and rotating individual pages
-- threshold / black-and-white conversion
-- grayscale conversion
+## Features
 
-Everything runs in the browser. Files are not uploaded anywhere.
+- Preview PDFs with page navigation, zoom, and high-quality progressive rendering
+- Organize pages by reordering, deleting, and splitting PDFs into named parts
+- Merge multiple PDFs and send the result into the organizer
+- Crop and rotate pages, including fine rotation when needed
+- Compress PDFs with original-quality, balanced, and small-size modes
+- Convert pages to black-and-white or grayscale
+- Export with page ranges, current-page-only export, and password protection
+- Switch between light and dark mode
+- Use the interface in English, Chinese, Korean, Japanese, Spanish, and French
 
-## Notes and limitations
+## Quality and Privacy
 
-This is meant to cover everyday PDF cleanup, not replace Acrobat. Some operations preserve the original PDF pages, while others have to rasterize the page:
+PDF Atelier tries to preserve original PDF quality whenever possible. Organize, split, merge, crop-only, and 90-degree rotation exports keep PDF page content intact where practical. Tools that alter pixels, such as threshold, grayscale, small-size compression, and fine rotation, may rasterize pages because those operations change the rendered page image.
 
-- merge, organize, split, crop-only, and 90-degree rotation try to preserve the original PDF content
-- threshold and grayscale rasterize pages because they change the pixels
-- fine rotation by small degrees also rasterizes the edited page
+Because processing happens in the browser, performance depends on the device and the PDF. Very large files can still be slow or memory-heavy, especially on phones and tablets.
 
-Large PDFs can still be demanding, especially on phones and tablets. The app uses lazy rendering and lower-resolution previews for big files, but exporting a huge document at high DPI may still be extremely slow or fail if the browser runs out of memory.
+## Using It Locally
+
+This is a static app. Open `index.html` in a browser, or publish the folder with any static host.
+
+For the best browser compatibility, serve it over HTTPS when publishing. Some browser APIs and CDN-loaded dependencies behave more predictably on a normal web origin than from a local file URL.
+
+## Third-party Libraries
+
+PDF Atelier uses third-party browser libraries including:
+
+- PDF.js
+- pdf-lib
+- jsPDF
+
+Those libraries remain under their own licenses. See their upstream projects for details.
+
+## License
+
+PDF Atelier is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
+
+You may use, study, modify, and share this project. If you modify it and make it available over a network, you must also provide the corresponding source code under the same license.
+
+The source code is licensed under AGPL-3.0-or-later. The project name, logo, and branding are not licensed for reuse without permission.
