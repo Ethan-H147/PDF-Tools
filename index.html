@@ -184,6 +184,12 @@ Ethan Hu -->
   .tool-tab.active { background: var(--ink); color: var(--paper); }
   .tool-tab .tab-num { font-size: 9px; opacity: .5; letter-spacing: 0.1em; }
   .tool-tab.active .tab-num { opacity: .7; }
+  .tool-tab:focus-visible,
+  .drop:focus-visible,
+  .toggle:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+  }
 
   /* ── MAIN GRID ── */
   main {
@@ -1282,7 +1288,8 @@ Ethan Hu -->
   }
 
   .page-editor-strip {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     flex: 0 0 168px;
     gap: 12px;
     max-height: 100%;
@@ -1386,6 +1393,7 @@ Ethan Hu -->
     border: 1px solid var(--line);
     border-radius: 14px;
     cursor: pointer;
+    flex: 0 0 auto;
     overflow: hidden;
     text-align: left;
     transition: box-shadow .16s, border-color .16s, transform .16s;
@@ -1403,10 +1411,22 @@ Ethan Hu -->
 
   .page-edit-card .page-card-actions {
     gap: 8px;
+    min-height: 46px;
   }
 
   .page-edit-card .page-number {
     font-size: 22px;
+  }
+
+  .page-edit-card .page-thumb {
+    aspect-ratio: auto;
+    height: 216px;
+    min-height: 216px;
+    object-fit: contain;
+  }
+
+  .page-edit-card .page-thumb-placeholder {
+    min-height: 216px;
   }
 
   .page-edit-badge {
@@ -1602,6 +1622,34 @@ Ethan Hu -->
     border-color: rgba(41, 151, 189, 0.72);
   }
 
+  .page-split-toggle {
+    align-items: center;
+    background: #fff;
+    border: 1px solid rgba(0, 113, 227, 0.30);
+    border-radius: 999px;
+    color: var(--accent);
+    cursor: pointer;
+    display: inline-flex;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 750;
+    height: 34px;
+    justify-content: center;
+    line-height: 1;
+    padding: 0 10px;
+  }
+
+  .page-split-toggle:hover:not(:disabled),
+  .page-split-toggle[aria-pressed="true"] {
+    background: var(--accent-soft);
+    border-color: rgba(0, 113, 227, 0.58);
+  }
+
+  .page-split-toggle:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+  }
+
   .page-drag-clone {
     border-radius: 14px;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
@@ -1616,7 +1664,8 @@ Ethan Hu -->
     z-index: 9999;
   }
 
-  .page-drag-clone .page-delete {
+  .page-drag-clone .page-delete,
+  .page-drag-clone .page-split-toggle {
     pointer-events: none;
   }
 
@@ -1691,6 +1740,12 @@ Ethan Hu -->
     .page-edit-card {
       flex: 0 0 136px;
     }
+
+    .page-edit-card .page-thumb,
+    .page-edit-card .page-thumb-placeholder {
+      height: 188px;
+      min-height: 188px;
+    }
   }
 </style>
 </head>
@@ -1709,25 +1764,25 @@ Ethan Hu -->
   </header>
 
   <!-- TOOL NAVIGATION -->
-  <nav class="tool-nav">
-    <div class="tool-nav-label">Tools</div>
-    <div class="tool-indicator" id="toolIndicator" aria-hidden="true"></div>
-    <div class="tool-tab active" data-tool="preview">
+  <nav class="tool-nav" role="tablist" aria-label="PDF tools">
+    <div class="tool-nav-label" role="presentation" aria-hidden="true">Tools</div>
+    <div class="tool-indicator" id="toolIndicator" role="presentation" aria-hidden="true"></div>
+    <div class="tool-tab active" id="tab-preview" data-tool="preview" role="tab" aria-selected="true" aria-controls="tool-preview" tabindex="0">
       <span class="tab-num">I.</span> Preview
     </div>
-    <div class="tool-tab" data-tool="organize">
+    <div class="tool-tab" id="tab-organize" data-tool="organize" role="tab" aria-selected="false" aria-controls="tool-organize" tabindex="-1">
       <span class="tab-num">II.</span> Organize
     </div>
-    <div class="tool-tab" data-tool="edit">
+    <div class="tool-tab" id="tab-edit" data-tool="edit" role="tab" aria-selected="false" aria-controls="tool-edit" tabindex="-1">
       <span class="tab-num">III.</span> Crop/Rotate
     </div>
-    <div class="tool-tab" data-tool="merge">
+    <div class="tool-tab" id="tab-merge" data-tool="merge" role="tab" aria-selected="false" aria-controls="tool-merge" tabindex="-1">
       <span class="tab-num">IV.</span> Merge
     </div>
-    <div class="tool-tab" data-tool="threshold">
+    <div class="tool-tab" id="tab-threshold" data-tool="threshold" role="tab" aria-selected="false" aria-controls="tool-threshold" tabindex="-1">
       <span class="tab-num">V.</span> Threshold
     </div>
-    <div class="tool-tab" data-tool="greyscale">
+    <div class="tool-tab" id="tab-greyscale" data-tool="greyscale" role="tab" aria-selected="false" aria-controls="tool-greyscale" tabindex="-1">
       <span class="tab-num">VI.</span> Grayscale
     </div>
   </nav>
@@ -1737,28 +1792,28 @@ Ethan Hu -->
 
       <!-- SHARED: Source -->
       <div class="section-label"><span>I. Source PDF</span><span>—</span></div>
-      <div class="drop" id="dropZone">
+      <div class="drop" id="dropZone" role="button" tabindex="0" aria-label="Upload a PDF">
         <div class="glyph" id="dropGlyph">¶</div>
         <div class="lbl" id="dropLabel">Upload PDF</div>
         <div class="sub" id="dropSub">PDF · click or drop</div>
       </div>
       <input type="file" id="fileInput" accept="application/pdf">
-      <div class="err" id="errBox"></div>
+      <div class="err" id="errBox" role="alert" aria-live="assertive" aria-atomic="true" aria-hidden="true"></div>
 
       <div class="filecard" id="fileCard">
         <div class="name" id="fileName">—</div>
         <div class="stats">
           <span>Pages <b id="pageCount">—</b></span>
           <span>Size <b id="fileSize">—</b></span>
-          <span>Status <b id="fileStatus">ready</b></span>
+          <span>Status <b id="fileStatus" role="status" aria-live="polite" aria-atomic="true">ready</b></span>
         </div>
       </div>
 
       <!-- ═══ PREVIEW PANEL ═══ -->
-      <div class="tool-panel active" id="tool-preview"></div>
+      <div class="tool-panel active" id="tool-preview" role="tabpanel" aria-labelledby="tab-preview" aria-hidden="false"></div>
 
       <!-- ═══ ORGANIZE PANEL ═══ -->
-      <div class="tool-panel" id="tool-organize">
+      <div class="tool-panel" id="tool-organize" role="tabpanel" aria-labelledby="tab-organize" aria-hidden="true">
         <div style="margin-top:26px">
           <div class="section-label"><span>II. Organize Pages</span><span id="organizeHint">ready</span></div>
           <div class="organize-summary" id="organizeSummary">Upload a PDF to reorder or remove pages.</div>
@@ -1775,7 +1830,7 @@ Ethan Hu -->
       </div>
 
       <!-- ═══ CROP / ROTATE PANEL ═══ -->
-      <div class="tool-panel" id="tool-edit">
+      <div class="tool-panel" id="tool-edit" role="tabpanel" aria-labelledby="tab-edit" aria-hidden="true">
         <div style="margin-top:26px">
           <div class="section-label"><span>II. Crop & Rotate</span><span id="editHint">select page</span></div>
           <div class="organize-summary" id="editSummary">Upload a PDF, then choose a page from the editor to crop or rotate it.</div>
@@ -1813,7 +1868,7 @@ Ethan Hu -->
       </div>
 
       <!-- ═══ MERGE PANEL ═══ -->
-      <div class="tool-panel" id="tool-merge">
+      <div class="tool-panel" id="tool-merge" role="tabpanel" aria-labelledby="tab-merge" aria-hidden="true">
         <div style="margin-top:26px">
           <div class="section-label"><span>II. Merge PDFs</span><span id="mergeHint">ready</span></div>
           <div class="organize-summary" id="mergeSummary">Choose multiple PDFs, arrange their order, then merge into the organizer.</div>
@@ -1826,7 +1881,7 @@ Ethan Hu -->
       </div>
 
       <!-- ═══ THRESHOLD PANEL ═══ -->
-      <div class="tool-panel" id="tool-threshold">
+      <div class="tool-panel" id="tool-threshold" role="tabpanel" aria-labelledby="tab-threshold" aria-hidden="true">
         <div style="margin-top:26px">
           <div class="section-label"><span>II. Threshold</span><span id="threshHint">mid range</span></div>
           <div class="big-display">
@@ -1844,13 +1899,13 @@ Ethan Hu -->
             <span>255 · black</span>
           </div>
           <div class="toggles">
-            <div class="toggle" id="invertToggle">↻ Invert</div>
+            <div class="toggle" id="invertToggle" role="button" tabindex="0" aria-pressed="false">↻ Invert</div>
           </div>
         </div>
       </div>
 
       <!-- ═══ GREYSCALE PANEL ═══ -->
-      <div class="tool-panel" id="tool-greyscale">
+      <div class="tool-panel" id="tool-greyscale" role="tabpanel" aria-labelledby="tab-greyscale" aria-hidden="true">
         <div style="margin-top:26px">
           <div class="section-label"><span>II. Grayscale</span><span id="greyHint">neutral</span></div>
 
@@ -1875,8 +1930,8 @@ Ethan Hu -->
           </div>
 
           <div class="toggles">
-            <div class="toggle" id="greyInvertToggle">↻ Invert</div>
-            <div class="toggle" id="sepiaToggle">◈ Sepia</div>
+            <div class="toggle" id="greyInvertToggle" role="button" tabindex="0" aria-pressed="false">↻ Invert</div>
+            <div class="toggle" id="sepiaToggle" role="button" tabindex="0" aria-pressed="false">◈ Sepia</div>
           </div>
         </div>
       </div>
@@ -1892,9 +1947,9 @@ Ethan Hu -->
       <!-- SHARED: Download -->
       <div class="actions">
         <div class="toggles resolution-options hidden" id="resolutionOptions" style="margin-bottom:14px">
-          <div class="toggle" id="resFast">Fast</div>
-          <div class="toggle" id="res300">300 dpi</div>
-          <div class="toggle on" id="res600">600 dpi</div>
+          <div class="toggle" id="resFast" role="button" tabindex="0" aria-pressed="false">Fast</div>
+          <div class="toggle" id="res300" role="button" tabindex="0" aria-pressed="false">300 dpi</div>
+          <div class="toggle on" id="res600" role="button" tabindex="0" aria-pressed="true">600 dpi</div>
         </div>
         <button class="btn-print" id="downloadBtn" disabled>
           <span id="downloadLabel">Preview Only</span>
@@ -1944,10 +1999,10 @@ Ethan Hu -->
             </div>
           </div>
         </div>
-        <div class="loader" id="loader">
+        <div class="loader" id="loader" role="status" aria-live="polite" aria-atomic="true" aria-busy="false" aria-hidden="true">
           <div class="lab" id="loaderLabel">Processing…</div>
           <div class="pct" id="loaderPct">0%</div>
-          <div class="bar"><div id="loaderBar"></div></div>
+          <div class="bar" id="loaderProgress" role="progressbar" aria-labelledby="loaderLabel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%"><div id="loaderBar"></div></div>
         </div>
       </div>
     </section>
@@ -1988,7 +2043,7 @@ Ethan Hu -->
     },
     organize: {
       lede: 'Reorder or remove pages before export.',
-      meta: 'Drag pages to reorder<br/>Click × to remove a page<br/>Right-click a page to split after it<br/>Drag pages across split lines freely<br/>Click a split × to remove it<br/>Name and export each part separately<br/>Original PDF pages are preserved',
+      meta: 'Drag pages to reorder<br/>Click × to remove a page<br/>Use Split to divide after a page<br/>Drag pages across split lines freely<br/>Click a split × to remove it<br/>Name and export each part separately<br/>Original PDF pages are preserved',
       downloadLabel: 'Export Organized PDF',
       downloadSub: 'preserve original page content',
       suffix: '_organized',
@@ -2151,6 +2206,7 @@ Ethan Hu -->
   const loaderLabel   = $('loaderLabel');
   const loaderPct     = $('loaderPct');
   const loaderBar     = $('loaderBar');
+  const loaderProgress = $('loaderProgress');
   const pageContextMenu = $('pageContextMenu');
   const contextSplitBtn = $('contextSplitBtn');
 
@@ -2159,9 +2215,59 @@ Ethan Hu -->
     sourceIndex: null,
   };
 
+  let errorHideTimer = null;
+  const toolTabs = Array.from(document.querySelectorAll('.tool-tab'));
+  const toolPanels = Array.from(document.querySelectorAll('.tool-panel'));
+
+  function activateElementOnKeyboard(el) {
+    if (!el) return;
+    el.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      el.click();
+    });
+  }
+
+  function setTogglePressed(el, pressed) {
+    if (!el) return;
+    el.classList.toggle('on', pressed);
+    el.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  }
+
+  function syncToolTabA11y() {
+    toolTabs.forEach(tab => {
+      const selected = tab.dataset.tool === activeTool;
+      tab.classList.toggle('active', selected);
+      tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+      tab.tabIndex = selected ? 0 : -1;
+    });
+    toolPanels.forEach(panel => {
+      const selected = panel.id === 'tool-' + activeTool;
+      panel.classList.toggle('active', selected);
+      panel.setAttribute('aria-hidden', selected ? 'false' : 'true');
+    });
+  }
+
   // ── Tool switching ──
-  document.querySelectorAll('.tool-tab').forEach(tab => {
+  toolTabs.forEach((tab, index) => {
     tab.addEventListener('click', () => switchTool(tab.dataset.tool));
+    tab.addEventListener('keydown', e => {
+      let nextIndex = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIndex = index + 1;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nextIndex = index - 1;
+      else if (e.key === 'Home') nextIndex = 0;
+      else if (e.key === 'End') nextIndex = toolTabs.length - 1;
+      else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        switchTool(tab.dataset.tool);
+        return;
+      }
+      if (nextIndex == null) return;
+      e.preventDefault();
+      const nextTab = toolTabs[(nextIndex + toolTabs.length) % toolTabs.length];
+      nextTab.focus();
+      switchTool(nextTab.dataset.tool);
+    });
   });
 
   function updateToolIndicator() {
@@ -2180,13 +2286,14 @@ Ethan Hu -->
   }
 
   function switchTool(id) {
-    if (id === activeTool) return;
+    if (!TOOLS[id]) return;
+    if (id === activeTool) {
+      syncToolTabA11y();
+      return;
+    }
     activeTool = id;
     if (id === 'threshold' || id === 'greyscale') processTool = id;
-    document.querySelectorAll('.tool-tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.tool === id));
-    document.querySelectorAll('.tool-panel').forEach(p =>
-      p.classList.toggle('active', p.id === 'tool-' + id));
+    syncToolTabA11y();
     const tool = TOOLS[id];
     $('masterLede').innerHTML = tool.lede;
     $('masterMeta').dataset.tooltip = toolTipText(tool.meta);
@@ -2248,15 +2355,27 @@ Ethan Hu -->
     dropGlyph.textContent = merging ? '∑' : '¶';
     dropLabel.textContent = merging ? 'Upload PDFs' : 'Upload PDF';
     dropSub.textContent = merging ? 'Multiple PDFs · click or drop' : 'PDF · click or drop';
+    dropZone.setAttribute('aria-label', merging ? 'Upload one or more PDFs' : 'Upload a PDF');
   }
 
   // ── Helpers ──
   function showError(msg) {
+    if (errorHideTimer) clearTimeout(errorHideTimer);
     errBox.textContent = '⚠ ' + msg;
     errBox.classList.add('on');
-    setTimeout(() => errBox.classList.remove('on'), 5000);
+    errBox.setAttribute('aria-hidden', 'false');
+    errorHideTimer = setTimeout(() => {
+      errBox.classList.remove('on');
+      errBox.setAttribute('aria-hidden', 'true');
+      errorHideTimer = null;
+    }, 5000);
   }
-  function clearError() { errBox.classList.remove('on'); }
+  function clearError() {
+    if (errorHideTimer) clearTimeout(errorHideTimer);
+    errorHideTimer = null;
+    errBox.classList.remove('on');
+    errBox.setAttribute('aria-hidden', 'true');
+  }
 
   function fmtBytes(b) {
     if (b < 1024) return b + ' B';
@@ -2459,7 +2578,7 @@ Ethan Hu -->
     clearSplitBtn.disabled = !splitActive;
     splitPartsList.innerHTML = '';
     if (!splitActive) {
-      splitSummary.textContent = 'Right-click a page in Organize to create a split.';
+      splitSummary.textContent = 'Use a page Split button in Organize to create a split.';
       return;
     }
     splitSummary.textContent = parts.length + ' PDFs from ' + state.splitPoints.length + ' split point' +
@@ -2528,7 +2647,7 @@ Ethan Hu -->
     organizeSummary.textContent = state.pdfDoc
       ? (state.splitPoints.length
         ? (state.splitPoints.length + 1) + ' PDFs are ready. Edit names and export each part from the split panel.'
-        : count + ' of ' + state.numPages + ' original pages will be included in export. Right-click a page to split.')
+        : count + ' of ' + state.numPages + ' original pages will be included in export. Use Split on a page to divide the PDF.')
       : 'Upload a PDF to reorder or remove pages.';
     updateSplitPanel();
     proofMeta.textContent = state.pdfDoc
@@ -2543,8 +2662,17 @@ Ethan Hu -->
 
   function setLoader(on, label, pct) {
     loader.classList.toggle('on', on);
+    loader.setAttribute('aria-busy', on ? 'true' : 'false');
+    loader.setAttribute('aria-hidden', on ? 'false' : 'true');
     if (on && label != null) loaderLabel.textContent = label;
-    if (on && pct != null) { loaderPct.textContent = Math.round(pct) + '%'; loaderBar.style.width = pct + '%'; }
+    if (on && pct != null) {
+      const clampedPct = Math.max(0, Math.min(100, Number(pct) || 0));
+      const roundedPct = Math.round(clampedPct);
+      loaderPct.textContent = roundedPct + '%';
+      loaderBar.style.width = clampedPct + '%';
+      loaderProgress.setAttribute('aria-valuenow', String(roundedPct));
+      loaderProgress.setAttribute('aria-valuetext', roundedPct + '%');
+    }
   }
 
   function threshHintText(v) {
@@ -2744,6 +2872,8 @@ Ethan Hu -->
   mergeRunBtn.addEventListener('click', () => mergeSelectedPdfs());
 
   dropZone.addEventListener('click', () => fileInput.click());
+  activateElementOnKeyboard(dropZone);
+  document.querySelectorAll('.toggle[role="button"]').forEach(activateElementOnKeyboard);
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
   dropZone.addEventListener('drop', e => {
@@ -2937,13 +3067,15 @@ Ethan Hu -->
     return thumb.toDataURL('image/png');
   }
 
-  async function renderThumbnail(sourceIndex) {
+  async function renderThumbnail(sourceIndex, quality = 'low') {
     if (!state.pdfDoc || sourceIndex == null) return null;
     const existing = state.pages[sourceIndex];
-    if (existing?.thumbUrl) return existing.thumbUrl;
+    if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) return existing.thumbUrl;
     const page = await state.pdfDoc.getPage(sourceIndex + 1);
     const baseVp = page.getViewport({ scale: 1 });
-    const scale = Math.min(0.75, 260 / Math.max(baseVp.width, baseVp.height));
+    const scale = quality === 'high'
+      ? Math.min(1.45, 900 / Math.max(baseVp.width, baseVp.height))
+      : Math.min(0.75, 260 / Math.max(baseVp.width, baseVp.height));
     const vp = page.getViewport({ scale });
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.floor(vp.width));
@@ -2952,9 +3084,11 @@ Ethan Hu -->
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, c.width, c.height);
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
-    const thumbUrl = makeThumbnailUrl(c, 220, 310);
+    const thumbUrl = quality === 'high'
+      ? makeThumbnailUrl(c, 520, 720)
+      : makeThumbnailUrl(c, 220, 310);
     const pd = await ensurePageMeta(sourceIndex);
-    state.pages[sourceIndex] = { ...(pd || {}), thumbUrl };
+    state.pages[sourceIndex] = { ...(pd || {}), thumbUrl, thumbQuality: quality };
     c.width = 0;
     c.height = 0;
     return thumbUrl;
@@ -2962,20 +3096,22 @@ Ethan Hu -->
 
   function applyThumbnailToElements(sourceIndex, thumbUrl) {
     document.querySelectorAll('[data-thumb-source="' + sourceIndex + '"]').forEach(el => {
-      el.style.backgroundImage = 'url("' + thumbUrl + '")';
+      if (el.tagName === 'IMG') el.src = thumbUrl;
+      else el.style.backgroundImage = 'url("' + thumbUrl + '")';
       el.textContent = '';
       el.setAttribute('aria-label', 'Page thumbnail ' + (sourceIndex + 1));
     });
   }
 
-  async function ensureThumbnail(sourceIndex) {
+  async function ensureThumbnail(sourceIndex, quality = 'low') {
     const existing = state.pages[sourceIndex];
-    if (existing?.thumbUrl) return existing.thumbUrl;
-    const jobKey = state.renderGeneration + ':thumb:' + sourceIndex;
+    if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) return existing.thumbUrl;
+    const jobKey = state.renderGeneration + ':thumb:' + sourceIndex + ':' + quality;
     if (thumbnailJobs.has(jobKey)) return thumbnailJobs.get(jobKey);
-    const job = renderThumbnail(sourceIndex)
+    const job = renderThumbnail(sourceIndex, quality)
       .then(url => {
         if (url) applyThumbnailToElements(sourceIndex, url);
+        if (quality === 'low') queueThumbnail(sourceIndex, 'high');
         return url;
       })
       .finally(() => thumbnailJobs.delete(jobKey));
@@ -2988,10 +3124,13 @@ Ethan Hu -->
     thumbnailQueueRunning = true;
     (async () => {
       while (thumbnailQueue.length) {
-        const sourceIndex = thumbnailQueue.shift();
-        thumbnailQueued.delete(sourceIndex);
-        if (state.pages[sourceIndex]?.thumbUrl) continue;
-        try { await ensureThumbnail(sourceIndex); }
+        const item = thumbnailQueue.shift();
+        const sourceIndex = item.sourceIndex;
+        const quality = item.quality;
+        thumbnailQueued.delete(sourceIndex + ':' + quality);
+        const existing = state.pages[sourceIndex];
+        if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) continue;
+        try { await ensureThumbnail(sourceIndex, quality); }
         catch (err) { console.warn('Thumbnail render failed', err); }
         await new Promise(r => setTimeout(r, 0));
       }
@@ -2999,10 +3138,14 @@ Ethan Hu -->
     })();
   }
 
-  function queueThumbnail(sourceIndex) {
-    if (sourceIndex == null || state.pages[sourceIndex]?.thumbUrl || thumbnailQueued.has(sourceIndex)) return;
-    thumbnailQueued.add(sourceIndex);
-    thumbnailQueue.push(sourceIndex);
+  function queueThumbnail(sourceIndex, quality = 'low') {
+    if (sourceIndex == null) return;
+    const existing = state.pages[sourceIndex];
+    if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) return;
+    const queueKey = sourceIndex + ':' + quality;
+    if (thumbnailQueued.has(queueKey)) return;
+    thumbnailQueued.add(queueKey);
+    thumbnailQueue.push({ sourceIndex, quality });
     runThumbnailQueue();
   }
 
@@ -3028,7 +3171,9 @@ Ethan Hu -->
       thumb.className = 'page-thumb';
       thumb.src = pd.thumbUrl;
       thumb.alt = label;
+      thumb.dataset.thumbSource = sourceIndex;
       thumb.draggable = false;
+      if (pd.thumbQuality !== 'high') queueThumbnail(sourceIndex, 'high');
       return thumb;
     }
     const thumb = document.createElement('div');
@@ -3092,10 +3237,10 @@ Ethan Hu -->
     ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
     try {
       const page = await state.pdfDoc.getPage(sourceIndex + 1);
-      if (token !== originalPreviewRenderToken || activeTool !== 'preview') return;
+      if (token !== originalPreviewRenderToken || (activeTool !== 'preview' && activeTool !== 'merge')) return;
       const viewport = page.getViewport({ scale: pd.scale });
       await page.render({ canvasContext: ctx, viewport }).promise;
-      if (token === originalPreviewRenderToken && activeTool === 'preview') applyZoom();
+      if (token === originalPreviewRenderToken && (activeTool === 'preview' || activeTool === 'merge')) applyZoom();
     } catch (err) {
       console.error(err);
       showError('Preview failed: ' + (err.message || err));
@@ -3110,9 +3255,9 @@ Ethan Hu -->
       return;
     }
     const token = ++processedPreviewRenderToken;
-    if (activeTool === 'preview' && sourceIndex != null) {
+    if ((activeTool === 'preview' || activeTool === 'merge') && sourceIndex != null) {
       const pd = await ensurePageMeta(sourceIndex);
-      if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'preview') return;
+      if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || (activeTool !== 'preview' && activeTool !== 'merge')) return;
       renderOriginalPreview(pd, sourceIndex);
       proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · page ' + state.curPage + '/' + activePageCount();
       return;
@@ -3304,39 +3449,39 @@ Ethan Hu -->
     requestEditedPreviewRender();
   }
 
-  function renderEditedLuminanceToCanvas(pd, edit, canvas) {
+  async function renderEditedColorPreviewToCanvas(sourceIndex, edit, canvas) {
+    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const baseVp = page.getViewport({ scale: 1 });
+    const scale = getRasterPreviewScale(baseVp);
+    const vp = page.getViewport({ scale });
+    const base = document.createElement('canvas');
+    base.width = Math.max(1, Math.floor(vp.width));
+    base.height = Math.max(1, Math.floor(vp.height));
+    const bctx = base.getContext('2d');
+    bctx.fillStyle = '#fff';
+    bctx.fillRect(0, 0, base.width, base.height);
+    await page.render({ canvasContext: bctx, viewport: vp }).promise;
+
     const e = clonePageEdit(edit);
-    const cropLeft = Math.round(pd.w * e.crop.left / 100);
-    const cropTop = Math.round(pd.h * e.crop.top / 100);
-    const cropRight = Math.round(pd.w * e.crop.right / 100);
-    const cropBottom = Math.round(pd.h * e.crop.bottom / 100);
-    const cropW = Math.max(1, pd.w - cropLeft - cropRight);
-    const cropH = Math.max(1, pd.h - cropTop - cropBottom);
-    const previewScale = Math.min(1, 1400 / Math.max(cropW, cropH));
-    const srcW = Math.max(1, Math.round(cropW * previewScale));
-    const srcH = Math.max(1, Math.round(cropH * previewScale));
-    const src = document.createElement('canvas');
-    src.width = srcW;
-    src.height = srcH;
-    const sctx = src.getContext('2d');
-    const img = sctx.createImageData(srcW, srcH);
-    const d = img.data;
-    for (let y = 0; y < srcH; y++) {
-      const sy = Math.min(pd.h - 1, cropTop + Math.floor((y / srcH) * cropH));
-      for (let x = 0; x < srcW; x++) {
-        const sx = Math.min(pd.w - 1, cropLeft + Math.floor((x / srcW) * cropW));
-        const v = pd.lum[sy * pd.w + sx];
-        const i = (y * srcW + x) * 4;
-        d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
-      }
-    }
-    sctx.putImageData(img, 0, 0);
+    const cropLeft = Math.round(base.width * e.crop.left / 100);
+    const cropTop = Math.round(base.height * e.crop.top / 100);
+    const cropRight = Math.round(base.width * e.crop.right / 100);
+    const cropBottom = Math.round(base.height * e.crop.bottom / 100);
+    const cropW = Math.max(1, base.width - cropLeft - cropRight);
+    const cropH = Math.max(1, base.height - cropTop - cropBottom);
+    const crop = document.createElement('canvas');
+    crop.width = cropW;
+    crop.height = cropH;
+    const cctx = crop.getContext('2d');
+    cctx.fillStyle = '#fff';
+    cctx.fillRect(0, 0, cropW, cropH);
+    cctx.drawImage(base, cropLeft, cropTop, cropW, cropH, 0, 0, cropW, cropH);
 
     const angle = editAngle(e) * Math.PI / 180;
     const cos = Math.abs(Math.cos(angle));
     const sin = Math.abs(Math.sin(angle));
-    const outW = Math.ceil(srcW * cos + srcH * sin);
-    const outH = Math.ceil(srcW * sin + srcH * cos);
+    const outW = Math.ceil(cropW * cos + cropH * sin);
+    const outH = Math.ceil(cropW * sin + cropH * cos);
     canvas.width = outW;
     canvas.height = outH;
     const ctx = canvas.getContext('2d');
@@ -3344,7 +3489,13 @@ Ethan Hu -->
     ctx.fillRect(0, 0, outW, outH);
     ctx.translate(outW / 2, outH / 2);
     ctx.rotate(angle);
-    ctx.drawImage(src, -srcW / 2, -srcH / 2);
+    ctx.drawImage(crop, -cropW / 2, -cropH / 2);
+
+    base.width = 0;
+    base.height = 0;
+    crop.width = 0;
+    crop.height = 0;
+    return { w: outW, h: outH };
   }
 
   let editedPreviewRenderToken = 0;
@@ -3352,9 +3503,21 @@ Ethan Hu -->
   async function drawEditedPagePreview() {
     const sourceIndex = currentSourceIndex();
     const token = ++editedPreviewRenderToken;
-    const pd = await ensureRasterPreviewData(sourceIndex);
-    if (!pd || token !== editedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'edit') return;
-    renderEditedLuminanceToCanvas(pd, currentPageEdit(), pageEditorCanvas);
+    if (sourceIndex == null || !state.pdfDoc) return;
+    const tmp = document.createElement('canvas');
+    const size = await renderEditedColorPreviewToCanvas(sourceIndex, currentPageEdit(), tmp);
+    if (!size || token !== editedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'edit') {
+      tmp.width = 0;
+      tmp.height = 0;
+      return;
+    }
+    pageEditorCanvas.width = tmp.width;
+    pageEditorCanvas.height = tmp.height;
+    const ctx = pageEditorCanvas.getContext('2d');
+    ctx.clearRect(0, 0, pageEditorCanvas.width, pageEditorCanvas.height);
+    ctx.drawImage(tmp, 0, 0);
+    tmp.width = 0;
+    tmp.height = 0;
     pageEditorCanvasWrap.style.display = 'block';
     proofMeta.textContent = 'page ' + state.curPage + '/' + activePageCount() + ' · ' + editedLabel(currentPageEdit());
     applyZoom({ preserveCenter: false });
@@ -3563,10 +3726,28 @@ Ethan Hu -->
         e.stopPropagation();
         deleteOutputPage(outputIndex);
       });
+      const canSplit = outputIndex >= 0 && outputIndex < count - 1;
+      const boundary = outputIndex + 1;
+      const splitExists = canSplit && state.splitPoints.includes(boundary);
+      const split = document.createElement('button');
+      split.type = 'button';
+      split.className = 'page-split-toggle';
+      split.disabled = !canSplit;
+      split.textContent = 'Split';
+      split.setAttribute('aria-pressed', splitExists ? 'true' : 'false');
+      split.setAttribute('aria-label', canSplit
+        ? (splitExists ? 'Remove split after original page ' : 'Split after original page ') + (sourceIndex + 1)
+        : 'Cannot split after the final page');
+      split.addEventListener('pointerdown', e => e.stopPropagation());
+      split.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleSplitAfter(outputIndex);
+      });
       const num = document.createElement('div');
       num.className = 'page-number';
       num.textContent = sourceIndex + 1;
       actions.appendChild(del);
+      actions.appendChild(split);
       actions.appendChild(num);
       card.appendChild(actions);
 
@@ -3669,7 +3850,7 @@ Ethan Hu -->
 
   function beginOrganizerDrag(e, card, sourceIndex) {
     if (!state.pdfDoc || organizerDrag.active || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    if (e.target.closest('.page-delete')) return;
+    if (e.target.closest('.page-delete, .page-split-toggle')) return;
     hidePageContextMenu();
     const outputIndex = state.pageOrder.indexOf(sourceIndex);
     if (outputIndex < 0) return;
@@ -3928,7 +4109,7 @@ Ethan Hu -->
   });
   invertToggle.addEventListener('click', () => {
     state.invert = !state.invert;
-    invertToggle.classList.toggle('on', state.invert);
+    setTogglePressed(invertToggle, state.invert);
     if (state.pdfDoc) requestPreviewRender(false);
   });
 
@@ -3951,13 +4132,13 @@ Ethan Hu -->
   });
   greyInvertToggle.addEventListener('click', () => {
     state.greyInvert = !state.greyInvert;
-    greyInvertToggle.classList.toggle('on', state.greyInvert);
+    setTogglePressed(greyInvertToggle, state.greyInvert);
     $('greyHint').textContent = greyHintText();
     if (state.pdfDoc) requestPreviewRender(false);
   });
   sepiaToggle.addEventListener('click', () => {
     state.sepia = !state.sepia;
-    sepiaToggle.classList.toggle('on', state.sepia);
+    setTogglePressed(sepiaToggle, state.sepia);
     $('greyHint').textContent = greyHintText();
     if (state.pdfDoc) requestPreviewRender(false);
   });
@@ -4042,12 +4223,15 @@ Ethan Hu -->
   const resButtons = { fast: $('resFast'), '300': $('res300'), '600': $('res600') };
   const resLabels  = { fast: 'Rendering page ', '300': 'Rendering at 300 dpi · page ', '600': 'Rendering at 600 dpi · page ' };
 
+  function syncResolutionToggles() {
+    Object.entries(resButtons).forEach(([key, btn]) => setTogglePressed(btn, state.resolution === key));
+  }
+
   Object.entries(resButtons).forEach(([key, btn]) => {
     btn.addEventListener('click', async () => {
       if (state.resolution === key) return;
       state.resolution = key;
-      Object.values(resButtons).forEach(b => b.classList.remove('on'));
-      btn.classList.add('on');
+      syncResolutionToggles();
       if (!state.pdfDoc) return;
       if (state.largePdfSafeMode) {
         forgetFullPageData();
@@ -4336,7 +4520,7 @@ Ethan Hu -->
 
   // ctrl/cmd + scroll (or trackpad pinch) = continuous zoom
   previewStage.addEventListener('wheel', e => {
-    const canZoomTool = activeTool === 'preview' || isRasterTool(activeTool) || activeTool === 'edit';
+    const canZoomTool = activeTool === 'preview' || activeTool === 'merge' || isRasterTool(activeTool) || activeTool === 'edit';
     const overPdf = e.target.closest('.preview-canvas-wrap, .page-editor-canvas-wrap');
     if (!state.pdfDoc || !canZoomTool || !overPdf || (!e.ctrlKey && !e.metaKey)) return;
     e.preventDefault();
@@ -4390,10 +4574,15 @@ Ethan Hu -->
     document.fonts.ready.then(syncPreviewStageHeight);
   }
   syncPreviewStageHeight();
+  syncToolTabA11y();
   updateSourceDropMode();
   resolutionOptions.classList.toggle('hidden', !isRasterTool(activeTool));
   downloadBtn.parentElement.style.display = activeTool === 'preview' ? 'none' : '';
   updateMergeState();
+  setTogglePressed(invertToggle, state.invert);
+  setTogglePressed(greyInvertToggle, state.greyInvert);
+  setTogglePressed(sepiaToggle, state.sepia);
+  syncResolutionToggles();
   syncFineQualityToggle();
   syncEditControls();
   updatePreviewMode();
