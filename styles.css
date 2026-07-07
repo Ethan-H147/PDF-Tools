@@ -315,7 +315,7 @@
   .btn-print:hover:not(:disabled)::after { right: 12px; }
   .btn-print:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-print .small { display: block; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 400; letter-spacing: 0.2em; text-transform: uppercase; margin-top: 4px; opacity: .65; }
-  .advanced-options { margin-top: 10px; }
+  .advanced-options { margin-top: 14px; }
   .advanced-options.hidden { display: none; }
   .advanced-toggle {
     width: 100%;
@@ -382,7 +382,8 @@
     font: 600 10px/1.25 var(--font-sans);
   }
   .advanced-row.is-disabled { opacity: .52; }
-  .advanced-password {
+  .advanced-password,
+  .advanced-text-input {
     width: 100%;
     margin-top: 4px;
     padding: 10px 12px;
@@ -393,8 +394,10 @@
     font: 600 12px/1 var(--font-sans);
     outline: none;
   }
-  .advanced-password:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(47,113,226,0.12); }
-  .advanced-password:disabled { opacity: .45; cursor: not-allowed; }
+  .advanced-password:focus,
+  .advanced-text-input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(47,113,226,0.12); }
+  .advanced-password:disabled,
+  .advanced-text-input:disabled { opacity: .45; cursor: not-allowed; }
 
   /* ── PREVIEW ── */
   .panel-right {
@@ -2187,6 +2190,7 @@
   body.dark-mode .file-name-input,
   body.dark-mode .split-name-input,
   body.dark-mode .advanced-password,
+  body.dark-mode .advanced-text-input,
   body.dark-mode .crop-readout {
     background: #2c2c2e;
     color: var(--ink);
@@ -2219,6 +2223,10 @@
     color: #fff;
   }
 
+  body.dark-mode .btn-print {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26);
+  }
+
   body.dark-mode .tool-tab.active {
     color: #fff;
   }
@@ -2229,6 +2237,10 @@
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
+  }
+
+  body.dark-mode .btn-print:hover:not(:disabled) {
+    box-shadow: 0 10px 24px rgba(0, 113, 227, 0.18);
   }
 
   body.dark-mode .filecard .name:hover,

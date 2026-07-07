@@ -9,6 +9,37 @@
   const RASTER_PREVIEW_MAX_PIXELS = (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4200000 : 2200000;
   const RASTER_PREVIEW_KEY = 'preview-raster';
   const PREVIEW_META_KEY = 'preview-meta';
+  const PDF_LIB_SCRIPT_URLS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
+    'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+  ];
+  const JSPDF_SCRIPT_URLS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js',
+  ];
+  const COMPRESSION_PRESETS = {
+    original: {
+      hint: 'original',
+      summary: 'Compact the PDF while keeping original page content.',
+      rasterize: false,
+    },
+    balanced: {
+      hint: 'balanced',
+      summary: 'Create a smaller color PDF with balanced quality.',
+      rasterize: true,
+      dpi: 160,
+      jpegQuality: 0.78,
+      maxDimension: 2600,
+    },
+    small: {
+      hint: 'small',
+      summary: 'Create the smallest PDF with lighter page images.',
+      rasterize: true,
+      dpi: 110,
+      jpegQuality: 0.58,
+      maxDimension: 1800,
+    },
+  };
 
   const TOOLS = {
     preview: {
@@ -38,6 +69,13 @@
       downloadLabel: 'Merge PDFs',
       downloadSub: 'combine selected files into organize',
       suffix: '_merged',
+    },
+    compress: {
+      lede: 'Reduce PDF file size with simple quality choices.',
+      meta: 'Original mode preserves page content<br/>Balanced and Small create lighter page images<br/>Password lock still works',
+      downloadLabel: 'Export Compressed PDF',
+      downloadSub: 'reduce file size',
+      suffix: '_compressed',
     },
     threshold: {
       lede: 'Convert PDFs to black and white with threshold control.',
@@ -70,6 +108,7 @@
     pages: [], pageOrder: [], splitPoints: [], splitNames: [], fileName: '', fileSize: 0, pdfBytes: null,
     mergeFiles: [], pageEdits: [],
     fineRotationQuality: 'high',
+    compressMode: 'original',
     largePdfSafeMode: false,
     renderGeneration: 0,
     fullPageCacheOrder: [],
@@ -81,6 +120,7 @@
   const thumbnailQueued = new Set();
   let thumbnailQueueRunning = false;
   let thumbnailObserver = null;
+  const lazyScriptLoads = new Map();
 
   const $ = id => document.getElementById(id);
 
@@ -123,16 +163,23 @@
   const advancedToggle = $('advancedToggle');
   const advancedPanel = $('advancedPanel');
   const advancedCurrentOnly = $('advancedCurrentOnly');
+  const advancedRangeRow = $('advancedRangeRow');
+  const advancedRangeToggle = $('advancedRangeToggle');
+  const advancedRangeInput = $('advancedRangeInput');
   const advancedPasswordRow = $('advancedPasswordRow');
   const advancedPasswordToggle = $('advancedPasswordToggle');
   const advancedPasswordInput = $('advancedPasswordInput');
-  const advancedPasswordNote = $('advancedPasswordNote');
   const resetPagesBtn = $('resetPagesBtn');
   const mergeHint     = $('mergeHint');
   const mergeSummary  = $('mergeSummary');
   const mergeList     = $('mergeList');
   const mergeClearBtn = $('mergeClearBtn');
   const mergeRunBtn   = $('mergeRunBtn');
+  const compressHint  = $('compressHint');
+  const compressSummary = $('compressSummary');
+  const compressOriginal = $('compressOriginal');
+  const compressBalanced = $('compressBalanced');
+  const compressSmall = $('compressSmall');
   const organizeHint  = $('organizeHint');
   const organizeSummary = $('organizeSummary');
   const splitPanel    = $('splitPanel');
@@ -249,7 +296,18 @@
     advancedToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
     advancedPanel.hidden = expanded;
   });
-  advancedCurrentOnly.addEventListener('change', updatePageState);
+  advancedCurrentOnly.addEventListener('change', () => {
+    if (advancedCurrentOnly.checked) advancedRangeToggle.checked = false;
+    syncAdvancedOptions();
+    updatePageState();
+  });
+  advancedRangeToggle.addEventListener('change', () => {
+    if (advancedRangeToggle.checked) advancedCurrentOnly.checked = false;
+    syncAdvancedOptions();
+    updatePageState();
+    if (!advancedRangeInput.disabled) advancedRangeInput.focus();
+  });
+  advancedRangeInput.addEventListener('input', updatePageState);
   advancedPasswordToggle.addEventListener('change', () => {
     syncAdvancedOptions();
     if (!advancedPasswordInput.disabled) advancedPasswordInput.focus();
@@ -350,7 +408,9 @@
         ? 'Crop & Rotate <em>— select one page</em>'
         : activeTool === 'preview'
           ? 'Preview <em>— original PDF</em>'
-          : 'Preview <em>— processed output</em>';
+          : activeTool === 'compress'
+            ? 'Preview <em>— compressed export</em>'
+            : 'Preview <em>— processed output</em>';
     organizer.style.display = organizing ? 'block' : 'none';
     pageEditor.style.display = editing ? 'flex' : 'none';
     if (!editing) cropOverlay.hidden = true;
@@ -428,8 +488,623 @@
     return clean || fallback;
   }
 
+  function loadScriptOnce(id, urls) {
+    if (lazyScriptLoads.has(id)) return lazyScriptLoads.get(id);
+    let index = 0;
+    const loadNext = () => new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = urls[index];
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => {
+        script.remove();
+        index += 1;
+        if (index < urls.length) loadNext().then(resolve, reject);
+        else reject(new Error(id + ' library did not load. Check your connection and try again.'));
+      };
+      document.head.appendChild(script);
+    });
+    const promise = loadNext().catch(err => {
+      lazyScriptLoads.delete(id);
+      throw err;
+    });
+    lazyScriptLoads.set(id, promise);
+    return promise;
+  }
+
+  async function ensurePdfLib() {
+    if (window.PDFLib) return window.PDFLib;
+    await loadScriptOnce('PDF', PDF_LIB_SCRIPT_URLS);
+    if (!window.PDFLib) throw new Error('PDF library did not load. Check your connection and try again.');
+    return window.PDFLib;
+  }
+
+  async function ensureJsPdf() {
+    if (window.jspdf?.jsPDF) return window.jspdf;
+    await loadScriptOnce('Rendered PDF', JSPDF_SCRIPT_URLS);
+    if (!window.jspdf?.jsPDF) throw new Error('Rendered PDF library did not load. Check your connection and try again.');
+    return window.jspdf;
+  }
+
+  function normalizePdfBytes(bytes) {
+    if (bytes instanceof Uint8Array) return bytes;
+    if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
+    if (ArrayBuffer.isView(bytes)) return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    throw new Error('Export did not produce PDF bytes.');
+  }
+
+  function createPdfArtifact(bytes, fileBase, meta = {}) {
+    return {
+      bytes: normalizePdfBytes(bytes),
+      fileBase: cleanDownloadBase(fileBase, outputBaseName()),
+      mimeType: 'application/pdf',
+      meta: {
+        processors: [],
+        ...meta,
+      },
+    };
+  }
+
+  function clonePdfArtifact(artifact, updates = {}) {
+    return {
+      ...artifact,
+      ...updates,
+      meta: {
+        ...(artifact.meta || {}),
+        ...(updates.meta || {}),
+      },
+    };
+  }
+
+  function downloadPdfArtifact(artifact) {
+    const blob = new Blob([normalizePdfBytes(artifact.bytes)], { type: artifact.mimeType || 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = cleanDownloadBase(artifact.fileBase, outputBaseName()) + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function createExportContext(toolId, pageOrder, fileBase, options = {}) {
+    const useCurrentOnly = options.useCurrentOnly !== false;
+    const usePassword = options.usePassword !== false;
+    const password = usePassword ? advancedPasswordValue() : '';
+    return {
+      toolId,
+      pageOrder: pageOrder.slice(),
+      fileBase,
+      advanced: {
+        currentOnly: useCurrentOnly && advancedCurrentOnly.checked,
+        password,
+      },
+    };
+  }
+
+  function buildAdvancedExportProcessors(context, artifact) {
+    const processors = [];
+    if (context.advanced.password && !artifact.meta?.passwordProtected) {
+      processors.push({
+        id: 'password',
+        label: 'Locking PDF...',
+        progress: 100,
+        apply: applyPasswordProcessor,
+      });
+    }
+    return processors;
+  }
+
+  async function loadNoRasterPdfEncryptionEngine() {
+    return noRasterPdfEncryptionEngine;
+  }
+
+  async function applyPasswordProcessor(artifact, context) {
+    const engine = await loadNoRasterPdfEncryptionEngine();
+    const encryptedBytes = await engine.encrypt({
+      bytes: artifact.bytes,
+      userPassword: context.advanced.password,
+      ownerPassword: context.advanced.password,
+    });
+    return clonePdfArtifact(artifact, {
+      bytes: encryptedBytes,
+      meta: {
+        passwordProtected: true,
+        processors: [...(artifact.meta?.processors || []), 'password'],
+      },
+    });
+  }
+
+  const PDF_PASSWORD_PADDING = Uint8Array.from([
+    0x28, 0xbf, 0x4e, 0x5e, 0x4e, 0x75, 0x8a, 0x41,
+    0x64, 0x00, 0x4e, 0x56, 0xff, 0xfa, 0x01, 0x08,
+    0x2e, 0x2e, 0x00, 0xb6, 0xd0, 0x68, 0x3e, 0x80,
+    0x2f, 0x0c, 0xa9, 0xfe, 0x64, 0x53, 0x69, 0x7a,
+  ]);
+
+  const noRasterPdfEncryptionEngine = {
+    encrypt({ bytes, userPassword, ownerPassword }) {
+      return encryptPdfBytesNoRaster(normalizePdfBytes(bytes), userPassword, ownerPassword || userPassword);
+    },
+  };
+
+  function concatBytes(...parts) {
+    const length = parts.reduce((sum, part) => sum + part.length, 0);
+    const out = new Uint8Array(length);
+    let offset = 0;
+    parts.forEach(part => {
+      out.set(part, offset);
+      offset += part.length;
+    });
+    return out;
+  }
+
+  function bytesToBinaryString(bytes) {
+    let out = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      out += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return out;
+  }
+
+  function binaryStringToBytes(str) {
+    const out = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0xff;
+    return out;
+  }
+
+  function bytesToHex(bytes) {
+    let out = '';
+    for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');
+    return out;
+  }
+
+  function hexToBytes(hex) {
+    const clean = (hex || '').replace(/\s+/g, '');
+    const out = new Uint8Array(Math.ceil(clean.length / 2));
+    for (let i = 0; i < out.length; i++) {
+      const pair = clean.slice(i * 2, i * 2 + 2).padEnd(2, '0');
+      out[i] = parseInt(pair, 16) || 0;
+    }
+    return out;
+  }
+
+  function randomBytes(length) {
+    const out = new Uint8Array(length);
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(out);
+    else throw new Error('Secure browser randomness is required to lock PDFs.');
+    return out;
+  }
+
+  function passwordBytes(password) {
+    return new TextEncoder().encode(String(password || ''));
+  }
+
+  function padPdfPassword(password) {
+    const raw = passwordBytes(password);
+    const out = new Uint8Array(32);
+    const copyLength = Math.min(raw.length, 32);
+    out.set(raw.subarray(0, copyLength), 0);
+    if (copyLength < 32) out.set(PDF_PASSWORD_PADDING.subarray(0, 32 - copyLength), copyLength);
+    return out;
+  }
+
+  function int32BytesLE(value) {
+    const n = value >>> 0;
+    return Uint8Array.from([n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff]);
+  }
+
+  function rc4(key, data) {
+    const s = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) s[i] = i;
+    let j = 0;
+    for (let i = 0; i < 256; i++) {
+      j = (j + s[i] + key[i % key.length]) & 255;
+      const t = s[i]; s[i] = s[j]; s[j] = t;
+    }
+    const out = new Uint8Array(data.length);
+    let i = 0;
+    j = 0;
+    for (let n = 0; n < data.length; n++) {
+      i = (i + 1) & 255;
+      j = (j + s[i]) & 255;
+      const t = s[i]; s[i] = s[j]; s[j] = t;
+      out[n] = data[n] ^ s[(s[i] + s[j]) & 255];
+    }
+    return out;
+  }
+
+  function xorKey(key, value) {
+    const out = new Uint8Array(key.length);
+    for (let i = 0; i < key.length; i++) out[i] = key[i] ^ value;
+    return out;
+  }
+
+  function leftRotate(value, shift) {
+    return ((value << shift) | (value >>> (32 - shift))) >>> 0;
+  }
+
+  function md5(bytes) {
+    const inputLength = bytes.length;
+    const paddedLength = (((inputLength + 8) >>> 6) + 1) << 6;
+    const buffer = new Uint8Array(paddedLength);
+    buffer.set(bytes);
+    buffer[inputLength] = 0x80;
+    const bitLength = inputLength * 8;
+    for (let i = 0; i < 8; i++) buffer[paddedLength - 8 + i] = Math.floor(bitLength / (2 ** (8 * i))) & 0xff;
+
+    let a0 = 0x67452301;
+    let b0 = 0xefcdab89;
+    let c0 = 0x98badcfe;
+    let d0 = 0x10325476;
+    const shifts = [
+      7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+      5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+      4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+      6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    ];
+    const table = new Uint32Array(64);
+    for (let i = 0; i < 64; i++) table[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0;
+
+    for (let offset = 0; offset < paddedLength; offset += 64) {
+      const m = new Uint32Array(16);
+      for (let i = 0; i < 16; i++) {
+        const p = offset + i * 4;
+        m[i] = buffer[p] | (buffer[p + 1] << 8) | (buffer[p + 2] << 16) | (buffer[p + 3] << 24);
+      }
+      let a = a0, b = b0, c = c0, d = d0;
+      for (let i = 0; i < 64; i++) {
+        let f, g;
+        if (i < 16) {
+          f = (b & c) | (~b & d);
+          g = i;
+        } else if (i < 32) {
+          f = (d & b) | (~d & c);
+          g = (5 * i + 1) % 16;
+        } else if (i < 48) {
+          f = b ^ c ^ d;
+          g = (3 * i + 5) % 16;
+        } else {
+          f = c ^ (b | ~d);
+          g = (7 * i) % 16;
+        }
+        const next = d;
+        d = c;
+        c = b;
+        b = (b + leftRotate((a + f + table[i] + m[g]) >>> 0, shifts[i])) >>> 0;
+        a = next;
+      }
+      a0 = (a0 + a) >>> 0;
+      b0 = (b0 + b) >>> 0;
+      c0 = (c0 + c) >>> 0;
+      d0 = (d0 + d) >>> 0;
+    }
+
+    const out = new Uint8Array(16);
+    [a0, b0, c0, d0].forEach((word, index) => {
+      const offset = index * 4;
+      out[offset] = word & 0xff;
+      out[offset + 1] = (word >>> 8) & 0xff;
+      out[offset + 2] = (word >>> 16) & 0xff;
+      out[offset + 3] = (word >>> 24) & 0xff;
+    });
+    return out;
+  }
+
+  function computeOwnerPasswordValue(ownerPassword, userPassword, keyLength) {
+    let digest = md5(padPdfPassword(ownerPassword));
+    for (let i = 0; i < 50; i++) digest = md5(digest);
+    const key = digest.subarray(0, keyLength);
+    let value = padPdfPassword(userPassword);
+    for (let i = 0; i < 20; i++) value = rc4(xorKey(key, i), value);
+    return value;
+  }
+
+  function computeFileEncryptionKey(userPassword, ownerValue, permissions, fileId, keyLength) {
+    let digest = md5(concatBytes(
+      padPdfPassword(userPassword),
+      ownerValue,
+      int32BytesLE(permissions),
+      fileId,
+    ));
+    for (let i = 0; i < 50; i++) digest = md5(digest.subarray(0, keyLength));
+    return digest.subarray(0, keyLength);
+  }
+
+  function computeUserPasswordValue(fileKey, fileId) {
+    let value = md5(concatBytes(PDF_PASSWORD_PADDING, fileId));
+    for (let i = 0; i < 20; i++) value = rc4(xorKey(fileKey, i), value);
+    return concatBytes(value, randomBytes(16));
+  }
+
+  function objectEncryptionKey(fileKey, objectNumber, generationNumber) {
+    const suffix = Uint8Array.from([
+      objectNumber & 0xff,
+      (objectNumber >>> 8) & 0xff,
+      (objectNumber >>> 16) & 0xff,
+      generationNumber & 0xff,
+      (generationNumber >>> 8) & 0xff,
+    ]);
+    return md5(concatBytes(fileKey, suffix)).subarray(0, Math.min(fileKey.length + 5, 16));
+  }
+
+  function decodePdfLiteralString(content) {
+    const out = [];
+    for (let i = 0; i < content.length; i++) {
+      let code = content.charCodeAt(i) & 0xff;
+      if (code !== 0x5c) {
+        out.push(code);
+        continue;
+      }
+      i += 1;
+      if (i >= content.length) break;
+      const next = content.charAt(i);
+      const nextCode = content.charCodeAt(i) & 0xff;
+      if (next === 'n') out.push(0x0a);
+      else if (next === 'r') out.push(0x0d);
+      else if (next === 't') out.push(0x09);
+      else if (next === 'b') out.push(0x08);
+      else if (next === 'f') out.push(0x0c);
+      else if (next === '(' || next === ')' || next === '\\') out.push(nextCode);
+      else if (next === '\r' || next === '\n') {
+        if (next === '\r' && content.charAt(i + 1) === '\n') i += 1;
+      } else if (/[0-7]/.test(next)) {
+        let octal = next;
+        for (let j = 0; j < 2 && /[0-7]/.test(content.charAt(i + 1)); j++) {
+          i += 1;
+          octal += content.charAt(i);
+        }
+        out.push(parseInt(octal, 8) & 0xff);
+      } else {
+        out.push(nextCode);
+      }
+    }
+    return Uint8Array.from(out);
+  }
+
+  function parsePdfLiteralString(source, start) {
+    let depth = 1;
+    let escaped = false;
+    for (let i = start + 1; i < source.length; i++) {
+      const ch = source.charAt(i);
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (ch === '(') depth += 1;
+      else if (ch === ')') {
+        depth -= 1;
+        if (depth === 0) {
+          return {
+            end: i + 1,
+            bytes: decodePdfLiteralString(source.slice(start + 1, i)),
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  function encryptPdfStrings(source, key) {
+    let out = '';
+    for (let i = 0; i < source.length;) {
+      const ch = source.charAt(i);
+      if (ch === '%') {
+        const end = source.slice(i).search(/[\r\n]/);
+        if (end === -1) {
+          out += source.slice(i);
+          break;
+        }
+        out += source.slice(i, i + end);
+        i += end;
+        continue;
+      }
+      if (ch === '(') {
+        const parsed = parsePdfLiteralString(source, i);
+        if (!parsed) {
+          out += ch;
+          i += 1;
+          continue;
+        }
+        out += '<' + bytesToHex(rc4(key, parsed.bytes)) + '>';
+        i = parsed.end;
+        continue;
+      }
+      if (ch === '<' && source.charAt(i + 1) !== '<') {
+        const end = source.indexOf('>', i + 1);
+        const value = end === -1 ? '' : source.slice(i + 1, end);
+        if (end !== -1 && /^[\da-fA-F\s]*$/.test(value)) {
+          out += '<' + bytesToHex(rc4(key, hexToBytes(value))) + '>';
+          i = end + 1;
+          continue;
+        }
+      }
+      out += ch;
+      i += 1;
+    }
+    return out;
+  }
+
+  function encryptPdfObjectBody(body, key) {
+    const streamMatch = /\bstream(\r\n|\n|\r)/.exec(body);
+    if (!streamMatch) return encryptPdfStrings(body, key);
+    const markerStart = streamMatch.index;
+    const markerEnd = markerStart + streamMatch[0].length;
+    const prefix = body.slice(0, markerStart);
+    const lengthMatch = /\/Length\s+(\d+)/.exec(prefix);
+    if (!lengthMatch) throw new Error('Cannot lock this PDF because a stream has an indirect length.');
+    const streamLength = Number(lengthMatch[1]);
+    const streamEnd = markerEnd + streamLength;
+    const streamBytes = binaryStringToBytes(body.slice(markerEnd, streamEnd));
+    return encryptPdfStrings(prefix, key) +
+      body.slice(markerStart, markerEnd) +
+      bytesToBinaryString(rc4(key, streamBytes)) +
+      body.slice(streamEnd);
+  }
+
+  function readBalancedPdfDictionary(source, start) {
+    if (source.slice(start, start + 2) !== '<<') return null;
+    let depth = 0;
+    for (let i = start; i < source.length - 1; i++) {
+      const pair = source.slice(i, i + 2);
+      if (pair === '<<') {
+        depth += 1;
+        i += 1;
+      } else if (pair === '>>') {
+        depth -= 1;
+        i += 1;
+        if (depth === 0) return { value: source.slice(start, i + 1), end: i + 1 };
+      }
+    }
+    return null;
+  }
+
+  function parseTrailerDictionary(pdfText) {
+    const trailerIndex = pdfText.lastIndexOf('trailer');
+    if (trailerIndex === -1) throw new Error('Cannot lock this PDF because its trailer was not found.');
+    const dictStart = pdfText.indexOf('<<', trailerIndex);
+    const parsed = readBalancedPdfDictionary(pdfText, dictStart);
+    if (!parsed) throw new Error('Cannot lock this PDF because its trailer is invalid.');
+    return parsed.value;
+  }
+
+  function parsePdfObjectEntries(pdfText) {
+    const startxrefIndex = pdfText.lastIndexOf('startxref');
+    if (startxrefIndex === -1) throw new Error('Cannot lock this PDF because its cross-reference table was not found.');
+    const startxrefMatch = /startxref\s+(\d+)/.exec(pdfText.slice(startxrefIndex));
+    if (!startxrefMatch) throw new Error('Cannot lock this PDF because its cross-reference table was invalid.');
+    const xrefOffset = Number(startxrefMatch[1]);
+    if (pdfText.slice(xrefOffset, xrefOffset + 4) !== 'xref') {
+      throw new Error('Cannot lock this PDF because it uses a compressed cross-reference stream.');
+    }
+    const trailerIndex = pdfText.indexOf('trailer', xrefOffset);
+    const xrefBody = pdfText.slice(xrefOffset + 4, trailerIndex);
+    const lines = xrefBody.split(/\r?\n/);
+    const refs = [];
+    for (let i = 0; i < lines.length; i++) {
+      const header = /^\s*(\d+)\s+(\d+)\s*$/.exec(lines[i]);
+      if (!header) continue;
+      const first = Number(header[1]);
+      const count = Number(header[2]);
+      for (let j = 0; j < count && i + 1 + j < lines.length; j++) {
+        const entry = /^(\d{10})\s+(\d{5})\s+([nf])/.exec(lines[i + 1 + j]);
+        if (entry && entry[3] === 'n') {
+          refs.push({
+            number: first + j,
+            generation: Number(entry[2]),
+            offset: Number(entry[1]),
+          });
+        }
+      }
+      i += count;
+    }
+    refs.sort((a, b) => a.offset - b.offset);
+    return refs.map((ref, index) => {
+      const nextOffset = refs[index + 1]?.offset ?? pdfText.length;
+      const slice = pdfText.slice(ref.offset, nextOffset);
+      const header = new RegExp('^\\s*' + ref.number + '\\s+' + ref.generation + '\\s+obj\\s*').exec(slice);
+      const endIndex = slice.lastIndexOf('endobj');
+      if (!header || endIndex === -1) throw new Error('Cannot lock this PDF because object ' + ref.number + ' is invalid.');
+      return {
+        number: ref.number,
+        generation: ref.generation,
+        body: slice.slice(header[0].length, endIndex).replace(/^\r?\n/, '').replace(/\s*$/, ''),
+      };
+    });
+  }
+
+  function extractTrailerRef(trailer, name) {
+    const match = new RegExp('/' + name + '\\s+(\\d+\\s+\\d+\\s+R)').exec(trailer);
+    return match ? match[1] : '';
+  }
+
+  function extractTrailerId(trailer) {
+    const match = /\/ID\s*\[\s*<([\da-fA-F\s]+)>\s*<([\da-fA-F\s]+)>/.exec(trailer);
+    return match ? hexToBytes(match[1]).subarray(0, 16) : randomBytes(16);
+  }
+
+  function encryptionDictionary(objectNumber, ownerValue, userValue, permissions) {
+    return objectNumber + ' 0 obj\n' +
+      '<< /Filter /Standard /V 2 /R 3 /Length 128 ' +
+      '/O <' + bytesToHex(ownerValue) + '> ' +
+      '/U <' + bytesToHex(userValue) + '> ' +
+      '/P ' + permissions + ' >>\n' +
+      'endobj\n';
+  }
+
+  function encryptPdfBytesNoRaster(bytes, userPassword, ownerPassword) {
+    const pdfText = bytesToBinaryString(bytes);
+    const objects = parsePdfObjectEntries(pdfText);
+    const trailer = parseTrailerDictionary(pdfText);
+    const rootRef = extractTrailerRef(trailer, 'Root');
+    if (!rootRef) throw new Error('Cannot lock this PDF because its document catalog was not found.');
+    const infoRef = extractTrailerRef(trailer, 'Info');
+    const fileId = extractTrailerId(trailer);
+    const keyLength = 16;
+    const permissions = -4;
+    const ownerValue = computeOwnerPasswordValue(ownerPassword, userPassword, keyLength);
+    const fileKey = computeFileEncryptionKey(userPassword, ownerValue, permissions, fileId, keyLength);
+    const userValue = computeUserPasswordValue(fileKey, fileId);
+    const maxObjectNumber = objects.reduce((max, object) => Math.max(max, object.number), 0);
+    const encryptObjectNumber = maxObjectNumber + 1;
+
+    let output = '%PDF-1.7\n%\x81\x81\x81\x81\n';
+    const offsets = new Map();
+    objects.forEach(object => {
+      offsets.set(object.number, output.length);
+      const key = objectEncryptionKey(fileKey, object.number, object.generation);
+      output += object.number + ' ' + object.generation + ' obj\n' +
+        encryptPdfObjectBody(object.body, key) + '\nendobj\n';
+    });
+    offsets.set(encryptObjectNumber, output.length);
+    output += encryptionDictionary(encryptObjectNumber, ownerValue, userValue, permissions);
+
+    const xrefOffset = output.length;
+    const size = encryptObjectNumber + 1;
+    output += 'xref\n0 ' + size + '\n';
+    for (let i = 0; i < size; i++) {
+      if (i === 0) output += '0000000000 65535 f \n';
+      else if (offsets.has(i)) output += String(offsets.get(i)).padStart(10, '0') + ' 00000 n \n';
+      else output += '0000000000 65535 f \n';
+    }
+    output += 'trailer\n<< /Size ' + size +
+      ' /Root ' + rootRef +
+      (infoRef ? ' /Info ' + infoRef : '') +
+      ' /Encrypt ' + encryptObjectNumber + ' 0 R' +
+      ' /ID [<' + bytesToHex(fileId) + '><' + bytesToHex(fileId) + '>]' +
+      ' >>\nstartxref\n' + xrefOffset + '\n%%EOF\n';
+    return binaryStringToBytes(output);
+  }
+
+  async function applyAdvancedExportProcessors(artifact, context) {
+    let current = artifact;
+    const processors = buildAdvancedExportProcessors(context, current);
+    for (const processor of processors) {
+      setLoader(true, processor.label, processor.progress);
+      current = await processor.apply(current, context);
+    }
+    return current;
+  }
+
+  async function runExportPipeline(context, producer) {
+    const produced = await producer(context);
+    const processed = await applyAdvancedExportProcessors(produced, context);
+    downloadPdfArtifact(processed);
+    return processed;
+  }
+
   function activePageCount() {
     return state.pageOrder.length;
+  }
+
+  function currentPageProgress(index, count) {
+    return count ? ((index + 1) / count) * 100 : 0;
   }
 
   function padPage(n) {
@@ -440,7 +1115,60 @@
     return state.pageOrder[state.curPage - 1];
   }
 
+  function advancedPageRangeEnabled() {
+    return advancedRangeToggle.checked;
+  }
+
+  function advancedPageRangeValue() {
+    return advancedPageRangeEnabled() ? advancedRangeInput.value.trim() : '';
+  }
+
+  function parsePageRangeSpec(value, count) {
+    const spec = String(value || '').trim();
+    if (!spec) return { ok: false, error: 'Enter a page range before exporting.' };
+    const pages = [];
+    const seen = new Set();
+    const parts = spec.split(',');
+    for (const rawPart of parts) {
+      const part = rawPart.trim();
+      if (!part) continue;
+      const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(part);
+      if (!match) return { ok: false, error: 'Use page ranges like 1-3, 8, 12-15.' };
+      const start = Number(match[1]);
+      const end = match[2] ? Number(match[2]) : start;
+      if (start < 1 || end < 1 || start > count || end > count) {
+        return { ok: false, error: 'Page range must stay between 1 and ' + count + '.' };
+      }
+      if (end < start) return { ok: false, error: 'Page ranges must go from low to high.' };
+      for (let page = start; page <= end; page++) {
+        if (seen.has(page)) continue;
+        seen.add(page);
+        pages.push(page);
+      }
+    }
+    if (!pages.length) return { ok: false, error: 'Enter at least one page to export.' };
+    return { ok: true, pages };
+  }
+
+  function selectedRangePages() {
+    const parsed = parsePageRangeSpec(advancedPageRangeValue(), activePageCount());
+    if (!parsed.ok) throw new Error(parsed.error);
+    return parsed.pages;
+  }
+
+  function rangeFileSuffix(value) {
+    const clean = String(value || '')
+      .replace(/\s+/g, '')
+      .replace(/,/g, '_')
+      .replace(/[^\d_-]+/g, '')
+      .slice(0, 48);
+    return clean || 'range';
+  }
+
   function selectedExportPageOrder() {
+    if (advancedPageRangeEnabled()) {
+      return selectedRangePages().map(page => state.pageOrder[page - 1]).filter(sourceIndex => sourceIndex != null);
+    }
     if (!advancedCurrentOnly.checked) return state.pageOrder.slice();
     const sourceIndex = currentSourceIndex();
     return sourceIndex == null ? [] : [sourceIndex];
@@ -448,23 +1176,25 @@
 
   function exportBaseNameForTool(toolId) {
     let base = outputBaseName() + TOOLS[toolId].suffix;
-    if (advancedCurrentOnly.checked && activePageCount() > 1) {
+    if (advancedPageRangeEnabled()) {
+      base += '_pages_' + rangeFileSuffix(advancedPageRangeValue());
+    } else if (advancedCurrentOnly.checked && activePageCount() > 1) {
       base += '_page_' + padPage(state.curPage);
     }
     return base;
   }
 
-  function canPasswordProtectExport() {
-    return isRasterTool(activeTool);
+  function canPasswordProtectExport(toolId = activeTool) {
+    return toolId !== 'preview' && toolId !== 'merge';
   }
 
   function advancedPasswordValue() {
     return advancedPasswordToggle.checked ? advancedPasswordInput.value.trim() : '';
   }
 
-  function jsPdfExportOptions(options) {
-    const password = advancedPasswordValue();
-    if (!password || !canPasswordProtectExport()) return options;
+  function jsPdfExportOptions(options, context) {
+    const password = context?.advanced?.password || '';
+    if (!password || !canPasswordProtectExport(context?.toolId || activeTool)) return options;
     return {
       ...options,
       encryption: {
@@ -480,13 +1210,15 @@
     const applies = activeTool !== 'preview' && activeTool !== 'merge';
     const passwordAvailable = applies && canPasswordProtectExport();
     advancedOptions.classList.toggle('hidden', !applies);
-    advancedCurrentOnly.disabled = !applies || !hasPages;
+    const rangeAvailable = applies && hasPages;
+    advancedCurrentOnly.disabled = !applies || !hasPages || advancedRangeToggle.checked;
+    advancedRangeToggle.disabled = !rangeAvailable || advancedCurrentOnly.checked;
+    advancedRangeRow.classList.toggle('is-disabled', !rangeAvailable || advancedCurrentOnly.checked);
+    advancedRangeInput.disabled = !rangeAvailable || !advancedRangeToggle.checked;
     advancedPasswordToggle.disabled = !passwordAvailable;
     advancedPasswordRow.classList.toggle('is-disabled', !passwordAvailable);
     advancedPasswordInput.disabled = !passwordAvailable || !advancedPasswordToggle.checked;
-    advancedPasswordNote.textContent = passwordAvailable
-      ? 'Locks Threshold and Grayscale PDFs.'
-      : 'Available for Threshold and Grayscale rendered exports.';
+    if (!rangeAvailable) advancedRangeToggle.checked = false;
     if (!passwordAvailable) {
       advancedPasswordToggle.checked = false;
       advancedPasswordInput.value = '';
@@ -596,6 +1328,22 @@
     fineQualityToggle.classList.toggle('on', ultra);
     fineQualityToggle.setAttribute('aria-pressed', ultra ? 'true' : 'false');
     fineQualityLabel.textContent = ultra ? 'Ultra · 900 dpi' : 'High · 600 dpi';
+  }
+
+  function syncCompressControls() {
+    const preset = COMPRESSION_PRESETS[state.compressMode] || COMPRESSION_PRESETS.original;
+    setTogglePressed(compressOriginal, state.compressMode === 'original');
+    setTogglePressed(compressBalanced, state.compressMode === 'balanced');
+    setTogglePressed(compressSmall, state.compressMode === 'small');
+    compressHint.textContent = preset.hint;
+    compressSummary.textContent = preset.summary;
+  }
+
+  function setCompressMode(mode) {
+    if (!COMPRESSION_PRESETS[mode] || state.compressMode === mode) return;
+    state.compressMode = mode;
+    syncCompressControls();
+    if (state.pdfDoc && activeTool === 'compress') requestPreviewRender(false);
   }
 
   function defaultSplitName(index) {
@@ -905,7 +1653,6 @@
 
   async function mergeSelectedPdfs() {
     clearError();
-    if (!window.PDFLib) throw new Error('PDF library did not load. Check your connection and try again.');
     if (!state.mergeFiles.length) {
       showError('Choose at least one PDF to merge.');
       return;
@@ -913,12 +1660,13 @@
     mergeRunBtn.disabled = true;
     setLoader(true, 'Merging PDFs…', 0);
     try {
-      const out = await PDFLib.PDFDocument.create();
+      const pdfLib = await ensurePdfLib();
+      const out = await pdfLib.PDFDocument.create();
       let totalPages = 0;
       for (let i = 0; i < state.mergeFiles.length; i++) {
         const file = state.mergeFiles[i];
         setLoader(true, 'Merging ' + file.name, (i / state.mergeFiles.length) * 70);
-        const src = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+        const src = await pdfLib.PDFDocument.load(await file.arrayBuffer());
         const pageIndices = src.getPageIndices();
         const pages = await out.copyPages(src, pageIndices);
         pages.forEach(page => out.addPage(page));
@@ -989,7 +1737,7 @@
     state.splitPoints = [];
     state.splitNames = [];
     updatePageState();
-    const lazyOpen = state.largePdfSafeMode || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit';
+    const lazyOpen = state.largePdfSafeMode || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit' || activeTool === 'compress';
     if (lazyOpen) {
       setLoader(true, state.largePdfSafeMode ? 'Opening large PDF safely…' : 'Opening PDF…', 45);
       await ensurePageMeta(0);
@@ -1317,7 +2065,7 @@
       if (token !== originalPreviewRenderToken || (activeTool !== 'preview' && activeTool !== 'merge')) return;
       const viewport = page.getViewport({ scale: pd.scale });
       await page.render({ canvasContext: ctx, viewport }).promise;
-      if (token === originalPreviewRenderToken && (activeTool === 'preview' || activeTool === 'merge')) applyZoom();
+      if (token === originalPreviewRenderToken && (activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress')) applyZoom();
     } catch (err) {
       console.error(err);
       showError('Preview failed: ' + (err.message || err));
@@ -1332,9 +2080,9 @@
       return;
     }
     const token = ++processedPreviewRenderToken;
-    if ((activeTool === 'preview' || activeTool === 'merge') && sourceIndex != null) {
+    if ((activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress') && sourceIndex != null) {
       const pd = await ensurePageMeta(sourceIndex);
-      if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || (activeTool !== 'preview' && activeTool !== 'merge')) return;
+      if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || (activeTool !== 'preview' && activeTool !== 'merge' && activeTool !== 'compress')) return;
       renderOriginalPreview(pd, sourceIndex);
       proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · page ' + state.curPage + '/' + activePageCount();
       return;
@@ -2205,31 +2953,32 @@
     if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
   }
 
-  async function exportPageOrderAsPdf(pageOrder, fileBase) {
-    if (!window.PDFLib) throw new Error('PDF library did not load. Check your connection and try again.');
+  async function createPageOrderPdfArtifact(pageOrder, fileBase, context) {
+    const pdfLib = await ensurePdfLib();
     if (!state.pdfBytes) throw new Error('Original PDF data is not available.');
     if (!pageOrder.length) throw new Error('There are no pages to export.');
-    const src = await PDFLib.PDFDocument.load(state.pdfBytes);
-    const out = await PDFLib.PDFDocument.create();
+    const src = await pdfLib.PDFDocument.load(state.pdfBytes);
+    const out = await pdfLib.PDFDocument.create();
     const copiedPages = await out.copyPages(src, pageOrder);
     copiedPages.forEach(page => out.addPage(page));
-    const bytes = await out.save();
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = cleanDownloadBase(fileBase, outputBaseName()) + '.pdf';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    const bytes = await out.save({ useObjectStreams: !context?.advanced?.password });
+    return createPdfArtifact(bytes, fileBase, {
+      source: 'pdf-lib',
+      rasterized: false,
+      preservesOriginalQuality: true,
+    });
+  }
+
+  async function exportPageOrderAsPdf(pageOrder, fileBase, options = {}) {
+    const context = createExportContext(options.toolId || 'organize', pageOrder, fileBase, options);
+    await runExportPipeline(context, () => createPageOrderPdfArtifact(pageOrder, fileBase, context));
   }
 
   async function exportOrganizedPdf(pageOrder = state.pageOrder, fileBase = outputBaseName() + TOOLS.organize.suffix) {
     await exportPageOrderAsPdf(pageOrder, fileBase);
   }
 
-  function applyVectorPageEdit(page, edit) {
+  function applyVectorPageEdit(page, edit, pdfLib) {
     const e = clonePageEdit(edit);
     const width = page.getWidth();
     const height = page.getHeight();
@@ -2244,23 +2993,25 @@
     }
     if (e.quarterTurns) {
       const currentRotation = page.getRotation().angle || 0;
-      page.setRotation(PDFLib.degrees((currentRotation + e.quarterTurns * 90) % 360));
+      page.setRotation(pdfLib.degrees((currentRotation + e.quarterTurns * 90) % 360));
     }
   }
 
-  async function exportEditedPdf(pageOrder = state.pageOrder, fileBase = outputBaseName() + TOOLS.edit.suffix) {
-    if (!window.PDFLib) throw new Error('PDF library did not load. Check your connection and try again.');
+  async function createEditedPdfArtifact(pageOrder, fileBase, context) {
+    const pdfLib = await ensurePdfLib();
     if (!state.pdfBytes) throw new Error('Original PDF data is not available.');
     if (!pageOrder.length) throw new Error('There are no pages to export.');
-    const src = await PDFLib.PDFDocument.load(state.pdfBytes);
-    const out = await PDFLib.PDFDocument.create();
+    const src = await pdfLib.PDFDocument.load(state.pdfBytes);
+    const out = await pdfLib.PDFDocument.create();
+    let rasterized = false;
     const count = pageOrder.length;
     for (let i = 0; i < count; i++) {
-      setLoader(true, 'Exporting edited page ' + (i + 1) + ' of ' + count, (i / count) * 100);
+      const progress = currentPageProgress(i, count);
+      setLoader(true, 'Exporting edited page ' + (i + 1) + ' of ' + count, progress);
       const sourceIndex = pageOrder[i];
       const edit = clonePageEdit(state.pageEdits[sourceIndex]);
       if (hasFineRotation(edit)) {
-        setLoader(true, 'Rasterizing fine rotation at ' + fineRotationExportDpi() + ' dpi · page ' + (i + 1) + ' of ' + count, (i / count) * 100);
+        setLoader(true, 'Rasterizing fine rotation at ' + fineRotationExportDpi() + ' dpi · page ' + (i + 1) + ' of ' + count, progress);
       }
       if (!isPageEdited(edit)) {
         const [copied] = await out.copyPages(src, [sourceIndex]);
@@ -2270,11 +3021,12 @@
 
       if (!hasFineRotation(edit)) {
         const [copied] = await out.copyPages(src, [sourceIndex]);
-        applyVectorPageEdit(copied, edit);
+        applyVectorPageEdit(copied, edit, pdfLib);
         out.addPage(copied);
         continue;
       }
 
+      rasterized = true;
       const canvas = document.createElement('canvas');
       const size = await renderEditedPageImageToCanvas(sourceIndex, edit, canvas);
       const image = await out.embedPng(canvas.toDataURL('image/png'));
@@ -2282,25 +3034,34 @@
       page.drawImage(image, { x: 0, y: 0, width: size.wPt, height: size.hPt });
       await new Promise(r => setTimeout(r, 0));
     }
-    const bytes = await out.save();
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = cleanDownloadBase(fileBase, outputBaseName()) + '.pdf';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    const bytes = await out.save({ useObjectStreams: !context?.advanced?.password });
+    return createPdfArtifact(bytes, fileBase, {
+      source: 'pdf-lib',
+      rasterized,
+      preservesOriginalQuality: !rasterized,
+    });
+  }
+
+  async function exportEditedPdf(pageOrder = state.pageOrder, fileBase = outputBaseName() + TOOLS.edit.suffix) {
+    const context = createExportContext('edit', pageOrder, fileBase);
+    await runExportPipeline(context, () => createEditedPdfArtifact(pageOrder, fileBase, context));
   }
 
   async function exportSplitPart(partIndex) {
     const part = splitParts()[partIndex];
     if (!part || !part.pageOrder.length) return;
+    if (advancedPasswordToggle.checked && canPasswordProtectExport('split') && !advancedPasswordValue()) {
+      showError('Enter a password before exporting a locked PDF.');
+      advancedPasswordInput.focus();
+      return;
+    }
     splitPartsList.querySelectorAll('button').forEach(button => { button.disabled = true; });
     setLoader(true, 'Exporting part ' + (partIndex + 1) + '…', 35);
     try {
-      await exportPageOrderAsPdf(part.pageOrder, part.name || defaultSplitName(partIndex));
+      await exportPageOrderAsPdf(part.pageOrder, part.name || defaultSplitName(partIndex), {
+        toolId: 'split',
+        useCurrentOnly: false,
+      });
       setLoader(false);
     } catch (err) {
       console.error(err);
@@ -2309,6 +3070,112 @@
     } finally {
       updatePageState();
     }
+  }
+
+  async function createRasterProcessedPdfArtifact(context) {
+    const { jsPDF } = await ensureJsPdf();
+    const tmp = document.createElement('canvas');
+    let pdf = null;
+    const count = context.pageOrder.length;
+    if (!count) throw new Error('There are no pages to export.');
+    for (let i = 0; i < count; i++) {
+      setLoader(true, 'Exporting page ' + (i + 1) + ' of ' + count, currentPageProgress(i, count));
+      const pd = await ensurePageData(context.pageOrder[i]);
+      if (!pd) throw new Error('Could not render page ' + (i + 1));
+      if (processTool === 'threshold') applyThresholdToCanvas(pd, tmp);
+      else applyGreyscaleToCanvas(pd, tmp);
+      const wPt = pd.w / pd.scale;
+      const hPt = pd.h / pd.scale;
+      const orient = wPt > hPt ? 'l' : 'p';
+      const dataUrl = tmp.toDataURL('image/png');
+      if (i === 0) {
+        pdf = new jsPDF(jsPdfExportOptions({
+          orientation: orient,
+          unit: 'pt',
+          format: [wPt, hPt],
+        }, context));
+      } else {
+        pdf.addPage([wPt, hPt], orient);
+      }
+      pdf.addImage(dataUrl, 'PNG', 0, 0, wPt, hPt, undefined, 'FAST');
+      tmp.width = 0;
+      tmp.height = 0;
+      await new Promise(r => setTimeout(r, 0));
+    }
+    return createPdfArtifact(pdf.output('arraybuffer'), context.fileBase, {
+      source: 'jsPDF',
+      rasterized: true,
+      passwordProtected: !!(context.advanced.password && canPasswordProtectExport(context.toolId)),
+      preservesOriginalQuality: false,
+    });
+  }
+
+  async function renderCompressedPageToCanvas(sourceIndex, preset, canvas) {
+    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const baseVp = page.getViewport({ scale: 1 });
+    const requestedScale = (preset.dpi || 144) / 72;
+    const cappedScale = Math.min(requestedScale, (preset.maxDimension || 2400) / Math.max(baseVp.width, baseVp.height));
+    const scale = Math.max(0.5, cappedScale);
+    const vp = page.getViewport({ scale });
+    canvas.width = Math.max(1, Math.floor(vp.width));
+    canvas.height = Math.max(1, Math.floor(vp.height));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    return {
+      wPt: baseVp.width,
+      hPt: baseVp.height,
+    };
+  }
+
+  async function createRasterCompressedPdfArtifact(context, preset) {
+    const { jsPDF } = await ensureJsPdf();
+    const tmp = document.createElement('canvas');
+    let pdf = null;
+    const count = context.pageOrder.length;
+    if (!count) throw new Error('There are no pages to export.');
+    for (let i = 0; i < count; i++) {
+      setLoader(true, 'Compressing page ' + (i + 1) + ' of ' + count, currentPageProgress(i, count));
+      const size = await renderCompressedPageToCanvas(context.pageOrder[i], preset, tmp);
+      const orient = size.wPt > size.hPt ? 'l' : 'p';
+      const dataUrl = tmp.toDataURL('image/jpeg', preset.jpegQuality);
+      if (i === 0) {
+        pdf = new jsPDF(jsPdfExportOptions({
+          orientation: orient,
+          unit: 'pt',
+          format: [size.wPt, size.hPt],
+          compress: true,
+        }, context));
+      } else {
+        pdf.addPage([size.wPt, size.hPt], orient);
+      }
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, size.wPt, size.hPt, undefined, 'FAST');
+      tmp.width = 0;
+      tmp.height = 0;
+      await new Promise(r => setTimeout(r, 0));
+    }
+    return createPdfArtifact(pdf.output('arraybuffer'), context.fileBase, {
+      source: 'jsPDF',
+      compressionMode: state.compressMode,
+      rasterized: true,
+      passwordProtected: !!(context.advanced.password && canPasswordProtectExport(context.toolId)),
+      preservesOriginalQuality: false,
+    });
+  }
+
+  async function createCompressedPdfArtifact(context) {
+    const preset = COMPRESSION_PRESETS[state.compressMode] || COMPRESSION_PRESETS.original;
+    if (!preset.rasterize) {
+      const artifact = await createPageOrderPdfArtifact(context.pageOrder, context.fileBase, context);
+      return clonePdfArtifact(artifact, {
+        meta: {
+          ...artifact.meta,
+          compressionMode: state.compressMode,
+        },
+      });
+    }
+    return createRasterCompressedPdfArtifact(context, preset);
   }
 
   // ── Threshold controls ──
@@ -2356,6 +3223,10 @@
     $('greyHint').textContent = greyHintText();
     if (state.pdfDoc) requestPreviewRender(false);
   });
+
+  compressOriginal.addEventListener('click', () => setCompressMode('original'));
+  compressBalanced.addEventListener('click', () => setCompressMode('balanced'));
+  compressSmall.addEventListener('click', () => setCompressMode('small'));
 
   function setFineRotation(value) {
     if (!state.pdfDoc) return;
@@ -2509,49 +3380,35 @@
       advancedPasswordInput.focus();
       return;
     }
-    const exportOrder = selectedExportPageOrder();
+    let exportOrder;
+    try {
+      exportOrder = selectedExportPageOrder();
+    } catch (err) {
+      showError(err.message || err);
+      advancedRangeInput.focus();
+      return;
+    }
     if (!exportOrder.length) return;
     downloadBtn.disabled = true;
     setLoader(true, 'Exporting pages…', 0);
     try {
+      const context = createExportContext(activeTool, exportOrder, exportBaseNameForTool(activeTool));
       if (activeTool === 'organize') {
         setLoader(true, 'Exporting original pages…', 35);
-        await exportOrganizedPdf(exportOrder, exportBaseNameForTool('organize'));
-        setLoader(false);
-        return;
-      }
-      if (activeTool === 'edit') {
+        await runExportPipeline(context, () => createPageOrderPdfArtifact(exportOrder, context.fileBase, context));
+      } else if (activeTool === 'edit') {
         setLoader(true, 'Exporting page edits…', 15);
-        await exportEditedPdf(exportOrder, exportBaseNameForTool('edit'));
-        setLoader(false);
-        return;
+        await runExportPipeline(context, () => createEditedPdfArtifact(exportOrder, context.fileBase, context));
+      } else if (activeTool === 'compress') {
+        setLoader(true, 'Compressing PDF…', 10);
+        await runExportPipeline(context, createCompressedPdfArtifact);
+      } else {
+        await runExportPipeline(context, createRasterProcessedPdfArtifact);
       }
-      const { jsPDF } = window.jspdf;
-      const tmp = document.createElement('canvas');
-      let pdf = null;
-      const count = exportOrder.length;
-      for (let i = 0; i < count; i++) {
-        setLoader(true, 'Exporting page ' + (i + 1) + ' of ' + count, (i / count) * 100);
-        const pd = await ensurePageData(exportOrder[i]);
-        if (!pd) throw new Error('Could not render page ' + (i + 1));
-        if (processTool === 'threshold') applyThresholdToCanvas(pd, tmp);
-        else applyGreyscaleToCanvas(pd, tmp);
-        const wPt = pd.w / pd.scale;
-        const hPt = pd.h / pd.scale;
-        const orient = wPt > hPt ? 'l' : 'p';
-        const dataUrl = tmp.toDataURL('image/png');
-        if (i === 0) pdf = new jsPDF(jsPdfExportOptions({ orientation: orient, unit: 'pt', format: [wPt, hPt] }));
-        else pdf.addPage([wPt, hPt], orient);
-        pdf.addImage(dataUrl, 'PNG', 0, 0, wPt, hPt, undefined, 'FAST');
-        tmp.width = 0;
-        tmp.height = 0;
-        await new Promise(r => setTimeout(r, 0));
-      }
-      pdf.save(cleanDownloadBase(exportBaseNameForTool(activeTool), outputBaseName()) + '.pdf');
       setLoader(false);
     } catch (err) {
       console.error(err);
-      showError('Render failed: ' + (err.message || err));
+      showError('Export failed: ' + (err.message || err));
       setLoader(false);
     } finally {
       updatePageState();
@@ -2749,7 +3606,7 @@
 
   // ctrl/cmd + scroll (or trackpad pinch) = continuous zoom
   previewStage.addEventListener('wheel', e => {
-    const canZoomTool = activeTool === 'preview' || activeTool === 'merge' || isRasterTool(activeTool) || activeTool === 'edit';
+    const canZoomTool = activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress' || isRasterTool(activeTool) || activeTool === 'edit';
     const overPdf = e.target.closest('.preview-canvas-wrap, .page-editor-canvas-wrap');
     if (!state.pdfDoc || !canZoomTool || !overPdf || (!e.ctrlKey && !e.metaKey)) return;
     e.preventDefault();
@@ -2818,6 +3675,7 @@
   setTogglePressed(greyInvertToggle, state.greyInvert);
   setTogglePressed(sepiaToggle, state.sepia);
   syncResolutionToggles();
+  syncCompressControls();
   syncFineQualityToggle();
   syncEditControls();
   updatePreviewMode();
