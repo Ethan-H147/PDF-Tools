@@ -7,6 +7,11 @@
   const LARGE_PDF_SAFE_MODE_PAGES = 80;
   const SAFE_FULL_PAGE_CACHE_LIMIT = (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4 : 3;
   const RASTER_PREVIEW_MAX_PIXELS = (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4200000 : 2200000;
+  const ORIGINAL_PREVIEW_MAX_PIXELS = (navigator.deviceMemory && navigator.deviceMemory >= 8)
+    ? 36000000
+    : (navigator.deviceMemory && navigator.deviceMemory >= 4)
+      ? 22000000
+      : 12000000;
   const RASTER_PREVIEW_KEY = 'preview-raster';
   const PREVIEW_META_KEY = 'preview-meta';
   const PDF_LIB_SCRIPT_URLS = [
@@ -95,6 +100,7 @@
 
   let activeTool = 'preview';
   let processTool = 'threshold';
+  let currentLocale = 'en';
 
   const state = {
     pdfDoc: null, numPages: 0, curPage: 1,
@@ -243,6 +249,111 @@
   let errorHideTimer = null;
   const toolTabs = Array.from(document.querySelectorAll('.tool-tab'));
   const toolPanels = Array.from(document.querySelectorAll('.tool-panel'));
+  const languageSwitcher = $('languageSwitcher');
+
+  function readSavedLocale() {
+    try {
+      const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
+      return LOCALES[saved] ? saved : DEFAULT_LOCALE;
+    } catch {
+      return DEFAULT_LOCALE;
+    }
+  }
+
+  function saveLocale(locale) {
+    try {
+      localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    } catch {
+      // Language changes still work for the current session if storage is blocked.
+    }
+  }
+
+  function t(key, vars = {}) {
+    const dict = LOCALES[currentLocale] || LOCALES[DEFAULT_LOCALE];
+    const fallback = LOCALES[DEFAULT_LOCALE] || {};
+    const template = dict[key] ?? fallback[key] ?? key;
+    return String(template).replace(/\{(\w+)\}/g, (_, name) =>
+      Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : '');
+  }
+
+  function toolText(toolId, key) {
+    const value = t('tool.' + toolId + '.' + key);
+    if (!value || value === 'tool.' + toolId + '.' + key) return TOOLS[toolId]?.[key] || '';
+    return value;
+  }
+
+  function setElementHtml(el, html) {
+    if (el) el.innerHTML = html;
+  }
+
+  function applyStaticLocale() {
+    document.documentElement.lang = currentLocale;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      el.innerHTML = t(el.dataset.i18nHtml);
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder));
+    });
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+      el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel));
+    });
+    document.querySelectorAll('[data-tool-label]').forEach(el => {
+      el.textContent = toolText(el.dataset.toolLabel, 'label');
+    });
+    if (languageSwitcher) {
+      languageSwitcher.setAttribute('aria-label', 'Language');
+      languageSwitcher.querySelectorAll('button[data-lang]').forEach(button => {
+        const selected = button.dataset.lang === currentLocale;
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        button.textContent = LOCALE_NAMES[button.dataset.lang] || button.dataset.lang;
+      });
+    }
+  }
+
+  function applyToolLocale() {
+    const tool = TOOLS[activeTool];
+    if (!tool) return;
+    const meta = toolText(activeTool, 'meta');
+    setElementHtml($('masterLede'), toolText(activeTool, 'lede'));
+    $('masterMeta').dataset.tooltip = toolTipText(meta);
+    $('masterMeta').setAttribute('aria-label', toolTipText(meta));
+    setElementHtml(downloadLabel, toolText(activeTool, 'downloadLabel'));
+    setElementHtml(downloadSub, toolText(activeTool, 'downloadSub'));
+  }
+
+  function setLocale(locale, persist = false) {
+    if (!LOCALES[locale]) locale = DEFAULT_LOCALE;
+    currentLocale = locale;
+    if (persist) saveLocale(locale);
+    applyStaticLocale();
+    applyToolLocale();
+    setDarkMode(document.body.classList.contains('dark-mode'));
+    updateSourceDropMode();
+    syncAdvancedOptions();
+    syncCompressControls();
+    syncFineQualityToggle();
+    syncToneLabels();
+    updateMergeState();
+    updatePageState();
+    syncEditControls();
+    updatePreviewMode();
+    updateToolIndicator();
+  }
+
+  function brightnessHintText(v = state.brightness) {
+    return v < -50 ? t('hint.dark') : v < -10 ? t('hint.reduced') : v <= 10 ? t('hint.neutral') : v <= 50 ? t('hint.bright') : t('hint.maximum');
+  }
+
+  function syncToneLabels() {
+    threshHint.textContent = threshHintText(state.threshold);
+    brightTag.textContent = brightnessHintText();
+    contrastTag.textContent = contrastHintText(state.contrast);
+    $('greyHint').textContent = greyHintText();
+    if (!state.pdfDoc) fileStatusEl.textContent = t('status.ready');
+  }
 
   function activateElementOnKeyboard(el) {
     if (!el) return;
@@ -280,8 +391,8 @@
   function setDarkMode(enabled, persist = false) {
     document.body.classList.toggle('dark-mode', enabled);
     themeToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    themeToggle.setAttribute('aria-label', enabled ? 'Turn off dark mode' : 'Turn on dark mode');
-    themeToggleText.textContent = enabled ? 'Light mode' : 'Dark mode';
+    themeToggle.setAttribute('aria-label', enabled ? t('theme.offAria') : t('theme.onAria'));
+    themeToggleText.textContent = enabled ? t('theme.light') : t('theme.dark');
     if (persist) saveTheme(enabled ? 'dark' : 'light');
     syncPreviewStageHeight();
     updateToolIndicator();
@@ -290,6 +401,14 @@
   themeToggle.addEventListener('click', () => {
     setDarkMode(!document.body.classList.contains('dark-mode'), true);
   });
+
+  if (languageSwitcher) {
+    languageSwitcher.addEventListener('click', e => {
+      const button = e.target.closest('button[data-lang]');
+      if (!button) return;
+      setLocale(button.dataset.lang, true);
+    });
+  }
 
   advancedToggle.addEventListener('click', () => {
     const expanded = advancedToggle.getAttribute('aria-expanded') === 'true';
@@ -373,12 +492,7 @@
     activeTool = id;
     if (id === 'threshold' || id === 'greyscale') processTool = id;
     syncToolTabA11y();
-    const tool = TOOLS[id];
-    $('masterLede').innerHTML = tool.lede;
-    $('masterMeta').dataset.tooltip = toolTipText(tool.meta);
-    $('masterMeta').setAttribute('aria-label', toolTipText(tool.meta));
-    downloadLabel.innerHTML = tool.downloadLabel;
-    downloadSub.innerHTML = tool.downloadSub;
+    applyToolLocale();
     resolutionOptions.classList.toggle('hidden', !isRasterTool(id));
     downloadBtn.parentElement.style.display = id === 'preview' ? 'none' : '';
     syncAdvancedOptions();
@@ -403,14 +517,14 @@
     previewStage.classList.toggle('editing', editing);
     previewTools.classList.toggle('preview-tools-hidden', organizing || editing);
     previewTitle.innerHTML = organizing
-      ? 'Rearrange <em>— drag pages to reorder</em>'
+      ? t('preview.titleOrganize')
       : editing
-        ? 'Crop & Rotate <em>— select one page</em>'
+        ? t('preview.titleEdit')
         : activeTool === 'preview'
-          ? 'Preview <em>— original PDF</em>'
+          ? t('preview.titleOriginal')
           : activeTool === 'compress'
-            ? 'Preview <em>— compressed export</em>'
-            : 'Preview <em>— processed output</em>';
+            ? t('preview.titleCompress')
+            : t('preview.titleProcessed');
     organizer.style.display = organizing ? 'block' : 'none';
     pageEditor.style.display = editing ? 'flex' : 'none';
     if (!editing) cropOverlay.hidden = true;
@@ -436,9 +550,9 @@
     const merging = activeTool === 'merge';
     fileInput.multiple = merging;
     dropGlyph.textContent = merging ? '∑' : '¶';
-    dropLabel.textContent = merging ? 'Upload PDFs' : 'Upload PDF';
-    dropSub.textContent = merging ? 'Multiple PDFs · click or drop' : 'PDF · click or drop';
-    dropZone.setAttribute('aria-label', merging ? 'Upload one or more PDFs' : 'Upload a PDF');
+    dropLabel.textContent = merging ? t('drop.uploadPdfs') : t('drop.uploadPdf');
+    dropSub.textContent = merging ? t('drop.multiSub') : t('drop.singleSub');
+    dropZone.setAttribute('aria-label', merging ? t('drop.multiAria') : t('drop.singleAria'));
   }
 
   // ── Helpers ──
@@ -628,6 +742,1233 @@
       return encryptPdfBytesNoRaster(normalizePdfBytes(bytes), userPassword, ownerPassword || userPassword);
     },
   };
+
+  const LOCALE_STORAGE_KEY = 'pdf-atelier-language';
+  const DEFAULT_LOCALE = 'en';
+  const LOCALE_NAMES = {
+    en: 'English',
+    'zh-Hans': '简体中文',
+    'zh-Hant-TW': '繁體中文（台灣）',
+    ko: '한국어',
+    ja: '日本語',
+    es: 'Español',
+    fr: 'Français',
+  };
+  const LOCALES = {
+    en: {
+      'brand.subtitle': 'PDF Tools',
+      'nav.tools': 'Tools',
+      'nav.toolsAria': 'PDF tools',
+      'sections.source': 'I. Source PDF',
+      'sections.organize': 'II. Organize Pages',
+      'sections.cropRotate': 'II. Crop & Rotate',
+      'sections.merge': 'II. Merge PDFs',
+      'sections.compress': 'II. Compress PDF',
+      'sections.threshold': 'II. Threshold',
+      'sections.greyscale': 'II. Grayscale',
+      'sections.pages': 'III. Pages',
+      'file.pages': 'Pages',
+      'file.page': 'Page',
+      'file.pagePrefix': 'Page ',
+      'file.pageSuffix': '',
+      'file.size': 'Size',
+      'file.status': 'Status',
+      'file.renameTitle': 'Click to rename',
+      'status.ready': 'ready',
+      'status.readySafe': 'ready · safe',
+      'status.loading': 'loading',
+      'status.error': 'error',
+      'drop.uploadPdf': 'Upload PDF',
+      'drop.uploadPdfs': 'Upload PDFs',
+      'drop.singleSub': 'PDF · click or drop',
+      'drop.multiSub': 'Multiple PDFs · click or drop',
+      'drop.singleAria': 'Upload a PDF',
+      'drop.multiAria': 'Upload one or more PDFs',
+      'actions.clear': 'Clear',
+      'actions.clearList': 'Clear list',
+      'actions.restoreOrder': 'Restore original order',
+      'actions.resetSelectedPage': 'Reset selected page',
+      'actions.mergeIntoOrganize': 'Merge into Organize',
+      'actions.invert': 'Invert',
+      'actions.sepia': 'Sepia',
+      'advanced.title': 'Advanced options',
+      'advanced.currentOnly': 'Current page only',
+      'advanced.currentOnlySub': 'Export just the selected page.',
+      'advanced.pageRange': 'Page range',
+      'advanced.passwordLock': 'Password lock',
+      'advanced.passwordPlaceholder': 'Password',
+      'split.title': 'Split Export',
+      'split.useButton': 'Use a page Split button in Organize to create a split.',
+      'split.summary': '{parts} PDFs from {points} split {pointWord}.',
+      'split.pointOne': 'point',
+      'split.pointMany': 'points',
+      'split.part': 'Part {num}',
+      'split.pagesOne': 'Page {start}',
+      'split.pagesMany': 'Pages {start}-{end}',
+      'split.nameAria': 'Name for part {num}',
+      'split.exportPart': 'Export part {num}',
+      'split.button': 'Split',
+      'split.removeAria': 'Remove split {num}',
+      'split.afterPage': 'Split after page {num}',
+      'split.removeAfterPage': 'Remove split after page {num}',
+      'split.afterOriginal': 'Split after original page {num}',
+      'split.removeAfterOriginal': 'Remove split after original page {num}',
+      'split.cannotFinal': 'Cannot split after the final page',
+      'edit.fineRotation': 'Fine Rotation',
+      'edit.cropFrame': 'Crop Frame',
+      'edit.fineRotationQuality': 'Fine Rotation Quality',
+      'edit.fineQualityAria': 'Use ultra 900 dpi for fine rotation export',
+      'edit.qualityHigh': 'High · 600 dpi',
+      'edit.qualityUltra': 'Ultra · 900 dpi',
+      'edit.selectPage': 'select page',
+      'edit.pageHint': 'page {page}',
+      'edit.summaryEmpty': 'Upload a PDF, then choose a page from the editor to crop or rotate it.',
+      'edit.summaryActive': 'Editing page {page} of {count}. Changes apply only to this page.',
+      'edit.fullPage': 'Full page',
+      'edit.cropKept': '{w}% × {h}% kept',
+      'edit.cropTotal': '{total}% total',
+      'merge.summaryEmpty': 'Choose multiple PDFs, arrange their order, then merge into the organizer.',
+      'merge.summaryActive': '{count} {pdfWord} selected · {size}. Arrange the list, then merge into Organize.',
+      'merge.pdfOne': 'PDF',
+      'merge.pdfMany': 'PDFs',
+      'merge.moveUp': 'Move {name} up',
+      'merge.moveDown': 'Move {name} down',
+      'merge.remove': 'Remove {name}',
+      'compress.original': 'Original',
+      'compress.balanced': 'Balanced',
+      'compress.small': 'Small',
+      'compress.hintOriginal': 'original',
+      'compress.hintBalanced': 'balanced',
+      'compress.hintSmall': 'small',
+      'compress.summaryOriginal': 'Compact the PDF while keeping original page content.',
+      'compress.summaryBalanced': 'Create a smaller color PDF with balanced quality.',
+      'compress.summarySmall': 'Create the smallest PDF with lighter page images.',
+      'resolution.fast': 'Fast',
+      'threshold.whiteTag': '0 · white',
+      'threshold.blackTag': '255 · black',
+      'greyscale.brightness': 'brightness',
+      'greyscale.darkTag': '−100 · dark',
+      'greyscale.lightTag': '+100 · light',
+      'greyscale.lowTag': '50% · low',
+      'greyscale.highTag': '200% · high',
+      'hint.ready': 'ready',
+      'hint.low': 'low',
+      'hint.soft': 'soft',
+      'hint.midRange': 'mid range',
+      'hint.darkRange': 'dark range',
+      'hint.lightRange': 'light range',
+      'hint.high': 'high',
+      'hint.neutral': 'neutral',
+      'hint.normal': 'normal',
+      'hint.dark': 'dark',
+      'hint.reduced': 'reduced',
+      'hint.bright': 'bright',
+      'hint.maximum': 'maximum',
+      'hint.sepia': 'sepia',
+      'hint.inverted': 'inverted',
+      'hint.lowContrast': 'low contrast',
+      'hint.highContrast': 'high contrast',
+      'empty.noPreview': 'No preview yet',
+      'empty.uploadToBegin': 'Upload a PDF to begin',
+      'empty.organize': 'Upload a PDF to organize pages.',
+      'empty.organizeRemoved': 'All pages have been removed. Restore the original order to continue.',
+      'empty.edit': 'Upload a PDF to crop or rotate pages.',
+      'preview.titleOrganize': 'Rearrange <em>— drag pages to reorder</em>',
+      'preview.titleEdit': 'Crop & Rotate <em>— select one page</em>',
+      'preview.titleOriginal': 'Preview <em>— original PDF</em>',
+      'preview.titleCompress': 'Preview <em>— compressed export</em>',
+      'preview.titleProcessed': 'Preview <em>— processed output</em>',
+      'proof.awaiting': 'awaiting PDF',
+      'proof.outputPages': '{count} pages in output',
+      'proof.noPages': 'no pages selected',
+      'organize.summaryEmpty': 'Upload a PDF to reorder or remove pages.',
+      'organize.summarySplit': '{parts} PDFs are ready. Edit names and export each part from the split panel.',
+      'organize.summaryPages': '{count} of {total} original pages will be included in export. Use Split on a page to divide the PDF.',
+      'organize.splits': '{count} splits',
+      'organize.pages': '{count} pages',
+      'theme.dark': 'Dark mode',
+      'theme.light': 'Light mode',
+      'theme.onAria': 'Turn on dark mode',
+      'theme.offAria': 'Turn off dark mode',
+      'footer.type': 'Set in SF Pro / Inter',
+      'footer.clientSide': 'Client-side PDF processing',
+      'footer.local': 'Runs entirely in your browser',
+      'errors.chooseMerge': 'Choose one or more PDF files to merge.',
+      'errors.password': 'Enter a password before exporting a locked PDF.',
+      'errors.notPdf': 'That doesn’t look like a PDF.',
+      'tool.preview.label': 'Preview',
+      'tool.preview.lede': 'View a PDF cleanly with fast page navigation and zoom.',
+      'tool.preview.meta': 'Open a PDF for viewing<br/>Use page navigation<br/>Zoom without changing the file',
+      'tool.preview.downloadLabel': 'Preview Only',
+      'tool.preview.downloadSub': 'view and zoom without exporting',
+      'tool.organize.label': 'Organize',
+      'tool.organize.lede': 'Reorder or remove pages before export.',
+      'tool.organize.meta': 'Drag pages to reorder<br/>Click × to remove a page<br/>Use Split to divide after a page<br/>Drag pages across split lines freely<br/>Click a split × to remove it<br/>Name and export each part separately<br/>Original PDF pages are preserved',
+      'tool.organize.downloadLabel': 'Export Organized PDF',
+      'tool.organize.downloadSub': 'preserve original page content',
+      'tool.edit.label': 'Crop/Rotate',
+      'tool.edit.lede': 'Crop and rotate individual pages before export.',
+      'tool.edit.meta': 'Select one page at a time<br/>Drag the crop frame on the page<br/>Fine rotate with a low-sensitivity slider<br/>Use 90° rotate buttons for page turns',
+      'tool.edit.downloadLabel': 'Export Edited PDF',
+      'tool.edit.downloadSub': 'apply page crops and rotations',
+      'tool.merge.label': 'Merge',
+      'tool.merge.lede': 'Merge multiple PDFs into one organized document.',
+      'tool.merge.meta': 'Select any number of PDFs<br/>Reorder files before merging<br/>Merged output opens in Organize',
+      'tool.merge.downloadLabel': 'Merge PDFs',
+      'tool.merge.downloadSub': 'combine selected files into organize',
+      'tool.compress.label': 'Compress',
+      'tool.compress.lede': 'Reduce PDF file size with simple quality choices.',
+      'tool.compress.meta': 'Original mode preserves page content<br/>Balanced and Small create lighter page images<br/>Password lock still works',
+      'tool.compress.downloadLabel': 'Export Compressed PDF',
+      'tool.compress.downloadSub': 'reduce file size',
+      'tool.threshold.label': 'Threshold',
+      'tool.threshold.lede': 'Convert PDFs to black and white with threshold control.',
+      'tool.threshold.meta': 'Black and white output<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
+      'tool.threshold.downloadLabel': 'Export PDF',
+      'tool.threshold.downloadSub': 'render and download all pages',
+      'tool.greyscale.label': 'Grayscale',
+      'tool.greyscale.lede': 'Convert PDFs to grayscale with brightness and contrast.',
+      'tool.greyscale.meta': 'Grayscale output<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
+      'tool.greyscale.downloadLabel': 'Export Grayscale PDF',
+      'tool.greyscale.downloadSub': 'render and download all pages',
+    },
+  };
+
+  Object.assign(LOCALES, {
+    'zh-Hans': {
+      'brand.subtitle': 'PDF 工具',
+      'nav.tools': '工具',
+      'nav.toolsAria': 'PDF 工具',
+      'sections.source': 'I. 原始 PDF',
+      'sections.organize': 'II. 整理页面',
+      'sections.cropRotate': 'II. 裁剪与旋转',
+      'sections.merge': 'II. 合并 PDF',
+      'sections.compress': 'II. 压缩 PDF',
+      'sections.threshold': 'II. 黑白阈值',
+      'sections.greyscale': 'II. 灰度',
+      'sections.pages': 'III. 页面',
+      'file.pages': '页数',
+      'file.page': '页',
+      'file.pagePrefix': '第',
+      'file.pageSuffix': '页',
+      'file.size': '大小',
+      'file.status': '状态',
+      'file.renameTitle': '点击重命名',
+      'status.ready': '就绪',
+      'status.readySafe': '就绪 · 安全',
+      'status.loading': '加载中',
+      'status.error': '错误',
+      'drop.uploadPdf': '选择 PDF',
+      'drop.uploadPdfs': '选择多个 PDF',
+      'drop.singleSub': 'PDF · 点击或拖入',
+      'drop.multiSub': '多个 PDF · 点击或拖入',
+      'drop.singleAria': '选择 PDF',
+      'drop.multiAria': '选择一个或多个 PDF',
+      'actions.clear': '清除',
+      'actions.clearList': '清空列表',
+      'actions.restoreOrder': '恢复原顺序',
+      'actions.resetSelectedPage': '重置所选页面',
+      'actions.mergeIntoOrganize': '合并到整理页',
+      'actions.invert': '反相',
+      'actions.sepia': '暖色',
+      'advanced.title': '高级选项',
+      'advanced.currentOnly': '仅当前页',
+      'advanced.currentOnlySub': '只导出当前选中的页面。',
+      'advanced.pageRange': '页面范围',
+      'advanced.passwordLock': '密码锁定',
+      'advanced.passwordPlaceholder': '密码',
+      'split.title': '拆分导出',
+      'split.useButton': '在页面上点“拆分”来添加拆分点。',
+      'split.summary': '{parts} 份 PDF，{points} 个拆分点。',
+      'split.pointOne': '拆分点',
+      'split.pointMany': '拆分点',
+      'split.part': '第 {num} 份',
+      'split.pagesOne': '第 {start} 页',
+      'split.pagesMany': '第 {start}-{end} 页',
+      'split.nameAria': '第 {num} 份的名称',
+      'split.exportPart': '导出第 {num} 份',
+      'split.button': '拆分',
+      'edit.fineRotation': '旋转微调',
+      'edit.cropFrame': '裁剪框',
+      'edit.fineRotationQuality': '旋转导出质量',
+      'edit.fineQualityAria': '旋转微调导出使用超清 900 dpi',
+      'edit.qualityHigh': '高 · 600 dpi',
+      'edit.qualityUltra': '超清 · 900 dpi',
+      'edit.selectPage': '选择页面',
+      'edit.pageHint': '第 {page} 页',
+      'edit.summaryEmpty': '上传 PDF 后，选择要裁剪或旋转的页面。',
+      'edit.summaryActive': '正在编辑第 {page}/{count} 页。改动只会应用到这一页。',
+      'edit.fullPage': '完整页面',
+      'edit.cropKept': '保留 {w}% × {h}%',
+      'edit.cropTotal': '共 {total}%',
+      'merge.summaryEmpty': '选择多个 PDF，调整顺序后合并。',
+      'merge.summaryActive': '已选择 {count} 个 {pdfWord} · {size}。调整顺序后合并到整理页。',
+      'merge.pdfOne': 'PDF',
+      'merge.pdfMany': 'PDF',
+      'compress.original': '原画质',
+      'compress.balanced': '均衡',
+      'compress.small': '小体积',
+      'compress.hintOriginal': '原画质',
+      'compress.hintBalanced': '平衡',
+      'compress.hintSmall': '小体积',
+      'compress.summaryOriginal': '尽量保持原始内容，只重新整理 PDF 结构。',
+      'compress.summaryBalanced': '压缩为较小的彩色 PDF，兼顾清晰度。',
+      'compress.summarySmall': '优先减小体积，适合快速分享。',
+      'resolution.fast': '快速',
+      'threshold.whiteTag': '0 · 白',
+      'threshold.blackTag': '255 · 黑',
+      'greyscale.brightness': '亮度',
+      'greyscale.darkTag': '−100 · 暗',
+      'greyscale.lightTag': '+100 · 亮',
+      'greyscale.lowTag': '50% · 低',
+      'greyscale.highTag': '200% · 高',
+      'hint.ready': '就绪',
+      'hint.low': '低',
+      'hint.soft': '柔和',
+      'hint.midRange': '中间',
+      'hint.darkRange': '偏暗范围',
+      'hint.lightRange': '偏亮范围',
+      'hint.high': '高',
+      'hint.neutral': '默认',
+      'hint.normal': '正常',
+      'hint.dark': '暗',
+      'hint.reduced': '偏暗',
+      'hint.bright': '偏亮',
+      'hint.maximum': '最高',
+      'hint.sepia': '暖色',
+      'hint.inverted': '反相',
+      'hint.lowContrast': '低对比度',
+      'hint.highContrast': '高对比度',
+      'empty.noPreview': '暂无预览',
+      'empty.uploadToBegin': '上传 PDF 后开始',
+      'empty.organize': '上传 PDF 后整理页面。',
+      'empty.organizeRemoved': '页面已全部移除。恢复原顺序后继续。',
+      'empty.edit': '上传 PDF 后裁剪或旋转页面。',
+      'preview.titleOrganize': '整理 <em>— 拖动页面调整顺序</em>',
+      'preview.titleEdit': '裁剪/旋转 <em>— 选择一个页面</em>',
+      'preview.titleOriginal': '预览 <em>— 原始 PDF</em>',
+      'preview.titleCompress': '预览 <em>— 压缩导出</em>',
+      'preview.titleProcessed': '预览 <em>— 处理结果</em>',
+      'proof.awaiting': '等待上传 PDF',
+      'proof.outputPages': '输出 {count} 页',
+      'proof.noPages': '未选择页面',
+      'organize.summaryEmpty': '上传 PDF 后调整页面顺序或删除页面。',
+      'organize.summarySplit': '{parts} 份 PDF 已准备好。可以改名后分别导出。',
+      'organize.summaryPages': '将导出 {count}/{total} 页。点击页面上的“拆分”可拆成多份 PDF。',
+      'organize.splits': '{count} 个拆分',
+      'organize.pages': '{count} 页',
+      'theme.dark': '深色模式',
+      'theme.light': '浅色模式',
+      'theme.onAria': '开启深色模式',
+      'theme.offAria': '关闭深色模式',
+      'footer.type': '字体 SF Pro / Inter',
+      'footer.clientSide': '本地处理 PDF',
+      'footer.local': '全程在浏览器内完成',
+      'tool.preview.label': '预览',
+      'tool.preview.lede': '查看 PDF，支持快速翻页和缩放。',
+      'tool.preview.meta': '打开 PDF 查看<br/>快速切换页面<br/>缩放不会改动文件',
+      'tool.preview.downloadLabel': '仅预览',
+      'tool.preview.downloadSub': '仅查看和缩放，不导出',
+      'tool.organize.label': '整理',
+      'tool.organize.lede': '导出前调整页面顺序或删除页面。',
+      'tool.organize.downloadLabel': '导出整理版 PDF',
+      'tool.organize.downloadSub': '保留原始页面内容',
+      'tool.edit.label': '裁剪/旋转',
+      'tool.edit.lede': '导出前裁剪或旋转指定页面。',
+      'tool.edit.downloadLabel': '导出编辑后的 PDF',
+      'tool.edit.downloadSub': '应用页面裁剪和旋转',
+      'tool.merge.label': '合并',
+      'tool.merge.lede': '把多个 PDF 合并成一个文件。',
+      'tool.merge.downloadLabel': '合并 PDF',
+      'tool.merge.downloadSub': '合并所选文件',
+      'tool.compress.label': '压缩',
+      'tool.compress.lede': '用简单选项减小 PDF 体积。',
+      'tool.compress.downloadLabel': '导出压缩 PDF',
+      'tool.compress.downloadSub': '压缩文件体积',
+      'tool.threshold.label': '黑白',
+      'tool.threshold.lede': '用阈值把 PDF 转成黑白。',
+      'tool.threshold.downloadLabel': '导出 PDF',
+      'tool.threshold.downloadSub': '渲染并下载所有页面',
+      'tool.greyscale.label': '灰度',
+      'tool.greyscale.lede': '使用亮度和对比度将 PDF 转为灰度。',
+      'tool.greyscale.downloadLabel': '导出灰度 PDF',
+      'tool.greyscale.downloadSub': '渲染并下载所有页面',
+    },
+    'zh-Hant-TW': {
+      'brand.subtitle': 'PDF 工具',
+      'nav.tools': '工具',
+      'nav.toolsAria': 'PDF 工具',
+      'sections.source': 'I. 原始 PDF',
+      'sections.organize': 'II. 整理頁面',
+      'sections.cropRotate': 'II. 裁切與旋轉',
+      'sections.merge': 'II. 合併 PDF',
+      'sections.compress': 'II. 壓縮 PDF',
+      'sections.threshold': 'II. 黑白閾值',
+      'sections.greyscale': 'II. 灰階',
+      'sections.pages': 'III. 頁面',
+      'file.pages': '頁數',
+      'file.page': '頁',
+      'file.pagePrefix': '第',
+      'file.pageSuffix': '頁',
+      'file.size': '大小',
+      'file.status': '狀態',
+      'file.renameTitle': '點擊重新命名',
+      'status.ready': '就緒',
+      'status.readySafe': '就緒 · 安全',
+      'status.loading': '載入中',
+      'status.error': '錯誤',
+      'drop.uploadPdf': '選擇 PDF',
+      'drop.uploadPdfs': '選擇多個 PDF',
+      'drop.singleSub': 'PDF · 點擊或拖入',
+      'drop.multiSub': '多個 PDF · 點擊或拖入',
+      'drop.singleAria': '選擇 PDF',
+      'drop.multiAria': '選擇一個或多個 PDF',
+      'actions.clear': '清除',
+      'actions.clearList': '清空列表',
+      'actions.restoreOrder': '還原原順序',
+      'actions.resetSelectedPage': '重設所選頁面',
+      'actions.mergeIntoOrganize': '合併到整理頁',
+      'actions.invert': '反相',
+      'actions.sepia': '暖色',
+      'advanced.title': '進階選項',
+      'advanced.currentOnly': '僅目前頁面',
+      'advanced.currentOnlySub': '只匯出目前選取的頁面。',
+      'advanced.pageRange': '頁面範圍',
+      'advanced.passwordLock': '密碼鎖定',
+      'advanced.passwordPlaceholder': '密碼',
+      'split.title': '分割匯出',
+      'split.useButton': '在頁面上點「分割」來新增分割點。',
+      'split.summary': '{parts} 份 PDF，{points} 個分割點。',
+      'split.pointOne': '分割點',
+      'split.pointMany': '分割點',
+      'split.part': '第 {num} 份',
+      'split.pagesOne': '第 {start} 頁',
+      'split.pagesMany': '第 {start}-{end} 頁',
+      'split.nameAria': '第 {num} 份的名稱',
+      'split.exportPart': '匯出第 {num} 份',
+      'split.button': '分割',
+      'split.removeAria': '移除第 {num} 個分割點',
+      'split.afterPage': '在第 {num} 頁後分割',
+      'split.removeAfterPage': '移除第 {num} 頁後的分割',
+      'split.afterOriginal': '在原始第 {num} 頁後分割',
+      'split.removeAfterOriginal': '移除原始第 {num} 頁後的分割',
+      'split.cannotFinal': '最後一頁後不能分割',
+      'edit.fineRotation': '旋轉微調',
+      'edit.cropFrame': '裁切框',
+      'edit.fineRotationQuality': '旋轉匯出品質',
+      'edit.fineQualityAria': '旋轉微調匯出使用超高 900 dpi',
+      'edit.qualityHigh': '高 · 600 dpi',
+      'edit.qualityUltra': '超高 · 900 dpi',
+      'edit.selectPage': '選擇頁面',
+      'edit.pageHint': '第 {page} 頁',
+      'edit.summaryEmpty': '上傳 PDF 後，選擇要裁切或旋轉的頁面。',
+      'edit.summaryActive': '正在編輯第 {page}/{count} 頁。變更只會套用到這一頁。',
+      'edit.fullPage': '完整頁面',
+      'edit.cropKept': '保留 {w}% × {h}%',
+      'edit.cropTotal': '共 {total}%',
+      'merge.summaryEmpty': '選擇多個 PDF，調整順序後合併。',
+      'merge.summaryActive': '已選擇 {count} 個 {pdfWord} · {size}。調整順序後合併到整理頁。',
+      'merge.pdfOne': 'PDF',
+      'merge.pdfMany': 'PDF',
+      'merge.moveUp': '將 {name} 往上移',
+      'merge.moveDown': '將 {name} 往下移',
+      'merge.remove': '移除 {name}',
+      'compress.original': '原畫質',
+      'compress.balanced': '均衡',
+      'compress.small': '小體積',
+      'compress.hintOriginal': '原畫質',
+      'compress.hintBalanced': '平衡',
+      'compress.hintSmall': '小體積',
+      'compress.summaryOriginal': '盡量保留原始內容，只重新整理 PDF 結構。',
+      'compress.summaryBalanced': '壓縮成較小的彩色 PDF，同時保留清晰度。',
+      'compress.summarySmall': '優先縮小檔案，適合快速分享。',
+      'resolution.fast': '快速',
+      'threshold.whiteTag': '0 · 白',
+      'threshold.blackTag': '255 · 黑',
+      'greyscale.brightness': '亮度',
+      'greyscale.darkTag': '−100 · 暗',
+      'greyscale.lightTag': '+100 · 亮',
+      'greyscale.lowTag': '50% · 低',
+      'greyscale.highTag': '200% · 高',
+      'hint.ready': '就緒',
+      'hint.low': '低',
+      'hint.soft': '柔和',
+      'hint.midRange': '中間',
+      'hint.darkRange': '偏暗',
+      'hint.lightRange': '偏亮',
+      'hint.high': '高',
+      'hint.neutral': '預設',
+      'hint.normal': '正常',
+      'hint.dark': '暗',
+      'hint.reduced': '偏暗',
+      'hint.bright': '偏亮',
+      'hint.maximum': '最高',
+      'hint.sepia': '暖色',
+      'hint.inverted': '反相',
+      'hint.lowContrast': '低對比',
+      'hint.highContrast': '高對比',
+      'empty.noPreview': '尚無預覽',
+      'empty.uploadToBegin': '上傳 PDF 後開始',
+      'empty.organize': '上傳 PDF 後整理頁面。',
+      'empty.organizeRemoved': '頁面已全部移除。還原原順序後繼續。',
+      'empty.edit': '上傳 PDF 後裁切或旋轉頁面。',
+      'preview.titleOrganize': '整理 <em>— 拖曳頁面調整順序</em>',
+      'preview.titleEdit': '裁切/旋轉 <em>— 選擇一個頁面</em>',
+      'preview.titleOriginal': '預覽 <em>— 原始 PDF</em>',
+      'preview.titleCompress': '預覽 <em>— 壓縮匯出</em>',
+      'preview.titleProcessed': '預覽 <em>— 處理結果</em>',
+      'proof.awaiting': '等待上傳 PDF',
+      'proof.outputPages': '輸出 {count} 頁',
+      'proof.noPages': '未選擇頁面',
+      'organize.summaryEmpty': '上傳 PDF 後調整頁面順序或刪除頁面。',
+      'organize.summarySplit': '{parts} 份 PDF 已準備好。可以改名後分別匯出。',
+      'organize.summaryPages': '將匯出 {count}/{total} 頁。點頁面上的「分割」可拆成多份 PDF。',
+      'organize.splits': '{count} 個分割',
+      'organize.pages': '{count} 頁',
+      'theme.dark': '深色模式',
+      'theme.light': '淺色模式',
+      'theme.onAria': '開啟深色模式',
+      'theme.offAria': '關閉深色模式',
+      'footer.type': '字體 SF Pro / Inter',
+      'footer.clientSide': '本機處理 PDF',
+      'footer.local': '全程在瀏覽器內完成',
+      'tool.preview.label': '預覽',
+      'tool.preview.lede': '查看 PDF，支援快速翻頁與縮放。',
+      'tool.preview.meta': '開啟 PDF 查看<br/>快速切換頁面<br/>縮放不會改動檔案',
+      'tool.preview.downloadLabel': '僅預覽',
+      'tool.preview.downloadSub': '僅查看和縮放，不匯出',
+      'tool.organize.label': '整理',
+      'tool.organize.lede': '匯出前調整頁面順序或刪除頁面。',
+      'tool.organize.meta': '拖曳頁面調整順序<br/>點 × 刪除頁面<br/>使用分割把 PDF 拆成多份<br/>原始頁面內容會保留',
+      'tool.organize.downloadLabel': '匯出整理版 PDF',
+      'tool.organize.downloadSub': '保留原始頁面內容',
+      'tool.edit.label': '裁切/旋轉',
+      'tool.edit.lede': '匯出前裁切或旋轉指定頁面。',
+      'tool.edit.meta': '一次編輯一頁<br/>拖曳裁切框<br/>用低敏感度滑桿微調旋轉<br/>也可用 90° 按鈕旋轉頁面',
+      'tool.edit.downloadLabel': '匯出編輯後的 PDF',
+      'tool.edit.downloadSub': '套用頁面裁切和旋轉',
+      'tool.merge.label': '合併',
+      'tool.merge.lede': '把多個 PDF 合併成一個檔案。',
+      'tool.merge.meta': '可選擇多個 PDF<br/>合併前可調整順序<br/>合併結果會進入整理頁',
+      'tool.merge.downloadLabel': '合併 PDF',
+      'tool.merge.downloadSub': '合併所選檔案',
+      'tool.compress.label': '壓縮',
+      'tool.compress.lede': '用簡單選項縮小 PDF 檔案。',
+      'tool.compress.meta': '原畫質模式保留頁面內容<br/>平衡和小體積會輸出較輕的頁面圖片<br/>仍可加上密碼鎖定',
+      'tool.compress.downloadLabel': '匯出壓縮 PDF',
+      'tool.compress.downloadSub': '縮小檔案體積',
+      'tool.threshold.label': '黑白',
+      'tool.threshold.lede': '用閾值把 PDF 轉成黑白。',
+      'tool.threshold.meta': '黑白輸出<br/>全程在本機處理<br/>閾值 · 0 → 255',
+      'tool.threshold.downloadLabel': '匯出 PDF',
+      'tool.threshold.downloadSub': '轉換並下載所有頁面',
+      'tool.greyscale.label': '灰階',
+      'tool.greyscale.lede': '用亮度和對比把 PDF 轉成灰階。',
+      'tool.greyscale.meta': '灰階輸出<br/>全程在本機處理<br/>亮度與對比',
+      'tool.greyscale.downloadLabel': '匯出灰階 PDF',
+      'tool.greyscale.downloadSub': '轉換並下載所有頁面',
+    },
+    ko: {
+      'brand.subtitle': 'PDF 도구',
+      'nav.tools': '도구',
+      'nav.toolsAria': 'PDF 도구',
+      'sections.source': 'I. 원본 PDF',
+      'sections.organize': 'II. 페이지 정리',
+      'sections.cropRotate': 'II. 자르기/회전',
+      'sections.merge': 'II. PDF 병합',
+      'sections.compress': 'II. PDF 압축',
+      'sections.threshold': 'II. 흑백',
+      'sections.greyscale': 'II. 그레이스케일',
+      'sections.pages': 'III. 페이지',
+      'file.pages': '페이지',
+      'file.page': '페이지',
+      'file.pagePrefix': '',
+      'file.pageSuffix': '페이지',
+      'file.size': '크기',
+      'file.status': '상태',
+      'file.renameTitle': '이름 바꾸기',
+      'status.ready': '준비됨',
+      'status.readySafe': '준비됨 · 안전 모드',
+      'status.loading': '불러오는 중',
+      'status.error': '오류',
+      'drop.uploadPdf': 'PDF 선택',
+      'drop.uploadPdfs': 'PDF 여러 개 선택',
+      'drop.singleSub': 'PDF · 클릭하거나 끌어오기',
+      'drop.multiSub': '여러 PDF · 클릭하거나 끌어오기',
+      'drop.singleAria': 'PDF 선택',
+      'drop.multiAria': '하나 이상의 PDF 선택',
+      'actions.clear': '지우기',
+      'actions.clearList': '목록 지우기',
+      'actions.restoreOrder': '원래 순서로 복원',
+      'actions.resetSelectedPage': '선택한 페이지 초기화',
+      'actions.mergeIntoOrganize': '정리 화면으로 병합',
+      'actions.invert': '반전',
+      'actions.sepia': '따뜻하게',
+      'advanced.title': '고급 옵션',
+      'advanced.currentOnly': '현재 페이지만',
+      'advanced.currentOnlySub': '선택한 페이지만 내보냅니다.',
+      'advanced.pageRange': '페이지 범위',
+      'advanced.passwordLock': '비밀번호 잠금',
+      'advanced.passwordPlaceholder': '비밀번호',
+      'split.title': '분할 내보내기',
+      'split.useButton': '페이지의 분할 버튼을 눌러 분할 지점을 추가하세요.',
+      'split.summary': 'PDF {parts}개 · 분할 지점 {points}개.',
+      'split.pointOne': '분할 지점',
+      'split.pointMany': '분할 지점',
+      'split.part': '{num}번째 파일',
+      'split.pagesOne': '{start}페이지',
+      'split.pagesMany': '{start}-{end}페이지',
+      'split.nameAria': '{num}번째 파일 이름',
+      'split.exportPart': '{num}번째 파일 내보내기',
+      'split.button': '분할',
+      'split.removeAria': '{num}번째 분할 지점 제거',
+      'split.afterPage': '{num}페이지 뒤에서 분할',
+      'split.removeAfterPage': '{num}페이지 뒤 분할 제거',
+      'split.afterOriginal': '원본 {num}페이지 뒤에서 분할',
+      'split.removeAfterOriginal': '원본 {num}페이지 뒤 분할 제거',
+      'split.cannotFinal': '마지막 페이지 뒤에서는 분할할 수 없습니다',
+      'edit.fineRotation': '회전 미세 조정',
+      'edit.cropFrame': '자르기 영역',
+      'edit.fineRotationQuality': '회전 내보내기 품질',
+      'edit.fineQualityAria': '회전 미세 조정 내보내기에 Ultra 900 dpi 사용',
+      'edit.qualityHigh': '높음 · 600 dpi',
+      'edit.qualityUltra': 'Ultra · 900 dpi',
+      'edit.selectPage': '페이지 선택',
+      'edit.pageHint': '{page}페이지',
+      'edit.summaryEmpty': 'PDF를 올린 뒤 자르거나 회전할 페이지를 선택하세요.',
+      'edit.summaryActive': '{count}페이지 중 {page}페이지를 편집 중입니다. 변경 사항은 이 페이지에만 적용됩니다.',
+      'edit.fullPage': '전체 페이지',
+      'edit.cropKept': '{w}% × {h}% 유지',
+      'edit.cropTotal': '총 {total}%',
+      'merge.summaryEmpty': 'PDF 여러 개를 선택하고 순서를 조정한 뒤 병합하세요.',
+      'merge.summaryActive': '{pdfWord} {count}개 선택됨 · {size}. 순서를 조정한 뒤 정리 화면으로 병합하세요.',
+      'merge.pdfOne': 'PDF',
+      'merge.pdfMany': 'PDF',
+      'merge.moveUp': '{name} 위로 이동',
+      'merge.moveDown': '{name} 아래로 이동',
+      'merge.remove': '{name} 제거',
+      'compress.original': '원본 품질',
+      'compress.balanced': '균형',
+      'compress.small': '작은 용량',
+      'compress.hintOriginal': '원본 품질',
+      'compress.hintBalanced': '균형',
+      'compress.hintSmall': '작은 용량',
+      'compress.summaryOriginal': '원본 페이지 내용을 최대한 유지하면서 PDF 구조를 정리합니다.',
+      'compress.summaryBalanced': '화질과 용량을 균형 있게 줄인 컬러 PDF를 만듭니다.',
+      'compress.summarySmall': '공유하기 쉬운 작은 용량을 우선합니다.',
+      'resolution.fast': '빠르게',
+      'threshold.whiteTag': '0 · 흰색',
+      'threshold.blackTag': '255 · 검정',
+      'greyscale.brightness': '밝기',
+      'greyscale.darkTag': '−100 · 어둡게',
+      'greyscale.lightTag': '+100 · 밝게',
+      'greyscale.lowTag': '50% · 낮음',
+      'greyscale.highTag': '200% · 높음',
+      'hint.ready': '준비됨',
+      'hint.low': '낮음',
+      'hint.soft': '부드러움',
+      'hint.midRange': '중간',
+      'hint.darkRange': '어두운 범위',
+      'hint.lightRange': '밝은 범위',
+      'hint.high': '높음',
+      'hint.neutral': '기본',
+      'hint.normal': '보통',
+      'hint.dark': '어두움',
+      'hint.reduced': '낮춤',
+      'hint.bright': '밝음',
+      'hint.maximum': '최대',
+      'hint.sepia': '따뜻하게',
+      'hint.inverted': '반전',
+      'hint.lowContrast': '낮은 대비',
+      'hint.highContrast': '높은 대비',
+      'empty.noPreview': '아직 미리보기가 없습니다',
+      'empty.uploadToBegin': 'PDF를 올려 시작하세요',
+      'empty.organize': 'PDF를 올려 페이지를 정리하세요.',
+      'empty.organizeRemoved': '모든 페이지가 제거되었습니다. 원래 순서로 복원해 계속하세요.',
+      'empty.edit': 'PDF를 올려 페이지를 자르거나 회전하세요.',
+      'preview.titleOrganize': '정리 <em>— 페이지를 끌어 순서 변경</em>',
+      'preview.titleEdit': '자르기/회전 <em>— 페이지 하나 선택</em>',
+      'preview.titleOriginal': '미리보기 <em>— 원본 PDF</em>',
+      'preview.titleCompress': '미리보기 <em>— 압축 내보내기</em>',
+      'preview.titleProcessed': '미리보기 <em>— 처리 결과</em>',
+      'proof.awaiting': 'PDF 대기 중',
+      'proof.outputPages': '출력 {count}페이지',
+      'proof.noPages': '선택한 페이지 없음',
+      'organize.summaryEmpty': 'PDF를 올려 페이지 순서를 바꾸거나 삭제하세요.',
+      'organize.summarySplit': 'PDF {parts}개가 준비되었습니다. 이름을 바꾼 뒤 각각 내보낼 수 있습니다.',
+      'organize.summaryPages': '{total}페이지 중 {count}페이지를 내보냅니다. 페이지의 분할을 눌러 PDF를 여러 개로 나눌 수 있습니다.',
+      'organize.splits': '분할 {count}개',
+      'organize.pages': '{count}페이지',
+      'theme.dark': '다크 모드',
+      'theme.light': '라이트 모드',
+      'theme.onAria': '다크 모드 켜기',
+      'theme.offAria': '다크 모드 끄기',
+      'footer.type': 'SF Pro / Inter 사용',
+      'footer.clientSide': '로컬 PDF 처리',
+      'footer.local': '브라우저 안에서만 실행',
+      'errors.chooseMerge': '병합할 PDF 파일을 하나 이상 선택하세요.',
+      'errors.password': '잠긴 PDF로 내보내려면 비밀번호를 입력하세요.',
+      'errors.notPdf': 'PDF 파일이 아닌 것 같습니다.',
+      'tool.preview.label': '미리보기',
+      'tool.preview.lede': 'PDF를 보고 빠르게 페이지를 넘기거나 확대하세요.',
+      'tool.preview.meta': 'PDF 열어 보기<br/>페이지 빠르게 이동<br/>확대해도 파일은 변경되지 않음',
+      'tool.preview.downloadLabel': '미리보기 전용',
+      'tool.preview.downloadSub': '보기와 확대만, 내보내기 없음',
+      'tool.organize.label': '정리',
+      'tool.organize.lede': '내보내기 전에 페이지 순서를 바꾸거나 삭제하세요.',
+      'tool.organize.meta': '페이지를 끌어 순서 변경<br/>×를 눌러 페이지 삭제<br/>분할로 PDF를 여러 개로 나누기<br/>원본 페이지 내용 유지',
+      'tool.organize.downloadLabel': '정리된 PDF 내보내기',
+      'tool.organize.downloadSub': '원본 페이지 내용 유지',
+      'tool.edit.label': '자르기/회전',
+      'tool.edit.lede': '내보내기 전에 원하는 페이지를 자르거나 회전하세요.',
+      'tool.edit.meta': '한 번에 한 페이지 편집<br/>자르기 영역 드래그<br/>슬라이더로 회전 미세 조정<br/>90° 버튼으로 페이지 회전',
+      'tool.edit.downloadLabel': '편집된 PDF 내보내기',
+      'tool.edit.downloadSub': '자르기와 회전 적용',
+      'tool.merge.label': '병합',
+      'tool.merge.lede': '여러 PDF를 하나의 파일로 합칩니다.',
+      'tool.merge.meta': 'PDF 여러 개 선택<br/>병합 전 순서 조정<br/>결과는 정리 화면으로 열림',
+      'tool.merge.downloadLabel': 'PDF 병합',
+      'tool.merge.downloadSub': '선택한 파일 합치기',
+      'tool.compress.label': '압축',
+      'tool.compress.lede': '간단한 옵션으로 PDF 용량을 줄입니다.',
+      'tool.compress.meta': '원본 품질은 페이지 내용을 유지<br/>균형과 작은 용량은 더 가벼운 페이지 이미지 생성<br/>비밀번호 잠금도 사용 가능',
+      'tool.compress.downloadLabel': '압축 PDF 내보내기',
+      'tool.compress.downloadSub': '파일 용량 줄이기',
+      'tool.threshold.label': '흑백',
+      'tool.threshold.lede': '임계값으로 PDF를 흑백으로 변환합니다.',
+      'tool.threshold.meta': '흑백 출력<br/>브라우저 안에서만 처리 · 업로드 없음<br/>임계값 · 0 → 255',
+      'tool.threshold.downloadLabel': 'PDF 내보내기',
+      'tool.threshold.downloadSub': '모든 페이지 변환 후 다운로드',
+      'tool.greyscale.label': '그레이스케일',
+      'tool.greyscale.lede': '밝기와 대비로 PDF를 그레이스케일로 변환합니다.',
+      'tool.greyscale.meta': '그레이스케일 출력<br/>브라우저 안에서만 처리 · 업로드 없음<br/>밝기와 대비',
+      'tool.greyscale.downloadLabel': '그레이스케일 PDF 내보내기',
+      'tool.greyscale.downloadSub': '모든 페이지 변환 후 다운로드',
+    },
+    ja: {
+      'brand.subtitle': 'PDFツール',
+      'nav.tools': 'ツール',
+      'nav.toolsAria': 'PDFツール',
+      'sections.source': 'I. 元のPDF',
+      'sections.organize': 'II. ページ整理',
+      'sections.cropRotate': 'II. トリミング/回転',
+      'sections.merge': 'II. PDF結合',
+      'sections.compress': 'II. PDF圧縮',
+      'sections.threshold': 'II. 白黒',
+      'sections.greyscale': 'II. グレースケール',
+      'sections.pages': 'III. ページ',
+      'file.pages': 'ページ',
+      'file.page': 'ページ',
+      'file.pagePrefix': '',
+      'file.pageSuffix': 'ページ',
+      'file.size': 'サイズ',
+      'file.status': '状態',
+      'file.renameTitle': '名前を変更',
+      'status.ready': '準備完了',
+      'status.readySafe': '準備完了 · 安全モード',
+      'status.loading': '読み込み中',
+      'status.error': 'エラー',
+      'drop.uploadPdf': 'PDFを選択',
+      'drop.uploadPdfs': '複数のPDFを選択',
+      'drop.singleSub': 'PDF · クリックまたはドラッグ',
+      'drop.multiSub': '複数PDF · クリックまたはドラッグ',
+      'drop.singleAria': 'PDFを選択',
+      'drop.multiAria': '1つ以上のPDFを選択',
+      'actions.clear': 'クリア',
+      'actions.clearList': 'リストをクリア',
+      'actions.restoreOrder': '元の順序に戻す',
+      'actions.resetSelectedPage': '選択ページをリセット',
+      'actions.mergeIntoOrganize': '整理画面に結合',
+      'actions.invert': '反転',
+      'actions.sepia': '暖色',
+      'advanced.title': '詳細オプション',
+      'advanced.currentOnly': '現在のページのみ',
+      'advanced.currentOnlySub': '選択中のページだけを書き出します。',
+      'advanced.pageRange': 'ページ範囲',
+      'advanced.passwordLock': 'パスワード保護',
+      'advanced.passwordPlaceholder': 'パスワード',
+      'split.title': '分割書き出し',
+      'split.useButton': 'ページの分割ボタンで分割位置を追加できます。',
+      'split.summary': 'PDF {parts}個 · 分割位置 {points}個。',
+      'split.pointOne': '分割位置',
+      'split.pointMany': '分割位置',
+      'split.part': '{num}個目',
+      'split.pagesOne': '{start}ページ',
+      'split.pagesMany': '{start}-{end}ページ',
+      'split.nameAria': '{num}個目の名前',
+      'split.exportPart': '{num}個目を書き出し',
+      'split.button': '分割',
+      'split.removeAria': '{num}個目の分割位置を削除',
+      'split.afterPage': '{num}ページの後で分割',
+      'split.removeAfterPage': '{num}ページ後の分割を削除',
+      'split.afterOriginal': '元の{num}ページの後で分割',
+      'split.removeAfterOriginal': '元の{num}ページ後の分割を削除',
+      'split.cannotFinal': '最後のページの後では分割できません',
+      'edit.fineRotation': '回転の微調整',
+      'edit.cropFrame': 'トリミング枠',
+      'edit.fineRotationQuality': '回転書き出し品質',
+      'edit.fineQualityAria': '回転微調整の書き出しにUltra 900 dpiを使用',
+      'edit.qualityHigh': '高 · 600 dpi',
+      'edit.qualityUltra': 'Ultra · 900 dpi',
+      'edit.selectPage': 'ページを選択',
+      'edit.pageHint': '{page}ページ',
+      'edit.summaryEmpty': 'PDFを追加して、トリミングまたは回転するページを選択してください。',
+      'edit.summaryActive': '{count}ページ中{page}ページを編集中です。変更はこのページにのみ適用されます。',
+      'edit.fullPage': 'ページ全体',
+      'edit.cropKept': '{w}% × {h}% を保持',
+      'edit.cropTotal': '合計 {total}%',
+      'merge.summaryEmpty': '複数のPDFを選択し、順序を調整して結合します。',
+      'merge.summaryActive': '{pdfWord} {count}個を選択 · {size}。順序を調整して整理画面に結合します。',
+      'merge.pdfOne': 'PDF',
+      'merge.pdfMany': 'PDF',
+      'merge.moveUp': '{name}を上へ移動',
+      'merge.moveDown': '{name}を下へ移動',
+      'merge.remove': '{name}を削除',
+      'compress.original': '元の品質',
+      'compress.balanced': 'バランス',
+      'compress.small': '小容量',
+      'compress.hintOriginal': '元の品質',
+      'compress.hintBalanced': 'バランス',
+      'compress.hintSmall': '小容量',
+      'compress.summaryOriginal': '元のページ内容をできるだけ保ったまま、PDF構造を整理します。',
+      'compress.summaryBalanced': '見やすさと容量のバランスを取ったカラーPDFを作成します。',
+      'compress.summarySmall': '共有しやすい小さなファイルサイズを優先します。',
+      'resolution.fast': '高速',
+      'threshold.whiteTag': '0 · 白',
+      'threshold.blackTag': '255 · 黒',
+      'greyscale.brightness': '明るさ',
+      'greyscale.darkTag': '−100 · 暗い',
+      'greyscale.lightTag': '+100 · 明るい',
+      'greyscale.lowTag': '50% · 低',
+      'greyscale.highTag': '200% · 高',
+      'hint.ready': '準備完了',
+      'hint.low': '低',
+      'hint.soft': 'ソフト',
+      'hint.midRange': '中間',
+      'hint.darkRange': '暗め',
+      'hint.lightRange': '明るめ',
+      'hint.high': '高',
+      'hint.neutral': '標準',
+      'hint.normal': '通常',
+      'hint.dark': '暗い',
+      'hint.reduced': '控えめ',
+      'hint.bright': '明るい',
+      'hint.maximum': '最大',
+      'hint.sepia': '暖色',
+      'hint.inverted': '反転',
+      'hint.lowContrast': '低コントラスト',
+      'hint.highContrast': '高コントラスト',
+      'empty.noPreview': 'まだプレビューはありません',
+      'empty.uploadToBegin': 'PDFを追加して開始',
+      'empty.organize': 'PDFを追加してページを整理します。',
+      'empty.organizeRemoved': 'すべてのページが削除されました。元の順序に戻して続行してください。',
+      'empty.edit': 'PDFを追加してページをトリミングまたは回転します。',
+      'preview.titleOrganize': '整理 <em>— ページをドラッグして並べ替え</em>',
+      'preview.titleEdit': 'トリミング/回転 <em>— ページを1つ選択</em>',
+      'preview.titleOriginal': 'プレビュー <em>— 元のPDF</em>',
+      'preview.titleCompress': 'プレビュー <em>— 圧縮書き出し</em>',
+      'preview.titleProcessed': 'プレビュー <em>— 処理結果</em>',
+      'proof.awaiting': 'PDF待機中',
+      'proof.outputPages': '出力 {count}ページ',
+      'proof.noPages': 'ページ未選択',
+      'organize.summaryEmpty': 'PDFを追加してページ順を変更または削除します。',
+      'organize.summarySplit': 'PDF {parts}個の準備ができました。名前を変更して個別に書き出せます。',
+      'organize.summaryPages': '{total}ページ中{count}ページを書き出します。ページの分割を使うとPDFを複数に分けられます。',
+      'organize.splits': '分割 {count}個',
+      'organize.pages': '{count}ページ',
+      'theme.dark': 'ダークモード',
+      'theme.light': 'ライトモード',
+      'theme.onAria': 'ダークモードをオン',
+      'theme.offAria': 'ダークモードをオフ',
+      'footer.type': 'SF Pro / Inter',
+      'footer.clientSide': 'ローカルPDF処理',
+      'footer.local': 'すべてブラウザ内で実行',
+      'errors.chooseMerge': '結合するPDFファイルを1つ以上選択してください。',
+      'errors.password': '保護されたPDFとして書き出すにはパスワードを入力してください。',
+      'errors.notPdf': 'PDFファイルではないようです。',
+      'tool.preview.label': 'プレビュー',
+      'tool.preview.lede': 'PDFを表示し、すばやくページ移動やズームができます。',
+      'tool.preview.meta': 'PDFを開いて表示<br/>ページをすばやく移動<br/>ズームしてもファイルは変更されません',
+      'tool.preview.downloadLabel': 'プレビューのみ',
+      'tool.preview.downloadSub': '表示とズームのみ、書き出しなし',
+      'tool.organize.label': '整理',
+      'tool.organize.lede': '書き出し前にページ順を変更または削除します。',
+      'tool.organize.meta': 'ページをドラッグして並べ替え<br/>×でページを削除<br/>分割でPDFを複数に分ける<br/>元のページ内容は保持',
+      'tool.organize.downloadLabel': '整理済みPDFを書き出し',
+      'tool.organize.downloadSub': '元のページ内容を保持',
+      'tool.edit.label': 'トリミング/回転',
+      'tool.edit.lede': '書き出し前に指定ページをトリミングまたは回転します。',
+      'tool.edit.meta': '1ページずつ編集<br/>トリミング枠をドラッグ<br/>スライダーで回転を微調整<br/>90°ボタンでページ回転',
+      'tool.edit.downloadLabel': '編集済みPDFを書き出し',
+      'tool.edit.downloadSub': 'トリミングと回転を適用',
+      'tool.merge.label': '結合',
+      'tool.merge.lede': '複数のPDFを1つのファイルにまとめます。',
+      'tool.merge.meta': '複数のPDFを選択<br/>結合前に順序を調整<br/>結果は整理画面で開きます',
+      'tool.merge.downloadLabel': 'PDFを結合',
+      'tool.merge.downloadSub': '選択したファイルを結合',
+      'tool.compress.label': '圧縮',
+      'tool.compress.lede': 'シンプルな設定でPDFの容量を減らします。',
+      'tool.compress.meta': '元の品質はページ内容を保持<br/>バランスと小容量は軽いページ画像を作成<br/>パスワード保護も利用可能',
+      'tool.compress.downloadLabel': '圧縮PDFを書き出し',
+      'tool.compress.downloadSub': 'ファイルサイズを削減',
+      'tool.threshold.label': '白黒',
+      'tool.threshold.lede': 'しきい値でPDFを白黒に変換します。',
+      'tool.threshold.meta': '白黒出力<br/>ブラウザ内のみで処理 · アップロードなし<br/>しきい値 · 0 → 255',
+      'tool.threshold.downloadLabel': 'PDFを書き出し',
+      'tool.threshold.downloadSub': '全ページを変換してダウンロード',
+      'tool.greyscale.label': 'グレースケール',
+      'tool.greyscale.lede': '明るさとコントラストでPDFをグレースケールに変換します。',
+      'tool.greyscale.meta': 'グレースケール出力<br/>ブラウザ内のみで処理 · アップロードなし<br/>明るさとコントラスト',
+      'tool.greyscale.downloadLabel': 'グレースケールPDFを書き出し',
+      'tool.greyscale.downloadSub': '全ページを変換してダウンロード',
+    },
+    es: {
+      'brand.subtitle': 'Herramientas PDF',
+      'nav.tools': 'Herramientas',
+      'sections.source': 'I. PDF de origen',
+      'sections.organize': 'II. Organizar páginas',
+      'sections.cropRotate': 'II. Recortar/Girar',
+      'sections.merge': 'II. Unir PDF',
+      'sections.compress': 'II. Comprimir PDF',
+      'sections.threshold': 'II. Umbral',
+      'sections.greyscale': 'II. Escala de grises',
+      'sections.pages': 'III. Páginas',
+      'file.pages': 'Páginas',
+      'file.page': 'Página',
+      'file.pagePrefix': 'Página ',
+      'file.pageSuffix': '',
+      'file.size': 'Tamaño',
+      'file.status': 'Estado',
+      'file.renameTitle': 'Haz clic para cambiar el nombre',
+      'status.ready': 'listo',
+      'status.readySafe': 'listo · seguro',
+      'status.loading': 'cargando',
+      'status.error': 'error',
+      'drop.uploadPdf': 'Subir PDF',
+      'drop.uploadPdfs': 'Subir PDFs',
+      'drop.singleSub': 'PDF · clic o arrastra',
+      'drop.multiSub': 'Varios PDF · clic o arrastra',
+      'drop.singleAria': 'Subir un PDF',
+      'drop.multiAria': 'Subir uno o más PDF',
+      'actions.clear': 'Borrar',
+      'actions.clearList': 'Borrar lista',
+      'actions.restoreOrder': 'Restaurar orden original',
+      'actions.resetSelectedPage': 'Restablecer página seleccionada',
+      'actions.mergeIntoOrganize': 'Unir en Organizar',
+      'actions.invert': 'Invertir',
+      'actions.sepia': 'Sepia',
+      'advanced.title': 'Opciones avanzadas',
+      'advanced.currentOnly': 'Solo página actual',
+      'advanced.currentOnlySub': 'Exporta solo la página seleccionada.',
+      'advanced.pageRange': 'Rango de páginas',
+      'advanced.passwordLock': 'Bloqueo con contraseña',
+      'advanced.passwordPlaceholder': 'Contraseña',
+      'split.title': 'Exportar división',
+      'split.useButton': 'Usa el botón Dividir de una página en Organizar para crear una división.',
+      'split.summary': '{parts} PDF desde {points} {pointWord}.',
+      'split.pointOne': 'punto de división',
+      'split.pointMany': 'puntos de división',
+      'split.part': 'Parte {num}',
+      'split.pagesOne': 'Página {start}',
+      'split.pagesMany': 'Páginas {start}-{end}',
+      'split.nameAria': 'Nombre de la parte {num}',
+      'split.exportPart': 'Exportar parte {num}',
+      'split.button': 'Dividir',
+      'split.removeAria': 'Quitar división {num}',
+      'split.afterPage': 'Dividir después de la página {num}',
+      'split.removeAfterPage': 'Quitar división después de la página {num}',
+      'split.afterOriginal': 'Dividir después de la página original {num}',
+      'split.removeAfterOriginal': 'Quitar división después de la página original {num}',
+      'split.cannotFinal': 'No se puede dividir después de la última página',
+      'edit.fineRotation': 'Rotación fina',
+      'edit.cropFrame': 'Marco de recorte',
+      'edit.fineRotationQuality': 'Calidad de rotación fina',
+      'edit.fineQualityAria': 'Usar ultra 900 dpi para exportar la rotación fina',
+      'edit.qualityHigh': 'Alta · 600 dpi',
+      'edit.qualityUltra': 'Ultra · 900 dpi',
+      'edit.selectPage': 'selecciona página',
+      'edit.pageHint': 'página {page}',
+      'edit.summaryEmpty': 'Sube un PDF y elige una página en el editor para recortarla o girarla.',
+      'edit.summaryActive': 'Editando página {page} de {count}. Los cambios solo afectan esta página.',
+      'edit.fullPage': 'Página completa',
+      'edit.cropKept': '{w}% × {h}% conservado',
+      'edit.cropTotal': '{total}% total',
+      'merge.summaryEmpty': 'Elige varios PDF, ordena la lista y únelos en el organizador.',
+      'merge.summaryActive': '{count} {pdfWord} seleccionados · {size}. Ordena la lista y únelos en Organizar.',
+      'merge.pdfOne': 'PDF',
+      'merge.pdfMany': 'PDF',
+      'merge.moveUp': 'Mover {name} arriba',
+      'merge.moveDown': 'Mover {name} abajo',
+      'merge.remove': 'Quitar {name}',
+      'compress.original': 'Original',
+      'compress.balanced': 'Equilibrado',
+      'compress.small': 'Pequeño',
+      'compress.hintOriginal': 'original',
+      'compress.hintBalanced': 'equilibrado',
+      'compress.hintSmall': 'pequeño',
+      'compress.summaryOriginal': 'Compacta el PDF conservando el contenido original de las páginas.',
+      'compress.summaryBalanced': 'Crea un PDF en color más pequeño con calidad equilibrada.',
+      'compress.summarySmall': 'Crea el PDF más pequeño con imágenes de página más ligeras.',
+      'resolution.fast': 'Rápido',
+      'threshold.whiteTag': '0 · blanco',
+      'threshold.blackTag': '255 · negro',
+      'greyscale.brightness': 'brillo',
+      'greyscale.darkTag': '−100 · oscuro',
+      'greyscale.lightTag': '+100 · claro',
+      'greyscale.lowTag': '50% · bajo',
+      'greyscale.highTag': '200% · alto',
+      'hint.ready': 'listo',
+      'hint.low': 'bajo',
+      'hint.soft': 'suave',
+      'hint.midRange': 'rango medio',
+      'hint.darkRange': 'rango oscuro',
+      'hint.lightRange': 'rango claro',
+      'hint.high': 'alto',
+      'hint.neutral': 'neutral',
+      'hint.normal': 'normal',
+      'hint.dark': 'oscuro',
+      'hint.reduced': 'reducido',
+      'hint.bright': 'claro',
+      'hint.maximum': 'máximo',
+      'hint.sepia': 'sepia',
+      'hint.inverted': 'invertido',
+      'hint.lowContrast': 'bajo contraste',
+      'hint.highContrast': 'alto contraste',
+      'empty.noPreview': 'Sin vista previa',
+      'empty.uploadToBegin': 'Sube un PDF para empezar',
+      'empty.organize': 'Sube un PDF para organizar páginas.',
+      'empty.organizeRemoved': 'Se han quitado todas las páginas. Restaura el orden original para continuar.',
+      'empty.edit': 'Sube un PDF para recortar o girar páginas.',
+      'preview.titleOrganize': 'Organizar <em>— arrastra páginas para reordenarlas</em>',
+      'preview.titleEdit': 'Recortar/Girar <em>— selecciona una página</em>',
+      'preview.titleOriginal': 'Vista previa <em>— PDF original</em>',
+      'preview.titleCompress': 'Vista previa <em>— exportación comprimida</em>',
+      'preview.titleProcessed': 'Vista previa <em>— resultado procesado</em>',
+      'proof.awaiting': 'esperando PDF',
+      'proof.outputPages': '{count} páginas en la salida',
+      'proof.noPages': 'sin páginas seleccionadas',
+      'organize.summaryEmpty': 'Sube un PDF para reordenar o quitar páginas.',
+      'organize.summarySplit': '{parts} PDF listos. Edita los nombres y exporta cada parte desde el panel de división.',
+      'organize.summaryPages': 'Se exportarán {count} de {total} páginas originales. Usa Dividir en una página para separar el PDF.',
+      'organize.splits': '{count} divisiones',
+      'organize.pages': '{count} páginas',
+      'theme.dark': 'Modo oscuro',
+      'theme.light': 'Modo claro',
+      'theme.onAria': 'Activar modo oscuro',
+      'theme.offAria': 'Desactivar modo oscuro',
+      'footer.type': 'Con SF Pro / Inter',
+      'footer.clientSide': 'Procesamiento PDF en el navegador',
+      'footer.local': 'Funciona íntegramente en tu navegador',
+      'tool.preview.label': 'Vista previa',
+      'tool.preview.lede': 'Visualiza un PDF con navegación rápida y zoom.',
+      'tool.preview.meta': 'Abre un PDF para verlo<br/>Usa la navegación de páginas<br/>El zoom no cambia el archivo',
+      'tool.preview.downloadLabel': 'Solo vista previa',
+      'tool.preview.downloadSub': 'ver y ampliar sin exportar',
+      'tool.organize.label': 'Organizar',
+      'tool.organize.lede': 'Reordena o elimina páginas antes de exportar.',
+      'tool.organize.meta': 'Arrastra páginas para reordenarlas<br/>Haz clic en × para quitar una página<br/>Usa Dividir para separar después de una página<br/>Se conserva el contenido original',
+      'tool.organize.downloadLabel': 'Exportar PDF organizado',
+      'tool.organize.downloadSub': 'conservar contenido original',
+      'tool.edit.label': 'Recortar/Girar',
+      'tool.edit.lede': 'Recorta y gira páginas individuales antes de exportar.',
+      'tool.edit.meta': 'Selecciona una página a la vez<br/>Arrastra el marco de recorte<br/>Ajusta la rotación con un control fino<br/>Usa botones de 90° para girar páginas',
+      'tool.edit.downloadLabel': 'Exportar PDF editado',
+      'tool.edit.downloadSub': 'aplicar recortes y rotaciones',
+      'tool.merge.label': 'Unir',
+      'tool.merge.lede': 'Une varios PDF en un documento organizado.',
+      'tool.merge.meta': 'Selecciona cualquier cantidad de PDF<br/>Reordena archivos antes de unirlos<br/>El resultado se abre en Organizar',
+      'tool.merge.downloadLabel': 'Unir PDF',
+      'tool.merge.downloadSub': 'combinar archivos seleccionados',
+      'tool.compress.label': 'Comprimir',
+      'tool.compress.lede': 'Reduce el tamaño del PDF con opciones simples de calidad.',
+      'tool.compress.meta': 'Original conserva el contenido<br/>Equilibrado y Pequeño crean imágenes de página más ligeras<br/>El bloqueo con contraseña sigue funcionando',
+      'tool.compress.downloadLabel': 'Exportar PDF comprimido',
+      'tool.compress.downloadSub': 'reducir tamaño del archivo',
+      'tool.threshold.label': 'Umbral',
+      'tool.threshold.lede': 'Convierte PDF a blanco y negro con control de umbral.',
+      'tool.threshold.meta': 'Salida en blanco y negro<br/>Solo en tu navegador · sin subida<br/>Umbral · 0 → 255',
+      'tool.threshold.downloadLabel': 'Exportar PDF',
+      'tool.threshold.downloadSub': 'renderizar y descargar todas las páginas',
+      'tool.greyscale.label': 'Grises',
+      'tool.greyscale.lede': 'Convierte PDF a escala de grises con brillo y contraste.',
+      'tool.greyscale.meta': 'Salida en escala de grises<br/>Solo en tu navegador · sin subida<br/>Brillo y contraste',
+      'tool.greyscale.downloadLabel': 'Exportar PDF en grises',
+      'tool.greyscale.downloadSub': 'renderizar y descargar todas las páginas',
+    },
+    fr: {
+      'brand.subtitle': 'Outils PDF',
+      'nav.tools': 'Outils',
+      'sections.source': 'I. PDF source',
+      'sections.organize': 'II. Organiser les pages',
+      'sections.cropRotate': 'II. Recadrer/Pivoter',
+      'sections.merge': 'II. Fusionner des PDF',
+      'sections.compress': 'II. Compresser le PDF',
+      'sections.threshold': 'II. Seuil',
+      'sections.greyscale': 'II. Niveaux de gris',
+      'sections.pages': 'III. Pages',
+      'file.pages': 'Pages',
+      'file.page': 'Page',
+      'file.pagePrefix': 'Page ',
+      'file.pageSuffix': '',
+      'file.size': 'Taille',
+      'file.status': 'État',
+      'file.renameTitle': 'Cliquer pour renommer',
+      'status.ready': 'prêt',
+      'status.readySafe': 'prêt · sécurisé',
+      'status.loading': 'chargement',
+      'status.error': 'erreur',
+      'drop.uploadPdf': 'Importer un PDF',
+      'drop.uploadPdfs': 'Importer des PDF',
+      'drop.singleSub': 'PDF · cliquer ou déposer',
+      'drop.multiSub': 'Plusieurs PDF · cliquer ou déposer',
+      'drop.singleAria': 'Importer un PDF',
+      'drop.multiAria': 'Importer un ou plusieurs PDF',
+      'actions.clear': 'Effacer',
+      'actions.clearList': 'Vider la liste',
+      'actions.restoreOrder': 'Restaurer l’ordre d’origine',
+      'actions.resetSelectedPage': 'Réinitialiser la page',
+      'actions.mergeIntoOrganize': 'Fusionner dans Organiser',
+      'actions.invert': 'Inverser',
+      'actions.sepia': 'Sépia',
+      'advanced.title': 'Options avancées',
+      'advanced.currentOnly': 'Page actuelle uniquement',
+      'advanced.currentOnlySub': 'Exporte seulement la page sélectionnée.',
+      'advanced.pageRange': 'Plage de pages',
+      'advanced.passwordLock': 'Verrouillage par mot de passe',
+      'advanced.passwordPlaceholder': 'Mot de passe',
+      'split.title': 'Export scindé',
+      'split.useButton': 'Utilisez le bouton Scinder sur une page dans Organiser pour créer une séparation.',
+      'split.summary': '{parts} PDF à partir de {points} {pointWord}.',
+      'split.pointOne': 'point de séparation',
+      'split.pointMany': 'points de séparation',
+      'split.part': 'Partie {num}',
+      'split.pagesOne': 'Page {start}',
+      'split.pagesMany': 'Pages {start}-{end}',
+      'split.nameAria': 'Nom de la partie {num}',
+      'split.exportPart': 'Exporter la partie {num}',
+      'split.button': 'Scinder',
+      'split.removeAria': 'Supprimer la séparation {num}',
+      'split.afterPage': 'Scinder après la page {num}',
+      'split.removeAfterPage': 'Supprimer la séparation après la page {num}',
+      'split.afterOriginal': 'Scinder après la page originale {num}',
+      'split.removeAfterOriginal': 'Supprimer la séparation après la page originale {num}',
+      'split.cannotFinal': 'Impossible de scinder après la dernière page',
+      'edit.fineRotation': 'Rotation fine',
+      'edit.cropFrame': 'Cadre de recadrage',
+      'edit.fineRotationQuality': 'Qualité de rotation fine',
+      'edit.fineQualityAria': 'Utiliser ultra 900 dpi pour exporter la rotation fine',
+      'edit.qualityHigh': 'Haute · 600 dpi',
+      'edit.qualityUltra': 'Ultra · 900 dpi',
+      'edit.selectPage': 'sélectionner une page',
+      'edit.pageHint': 'page {page}',
+      'edit.summaryEmpty': 'Importez un PDF, puis choisissez une page à recadrer ou faire pivoter.',
+      'edit.summaryActive': 'Modification de la page {page} sur {count}. Les changements ne touchent que cette page.',
+      'edit.fullPage': 'Page complète',
+      'edit.cropKept': '{w}% × {h}% conservé',
+      'edit.cropTotal': '{total}% au total',
+      'merge.summaryEmpty': 'Choisissez plusieurs PDF, organisez leur ordre, puis fusionnez-les.',
+      'merge.summaryActive': '{count} {pdfWord} sélectionnés · {size}. Organisez la liste, puis fusionnez dans Organiser.',
+      'merge.pdfOne': 'PDF',
+      'merge.pdfMany': 'PDF',
+      'merge.moveUp': 'Déplacer {name} vers le haut',
+      'merge.moveDown': 'Déplacer {name} vers le bas',
+      'merge.remove': 'Supprimer {name}',
+      'compress.original': 'Original',
+      'compress.balanced': 'Équilibré',
+      'compress.small': 'Petit',
+      'compress.hintOriginal': 'original',
+      'compress.hintBalanced': 'équilibré',
+      'compress.hintSmall': 'petit',
+      'compress.summaryOriginal': 'Compacte le PDF tout en conservant le contenu original des pages.',
+      'compress.summaryBalanced': 'Crée un PDF couleur plus léger avec une qualité équilibrée.',
+      'compress.summarySmall': 'Crée le PDF le plus léger avec des images de page allégées.',
+      'resolution.fast': 'Rapide',
+      'threshold.whiteTag': '0 · blanc',
+      'threshold.blackTag': '255 · noir',
+      'greyscale.brightness': 'luminosité',
+      'greyscale.darkTag': '−100 · sombre',
+      'greyscale.lightTag': '+100 · clair',
+      'greyscale.lowTag': '50% · faible',
+      'greyscale.highTag': '200% · élevé',
+      'hint.ready': 'prêt',
+      'hint.low': 'bas',
+      'hint.soft': 'doux',
+      'hint.midRange': 'milieu',
+      'hint.darkRange': 'plage sombre',
+      'hint.lightRange': 'plage claire',
+      'hint.high': 'haut',
+      'hint.neutral': 'neutre',
+      'hint.normal': 'normal',
+      'hint.dark': 'sombre',
+      'hint.reduced': 'réduit',
+      'hint.bright': 'clair',
+      'hint.maximum': 'maximum',
+      'hint.sepia': 'sépia',
+      'hint.inverted': 'inversé',
+      'hint.lowContrast': 'faible contraste',
+      'hint.highContrast': 'contraste élevé',
+      'empty.noPreview': 'Aucun aperçu',
+      'empty.uploadToBegin': 'Importez un PDF pour commencer',
+      'empty.organize': 'Importez un PDF pour organiser les pages.',
+      'empty.organizeRemoved': 'Toutes les pages ont été supprimées. Restaurez l’ordre d’origine pour continuer.',
+      'empty.edit': 'Importez un PDF pour recadrer ou faire pivoter les pages.',
+      'preview.titleOrganize': 'Organiser <em>— faites glisser les pages pour les réordonner</em>',
+      'preview.titleEdit': 'Recadrer/Pivoter <em>— sélectionnez une page</em>',
+      'preview.titleOriginal': 'Aperçu <em>— PDF original</em>',
+      'preview.titleCompress': 'Aperçu <em>— export compressé</em>',
+      'preview.titleProcessed': 'Aperçu <em>— résultat traité</em>',
+      'proof.awaiting': 'en attente du PDF',
+      'proof.outputPages': '{count} pages en sortie',
+      'proof.noPages': 'aucune page sélectionnée',
+      'organize.summaryEmpty': 'Importez un PDF pour réordonner ou supprimer des pages.',
+      'organize.summarySplit': '{parts} PDF sont prêts. Modifiez les noms et exportez chaque partie depuis le panneau de séparation.',
+      'organize.summaryPages': '{count} pages originales sur {total} seront incluses dans l’export. Utilisez Scinder sur une page pour séparer le PDF.',
+      'organize.splits': '{count} séparations',
+      'organize.pages': '{count} pages',
+      'theme.dark': 'Mode sombre',
+      'theme.light': 'Mode clair',
+      'theme.onAria': 'Activer le mode sombre',
+      'theme.offAria': 'Désactiver le mode sombre',
+      'footer.type': 'En SF Pro / Inter',
+      'footer.clientSide': 'Traitement PDF côté navigateur',
+      'footer.local': 'Fonctionne entièrement dans votre navigateur',
+      'tool.preview.label': 'Aperçu',
+      'tool.preview.lede': 'Consultez un PDF avec navigation rapide et zoom.',
+      'tool.preview.meta': 'Ouvrir un PDF pour le consulter<br/>Utiliser la navigation de pages<br/>Zoomer sans modifier le fichier',
+      'tool.preview.downloadLabel': 'Aperçu seul',
+      'tool.preview.downloadSub': 'voir et zoomer sans exporter',
+      'tool.organize.label': 'Organiser',
+      'tool.organize.lede': 'Réorganisez ou supprimez des pages avant export.',
+      'tool.organize.meta': 'Faites glisser les pages pour les réordonner<br/>Cliquez sur × pour supprimer une page<br/>Utilisez Scinder pour séparer après une page<br/>Les pages originales sont conservées',
+      'tool.organize.downloadLabel': 'Exporter le PDF organisé',
+      'tool.organize.downloadSub': 'conserver le contenu original',
+      'tool.edit.label': 'Recadrer/Pivoter',
+      'tool.edit.lede': 'Recadrez et faites pivoter des pages avant export.',
+      'tool.edit.meta': 'Sélectionnez une page à la fois<br/>Faites glisser le cadre de recadrage<br/>Ajustez la rotation avec un curseur fin<br/>Utilisez les boutons 90° pour pivoter',
+      'tool.edit.downloadLabel': 'Exporter le PDF modifié',
+      'tool.edit.downloadSub': 'appliquer recadrages et rotations',
+      'tool.merge.label': 'Fusionner',
+      'tool.merge.lede': 'Fusionnez plusieurs PDF en un document organisé.',
+      'tool.merge.meta': 'Sélectionnez autant de PDF que nécessaire<br/>Réordonnez les fichiers avant fusion<br/>Le résultat s’ouvre dans Organiser',
+      'tool.merge.downloadLabel': 'Fusionner les PDF',
+      'tool.merge.downloadSub': 'combiner les fichiers sélectionnés',
+      'tool.compress.label': 'Compresser',
+      'tool.compress.lede': 'Réduisez la taille du PDF avec des choix simples.',
+      'tool.compress.meta': 'Original conserve le contenu des pages<br/>Équilibré et Petit créent des images de page plus légères<br/>Le verrouillage par mot de passe fonctionne toujours',
+      'tool.compress.downloadLabel': 'Exporter le PDF compressé',
+      'tool.compress.downloadSub': 'réduire la taille du fichier',
+      'tool.threshold.label': 'Seuil',
+      'tool.threshold.lede': 'Convertissez les PDF en noir et blanc avec un seuil réglable.',
+      'tool.threshold.meta': 'Sortie noir et blanc<br/>Dans le navigateur uniquement · aucun envoi<br/>Seuil · 0 → 255',
+      'tool.threshold.downloadLabel': 'Exporter le PDF',
+      'tool.threshold.downloadSub': 'rendre et télécharger toutes les pages',
+      'tool.greyscale.label': 'Gris',
+      'tool.greyscale.lede': 'Convertissez les PDF en niveaux de gris avec luminosité et contraste.',
+      'tool.greyscale.meta': 'Sortie en niveaux de gris<br/>Dans le navigateur uniquement · aucun envoi<br/>Luminosité et contraste',
+      'tool.greyscale.downloadLabel': 'Exporter le PDF en gris',
+      'tool.greyscale.downloadSub': 'rendre et télécharger toutes les pages',
+    },
+  });
 
   function concatBytes(...parts) {
     const length = parts.reduce((sum, part) => sum + part.length, 0);
@@ -1327,7 +2668,7 @@
     const ultra = state.fineRotationQuality === 'ultra';
     fineQualityToggle.classList.toggle('on', ultra);
     fineQualityToggle.setAttribute('aria-pressed', ultra ? 'true' : 'false');
-    fineQualityLabel.textContent = ultra ? 'Ultra · 900 dpi' : 'High · 600 dpi';
+    fineQualityLabel.textContent = ultra ? t('edit.qualityUltra') : t('edit.qualityHigh');
   }
 
   function syncCompressControls() {
@@ -1335,8 +2676,9 @@
     setTogglePressed(compressOriginal, state.compressMode === 'original');
     setTogglePressed(compressBalanced, state.compressMode === 'balanced');
     setTogglePressed(compressSmall, state.compressMode === 'small');
-    compressHint.textContent = preset.hint;
-    compressSummary.textContent = preset.summary;
+    const modeKey = state.compressMode === 'balanced' ? 'Balanced' : state.compressMode === 'small' ? 'Small' : 'Original';
+    compressHint.textContent = t('compress.hint' + modeKey);
+    compressSummary.textContent = t('compress.summary' + modeKey);
   }
 
   function setCompressMode(mode) {
@@ -1392,7 +2734,9 @@
   }
 
   function pageRangeText(start, end) {
-    return start + 1 === end ? 'Page ' + (start + 1) : 'Pages ' + (start + 1) + '-' + end;
+    return start + 1 === end
+      ? t('split.pagesOne', { start: start + 1 })
+      : t('split.pagesMany', { start: start + 1, end });
   }
 
   function updateSplitPanel() {
@@ -1402,11 +2746,14 @@
     clearSplitBtn.disabled = !splitActive;
     splitPartsList.innerHTML = '';
     if (!splitActive) {
-      splitSummary.textContent = 'Use a page Split button in Organize to create a split.';
+      splitSummary.textContent = t('split.useButton');
       return;
     }
-    splitSummary.textContent = parts.length + ' PDFs from ' + state.splitPoints.length + ' split point' +
-      (state.splitPoints.length === 1 ? '.' : 's.');
+    splitSummary.textContent = t('split.summary', {
+      parts: parts.length,
+      points: state.splitPoints.length,
+      pointWord: t(state.splitPoints.length === 1 ? 'split.pointOne' : 'split.pointMany'),
+    });
     parts.forEach(part => {
       const row = document.createElement('div');
       row.className = 'split-part-row';
@@ -1415,7 +2762,7 @@
       top.className = 'split-part-top';
       const label = document.createElement('div');
       label.className = 'split-part-label';
-      label.textContent = 'Part ' + (part.index + 1);
+      label.textContent = t('split.part', { num: part.index + 1 });
       const pages = document.createElement('div');
       pages.className = 'split-part-pages';
       pages.textContent = pageRangeText(part.start, part.end);
@@ -1426,7 +2773,7 @@
       input.className = 'split-name-input';
       input.type = 'text';
       input.value = part.name;
-      input.setAttribute('aria-label', 'Name for part ' + (part.index + 1));
+      input.setAttribute('aria-label', t('split.nameAria', { num: part.index + 1 }));
       input.addEventListener('input', () => {
         state.splitNames[part.index] = input.value;
       });
@@ -1434,7 +2781,7 @@
       const button = document.createElement('button');
       button.className = 'btn-secondary split-export-btn';
       button.type = 'button';
-      button.textContent = 'Export part ' + (part.index + 1);
+      button.textContent = t('split.exportPart', { num: part.index + 1 });
       button.addEventListener('click', () => exportSplitPart(part.index));
 
       row.appendChild(top);
@@ -1466,17 +2813,19 @@
         : !state.pdfDoc || count === 0;
     resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
     organizeHint.textContent = state.pdfDoc
-      ? (state.splitPoints.length ? state.splitPoints.length + ' splits' : count + ' pages')
-      : 'ready';
+      ? (state.splitPoints.length
+        ? t('organize.splits', { count: state.splitPoints.length })
+        : t('organize.pages', { count }))
+      : t('hint.ready');
     organizeSummary.textContent = state.pdfDoc
       ? (state.splitPoints.length
-        ? (state.splitPoints.length + 1) + ' PDFs are ready. Edit names and export each part from the split panel.'
-        : count + ' of ' + state.numPages + ' original pages will be included in export. Use Split on a page to divide the PDF.')
-      : 'Upload a PDF to reorder or remove pages.';
+        ? t('organize.summarySplit', { parts: state.splitPoints.length + 1 })
+        : t('organize.summaryPages', { count, total: state.numPages }))
+      : t('organize.summaryEmpty');
     updateSplitPanel();
     proofMeta.textContent = state.pdfDoc
-      ? (count ? count + ' pages in output' : 'no pages selected')
-      : 'awaiting PDF';
+      ? (count ? t('proof.outputPages', { count }) : t('proof.noPages'))
+      : t('proof.awaiting');
     syncAdvancedOptions();
     updatePreviewMode();
     if (activeTool === 'edit') {
@@ -1501,28 +2850,28 @@
   }
 
   function threshHintText(v) {
-    if (v < 64) return 'low';
-    if (v < 110) return 'dark range';
-    if (v < 145) return 'mid range';
-    if (v < 200) return 'light range';
-    return 'high';
+    if (v < 64) return t('hint.low');
+    if (v < 110) return t('hint.darkRange');
+    if (v < 145) return t('hint.midRange');
+    if (v < 200) return t('hint.lightRange');
+    return t('hint.high');
   }
 
   function contrastHintText(v) {
-    if (v < 80) return 'low';
-    if (v < 95) return 'soft';
-    if (v <= 115) return 'normal';
-    if (v <= 150) return 'high';
-    return 'maximum';
+    if (v < 80) return t('hint.low');
+    if (v < 95) return t('hint.soft');
+    if (v <= 115) return t('hint.normal');
+    if (v <= 150) return t('hint.high');
+    return t('hint.maximum');
   }
 
   function greyHintText() {
-    if (state.sepia) return 'sepia';
-    if (state.greyInvert) return 'inverted';
-    if (state.brightness > 40) return 'bright';
-    if (state.brightness < -40) return 'dark';
-    if (state.contrast > 140) return 'high contrast';
-    return 'neutral';
+    if (state.sepia) return t('hint.sepia');
+    if (state.greyInvert) return t('hint.inverted');
+    if (state.brightness > 40) return t('hint.bright');
+    if (state.brightness < -40) return t('hint.dark');
+    if (state.contrast > 140) return t('hint.highContrast');
+    return t('hint.neutral');
   }
 
   // ── File handling ──
@@ -1545,7 +2894,7 @@
       if (commit) state.fileName = normalizePdfName(input.value);
       else state.fileName = currentName;
       fileNameEl.textContent = state.fileName;
-      fileNameEl.title = 'Click to rename';
+      fileNameEl.title = t('file.renameTitle');
     };
 
     input.addEventListener('keydown', e => {
@@ -1589,18 +2938,18 @@
       up.type = 'button';
       up.textContent = '↑';
       up.disabled = index === 0;
-      up.setAttribute('aria-label', 'Move ' + file.name + ' up');
+      up.setAttribute('aria-label', t('merge.moveUp', { name: file.name }));
       up.addEventListener('click', () => moveMergeFile(index, -1));
       const down = document.createElement('button');
       down.type = 'button';
       down.textContent = '↓';
       down.disabled = index === state.mergeFiles.length - 1;
-      down.setAttribute('aria-label', 'Move ' + file.name + ' down');
+      down.setAttribute('aria-label', t('merge.moveDown', { name: file.name }));
       down.addEventListener('click', () => moveMergeFile(index, 1));
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.textContent = '×';
-      remove.setAttribute('aria-label', 'Remove ' + file.name);
+      remove.setAttribute('aria-label', t('merge.remove', { name: file.name }));
       remove.addEventListener('click', () => removeMergeFile(index));
       actions.appendChild(up);
       actions.appendChild(down);
@@ -1616,10 +2965,14 @@
   function updateMergeState() {
     const count = state.mergeFiles.length;
     const totalSize = state.mergeFiles.reduce((sum, file) => sum + file.size, 0);
-    mergeHint.textContent = count ? count + ' PDFs' : 'ready';
+    mergeHint.textContent = count ? count + ' PDFs' : t('hint.ready');
     mergeSummary.textContent = count
-      ? count + ' PDF' + (count === 1 ? '' : 's') + ' selected · ' + fmtBytes(totalSize) + '. Arrange the list, then merge into Organize.'
-      : 'Choose multiple PDFs, arrange their order, then merge into the organizer.';
+      ? t('merge.summaryActive', {
+        count,
+        pdfWord: t(count === 1 ? 'merge.pdfOne' : 'merge.pdfMany'),
+        size: fmtBytes(totalSize),
+      })
+      : t('merge.summaryEmpty');
     mergeClearBtn.disabled = count === 0;
     mergeRunBtn.disabled = count === 0;
     if (activeTool === 'merge') downloadBtn.disabled = count === 0;
@@ -1631,7 +2984,7 @@
     const files = Array.from(fileList).filter(file =>
       file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
     if (!files.length) {
-      showError('Choose one or more PDF files to merge.');
+      showError(t('errors.chooseMerge'));
       return;
     }
     state.mergeFiles.push(...files);
@@ -1654,7 +3007,7 @@
   async function mergeSelectedPdfs() {
     clearError();
     if (!state.mergeFiles.length) {
-      showError('Choose at least one PDF to merge.');
+      showError(t('errors.chooseMerge'));
       return;
     }
     mergeRunBtn.disabled = true;
@@ -1719,10 +3072,10 @@
     state.fileName = normalizePdfName(fileName);
     state.fileSize = fileSize;
     fileNameEl.textContent = state.fileName;
-    fileNameEl.title = 'Click to rename';
+    fileNameEl.title = t('file.renameTitle');
     fileNameEl.tabIndex = 0;
     fileSizeEl.textContent = fmtBytes(fileSize);
-    fileStatusEl.textContent = 'loading';
+    fileStatusEl.textContent = t('status.loading');
     fileCard.classList.add('on');
     setLoader(true, loadingLabel, 0);
     state.pdfBytes = buf.slice(0);
@@ -1748,7 +3101,7 @@
         await renderPageToLuminance(i);
       }
     }
-    fileStatusEl.textContent = state.largePdfSafeMode ? 'ready · safe' : 'ready';
+    fileStatusEl.textContent = state.largePdfSafeMode ? t('status.readySafe') : t('status.ready');
     downloadBtn.disabled = false;
     zoomLevel = 1;
     zoomInBtn.disabled = false;
@@ -1763,14 +3116,14 @@
   async function handleFile(file) {
     clearError();
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      showError('That doesn’t look like a PDF.'); return;
+      showError(t('errors.notPdf')); return;
     }
     try {
       await loadPdfBytes(await file.arrayBuffer(), file.name, file.size);
     } catch (err) {
       console.error(err);
       showError('Could not read this PDF: ' + (err.message || err));
-      fileStatusEl.textContent = 'error';
+      fileStatusEl.textContent = t('status.error');
       setLoader(false);
     }
   }
@@ -1784,6 +3137,17 @@
 
   function getPreviewRenderScale(baseVp) {
     return Math.min(2.5, 2200 / Math.max(baseVp.width, baseVp.height));
+  }
+
+  function isOriginalPreviewTool(id = activeTool) {
+    return id === 'preview' || id === 'merge' || id === 'compress';
+  }
+
+  function getOriginalPreviewScale(baseVp, targetCssWidth) {
+    const basePixels = Math.max(1, baseVp.width * baseVp.height);
+    const fitScale = Math.max(0.1, (targetCssWidth || baseVp.width) * Math.max(1, devicePixelRatio || 1) / baseVp.width);
+    const memoryScale = Math.sqrt(ORIGINAL_PREVIEW_MAX_PIXELS / basePixels);
+    return Math.max(getPreviewRenderScale(baseVp), Math.min(fitScale, memoryScale));
   }
 
   function getRasterPreviewScale(baseVp) {
@@ -1804,6 +3168,9 @@
       w: Math.floor(vp.width),
       h: Math.floor(vp.height),
       scale,
+      baseW: baseVp.width,
+      baseH: baseVp.height,
+      previewQualityScale: existing?.previewQualityScale || 0,
       lum: existing?.lum || null,
       histo: existing?.histo || null,
       thumbUrl: existing?.thumbUrl || null,
@@ -2052,24 +3419,89 @@
 
   let originalPreviewRenderToken = 0;
   let processedPreviewRenderToken = 0;
+  let originalPreviewUpgradeTimer = null;
 
   async function renderOriginalPreview(pd, sourceIndex) {
     const token = ++originalPreviewRenderToken;
-    previewCanvas.width = pd.w;
-    previewCanvas.height = pd.h;
-    const ctx = previewCanvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+    if (originalPreviewUpgradeTimer) {
+      clearTimeout(originalPreviewUpgradeTimer);
+      originalPreviewUpgradeTimer = null;
+    }
     try {
-      const page = await state.pdfDoc.getPage(sourceIndex + 1);
-      if (token !== originalPreviewRenderToken || (activeTool !== 'preview' && activeTool !== 'merge')) return;
-      const viewport = page.getViewport({ scale: pd.scale });
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      if (token === originalPreviewRenderToken && (activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress')) applyZoom();
+      await renderOriginalPreviewPass(pd, sourceIndex, pd.scale, token, false);
+      if (token === originalPreviewRenderToken && isOriginalPreviewTool()) {
+        applyZoom();
+        queueOriginalPreviewUpgrade(sourceIndex, token);
+      }
     } catch (err) {
       console.error(err);
       showError('Preview failed: ' + (err.message || err));
     }
+  }
+
+  async function renderOriginalPreviewPass(pd, sourceIndex, scale, token, highQuality) {
+    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    if (token !== originalPreviewRenderToken || !isOriginalPreviewTool()) return false;
+    const viewport = page.getViewport({ scale });
+    const nextW = Math.max(1, Math.floor(viewport.width));
+    const nextH = Math.max(1, Math.floor(viewport.height));
+    const tmp = highQuality ? document.createElement('canvas') : previewCanvas;
+    tmp.width = nextW;
+    tmp.height = nextH;
+    const ctx = tmp.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, tmp.width, tmp.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    if (token !== originalPreviewRenderToken || !isOriginalPreviewTool()) {
+      if (highQuality) { tmp.width = 0; tmp.height = 0; }
+      return false;
+    }
+    if (highQuality) {
+      previewCanvas.width = tmp.width;
+      previewCanvas.height = tmp.height;
+      previewCanvas.getContext('2d').drawImage(tmp, 0, 0);
+      tmp.width = 0;
+      tmp.height = 0;
+    }
+    const updated = {
+      ...pd,
+      w: nextW,
+      h: nextH,
+      scale,
+      previewQualityScale: highQuality ? scale : (pd.previewQualityScale || scale),
+      metaKey: PREVIEW_META_KEY,
+    };
+    state.pages[sourceIndex] = updated;
+    if (sourceIndex === currentSourceIndex()) {
+      proofMeta.textContent = nextW + ' × ' + nextH + ' px · page ' + state.curPage + '/' + activePageCount();
+    }
+    return true;
+  }
+
+  function queueOriginalPreviewUpgrade(sourceIndex, token) {
+    originalPreviewUpgradeTimer = setTimeout(async () => {
+      originalPreviewUpgradeTimer = null;
+      if (token !== originalPreviewRenderToken || !isOriginalPreviewTool() || sourceIndex !== currentSourceIndex()) return;
+      const pd = state.pages[sourceIndex];
+      if (!pd) return;
+      const baseVp = {
+        width: pd.baseW || (pd.w / pd.scale),
+        height: pd.baseH || (pd.h / pd.scale),
+      };
+      const cssWidth = parseFloat(previewCanvas.style.width) || getFitCanvasWidth(pd) * zoomLevel;
+      const targetScale = getOriginalPreviewScale(baseVp, cssWidth);
+      if (targetScale <= (pd.scale || 0) * 1.12) return;
+      try {
+        const center = getScrollCenter();
+        const rendered = await renderOriginalPreviewPass(pd, sourceIndex, targetScale, token, true);
+        if (rendered && token === originalPreviewRenderToken && isOriginalPreviewTool() && sourceIndex === currentSourceIndex()) {
+          applyZoom({ preserveCenter: false });
+          if (zoomLevel > 1.001) requestAnimationFrame(() => restoreScrollCenter(center));
+        }
+      } catch (err) {
+        console.warn('High quality preview failed', err);
+      }
+    }, 120);
   }
 
   async function drawPreview() {
@@ -2169,12 +3601,12 @@
   }
 
   function editedLabel(edit) {
-    if (!isPageEdited(edit)) return 'Original';
+    if (!isPageEdited(edit)) return t('compress.original');
     const parts = [];
     const angle = editAngle(edit);
     if (Math.abs(angle) > 0.001) parts.push((Math.round(angle * 10) / 10) + '°');
     const cropTotal = edit.crop.left + edit.crop.top + edit.crop.right + edit.crop.bottom;
-    if (cropTotal) parts.push('crop');
+    if (cropTotal) parts.push(t('edit.cropFrame'));
     return parts.join(' · ');
   }
 
@@ -2186,7 +3618,7 @@
     pageEditorCanvasWrap.style.display = state.pdfDoc && count ? 'block' : 'none';
     pageEditorBottom.style.display = state.pdfDoc && count ? 'flex' : 'none';
     if (!state.pdfDoc || count === 0) {
-      pageEditorEmpty.textContent = 'Upload a PDF to crop or rotate pages.';
+      pageEditorEmpty.textContent = t('empty.edit');
       cropOverlay.hidden = true;
       return;
     }
@@ -2236,10 +3668,10 @@
     const total = edit.crop.left + edit.crop.top + edit.crop.right + edit.crop.bottom;
     const retainedW = Math.max(0, 100 - edit.crop.left - edit.crop.right);
     const retainedH = Math.max(0, 100 - edit.crop.top - edit.crop.bottom);
-    cropHint.textContent = total ? roundCropValue(total) + '% total' : '0%';
+    cropHint.textContent = total ? t('edit.cropTotal', { total: roundCropValue(total) }) : '0%';
     cropReadout.textContent = total
-      ? roundCropValue(retainedW) + '% × ' + roundCropValue(retainedH) + '% kept'
-      : 'Full page';
+      ? t('edit.cropKept', { w: roundCropValue(retainedW), h: roundCropValue(retainedH) })
+      : t('edit.fullPage');
     updateCropOverlay();
   }
 
@@ -2250,16 +3682,16 @@
     bottomRotateLeftBtn.disabled = !hasPages;
     bottomRotateRightBtn.disabled = !hasPages;
     resetEditBtn.disabled = !hasPages || !isPageEdited(currentPageEdit());
-    editHint.textContent = hasPages ? 'page ' + state.curPage : 'select page';
+    editHint.textContent = hasPages ? t('edit.pageHint', { page: state.curPage }) : t('edit.selectPage');
     editSummary.textContent = hasPages
-      ? 'Editing page ' + state.curPage + ' of ' + activePageCount() + '. Changes apply only to this page.'
-      : 'Upload a PDF, then choose a page from the editor to crop or rotate it.';
+      ? t('edit.summaryActive', { page: state.curPage, count: activePageCount() })
+      : t('edit.summaryEmpty');
     editRotateSlider.disabled = !hasPages;
     bottomRotateSlider.disabled = !hasPages;
     cropOverlay.hidden = !hasPages;
     if (!hasPages) {
       cropHint.textContent = '0%';
-      cropReadout.textContent = 'Full page';
+      cropReadout.textContent = t('edit.fullPage');
       return;
     }
     const edit = currentPageEdit();
@@ -2637,8 +4069,8 @@
     const count = activePageCount();
     organizerEmpty.classList.toggle('on', !state.pdfDoc || count === 0);
     organizerEmpty.textContent = state.pdfDoc
-      ? 'All pages have been removed. Restore the original order to continue.'
-      : 'Upload a PDF to organize pages.';
+      ? t('empty.organizeRemoved')
+      : t('empty.organize');
     if (!state.pdfDoc || count === 0) return;
 
     const isDragging = organizerDrag.active;
@@ -2695,11 +4127,11 @@
       split.type = 'button';
       split.className = 'page-split-toggle';
       split.disabled = !canSplit;
-      split.textContent = 'Split';
+      split.textContent = t('split.button');
       split.setAttribute('aria-pressed', splitExists ? 'true' : 'false');
       split.setAttribute('aria-label', canSplit
-        ? (splitExists ? 'Remove split after original page ' : 'Split after original page ') + (sourceIndex + 1)
-        : 'Cannot split after the final page');
+        ? t(splitExists ? 'split.removeAfterOriginal' : 'split.afterOriginal', { num: sourceIndex + 1 })
+        : t('split.cannotFinal'));
       split.addEventListener('pointerdown', e => e.stopPropagation());
       split.addEventListener('click', e => {
         e.stopPropagation();
@@ -2726,11 +4158,11 @@
     divider.dataset.splitIndex = splitIndex;
     const label = document.createElement('span');
     label.className = 'page-split-label';
-    label.append('Split ' + (splitIndex + 1));
+    label.append(t('split.part', { num: splitIndex + 1 }));
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'page-split-remove';
-    remove.setAttribute('aria-label', 'Remove split ' + (splitIndex + 1));
+    remove.setAttribute('aria-label', t('split.removeAria', { num: splitIndex + 1 }));
     remove.textContent = '×';
     remove.addEventListener('pointerdown', e => e.stopPropagation());
     remove.addEventListener('click', e => {
@@ -3051,7 +4483,7 @@
     const part = splitParts()[partIndex];
     if (!part || !part.pageOrder.length) return;
     if (advancedPasswordToggle.checked && canPasswordProtectExport('split') && !advancedPasswordValue()) {
-      showError('Enter a password before exporting a locked PDF.');
+      showError(t('errors.password'));
       advancedPasswordInput.focus();
       return;
     }
@@ -3199,7 +4631,7 @@
     const v = +e.target.value;
     state.brightness = v;
     brightNum.textContent = v > 0 ? '+' + v : String(v);
-    brightTag.textContent = v < -50 ? 'dark' : v < -10 ? 'reduced' : v <= 10 ? 'neutral' : v <= 50 ? 'bright' : 'maximum';
+    brightTag.textContent = brightnessHintText(v);
     $('greyHint').textContent = greyHintText();
     if (state.pdfDoc) requestPreviewRender(false);
   });
@@ -3376,7 +4808,7 @@
     }
     if (!state.pdfDoc || activePageCount() === 0) return;
     if (advancedPasswordToggle.checked && canPasswordProtectExport() && !advancedPasswordValue()) {
-      showError('Enter a password before exporting a locked PDF.');
+      showError(t('errors.password'));
       advancedPasswordInput.focus();
       return;
     }
@@ -3568,6 +5000,9 @@
     previewStage.classList.toggle('zoomed', isZoomedIn);
     previewCanvas.style.width = (getFitCanvasWidth(pd) * z) + 'px';
     previewCanvas.style.height = 'auto';
+    if (isOriginalPreviewTool() && previewCanvas.width && currentSourceIndex() != null) {
+      queueOriginalPreviewUpgrade(currentSourceIndex(), originalPreviewRenderToken);
+    }
 
     requestAnimationFrame(() => {
       if (isZoomedIn) restoreScrollCenter(center);
@@ -3663,6 +5098,9 @@
     document.body.classList.add('title-condensed');
     syncPreviewStageHeight();
   }, 1000);
+  currentLocale = readSavedLocale();
+  applyStaticLocale();
+  applyToolLocale();
   setDarkMode(readSavedTheme() === 'dark');
   syncPreviewStageHeight();
   syncToolTabA11y();
@@ -3677,6 +5115,7 @@
   syncResolutionToggles();
   syncCompressControls();
   syncFineQualityToggle();
+  syncToneLabels();
   syncEditControls();
   updatePreviewMode();
   updateToolIndicator();

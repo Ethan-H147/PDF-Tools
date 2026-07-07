@@ -445,8 +445,36 @@
   .loader .bar > div { height: 100%; background: var(--ink); width: 0%; transition: width .25s; }
 
   /* ── FOOTER ── */
-  footer { display: flex; justify-content: space-between; align-items: baseline; margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--ink); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute); }
+  footer { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--ink); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute); flex-wrap: wrap; }
   footer em { font-family: 'Bodoni Moda', serif; font-style: italic; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--ink-soft); }
+
+  .language-switcher {
+    align-items: center;
+    display: flex;
+    flex: 1 1 360px;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .language-switcher button {
+    appearance: none;
+    background: none;
+    border: 0;
+    color: var(--ink-mute);
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: 0;
+    padding: 0;
+    transition: color .16s;
+    white-space: nowrap;
+  }
+
+  .language-switcher button:hover,
+  .language-switcher button[aria-pressed="true"] {
+    color: var(--ink-soft);
+  }
 
   .err { margin-top: 12px; padding: 10px 12px; border-left: 3px solid var(--accent); background: rgba(138,29,24,0.08); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-soft); display: none; }
   .err.on { display: block; }
@@ -956,6 +984,13 @@
 
   footer em {
     color: var(--ink-mute);
+  }
+
+  .language-switcher button {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: none;
   }
 
   .theme-toggle {
@@ -2214,6 +2249,11 @@
   body.dark-mode .advanced-toggle:hover,
   body.dark-mode .theme-toggle:hover {
     background: #303033;
+  }
+
+  body.dark-mode .language-switcher button:hover,
+  body.dark-mode .language-switcher button[aria-pressed="true"] {
+    color: var(--ink);
   }
 
   body.dark-mode .tool-indicator,

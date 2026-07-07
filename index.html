@@ -31,7 +31,7 @@ Ethan Hu -->
 
   <header class="masthead">
     <h1 class="title">PDF<em> Atelier</em></h1>
-    <div class="title-sub">PDF Tools</div>
+    <div class="title-sub" data-i18n="brand.subtitle">PDF Tools</div>
     <div class="subhead">
       <div class="lede" id="masterLede">
         View a PDF cleanly with fast page navigation and zoom.
@@ -41,29 +41,29 @@ Ethan Hu -->
   </header>
 
   <!-- TOOL NAVIGATION -->
-  <nav class="tool-nav" role="tablist" aria-label="PDF tools">
-    <div class="tool-nav-label" role="presentation" aria-hidden="true">Tools</div>
+  <nav class="tool-nav" role="tablist" aria-label="PDF tools" data-i18n-aria-label="nav.toolsAria">
+    <div class="tool-nav-label" role="presentation" aria-hidden="true" data-i18n="nav.tools">Tools</div>
     <div class="tool-indicator" id="toolIndicator" role="presentation" aria-hidden="true"></div>
     <div class="tool-tab active" id="tab-preview" data-tool="preview" role="tab" aria-selected="true" aria-controls="tool-preview" tabindex="0">
-      <span class="tab-num">I.</span> Preview
+      <span class="tab-num">I.</span> <span data-tool-label="preview">Preview</span>
     </div>
     <div class="tool-tab" id="tab-organize" data-tool="organize" role="tab" aria-selected="false" aria-controls="tool-organize" tabindex="-1">
-      <span class="tab-num">II.</span> Organize
+      <span class="tab-num">II.</span> <span data-tool-label="organize">Organize</span>
     </div>
     <div class="tool-tab" id="tab-edit" data-tool="edit" role="tab" aria-selected="false" aria-controls="tool-edit" tabindex="-1">
-      <span class="tab-num">III.</span> Crop/Rotate
+      <span class="tab-num">III.</span> <span data-tool-label="edit">Crop/Rotate</span>
     </div>
     <div class="tool-tab" id="tab-merge" data-tool="merge" role="tab" aria-selected="false" aria-controls="tool-merge" tabindex="-1">
-      <span class="tab-num">IV.</span> Merge
+      <span class="tab-num">IV.</span> <span data-tool-label="merge">Merge</span>
     </div>
     <div class="tool-tab" id="tab-compress" data-tool="compress" role="tab" aria-selected="false" aria-controls="tool-compress" tabindex="-1">
-      <span class="tab-num">V.</span> Compress
+      <span class="tab-num">V.</span> <span data-tool-label="compress">Compress</span>
     </div>
     <div class="tool-tab" id="tab-threshold" data-tool="threshold" role="tab" aria-selected="false" aria-controls="tool-threshold" tabindex="-1">
-      <span class="tab-num">VI.</span> Threshold
+      <span class="tab-num">VI.</span> <span data-tool-label="threshold">Threshold</span>
     </div>
     <div class="tool-tab" id="tab-greyscale" data-tool="greyscale" role="tab" aria-selected="false" aria-controls="tool-greyscale" tabindex="-1">
-      <span class="tab-num">VII.</span> Grayscale
+      <span class="tab-num">VII.</span> <span data-tool-label="greyscale">Grayscale</span>
     </div>
   </nav>
 
@@ -71,7 +71,7 @@ Ethan Hu -->
     <section class="panel panel-left">
 
       <!-- SHARED: Source -->
-      <div class="section-label"><span>I. Source PDF</span><span>—</span></div>
+      <div class="section-label"><span data-i18n="sections.source">I. Source PDF</span><span>—</span></div>
       <div class="drop" id="dropZone" role="button" tabindex="0" aria-label="Upload a PDF">
         <div class="glyph" id="dropGlyph">¶</div>
         <div class="lbl" id="dropLabel">Upload PDF</div>
@@ -83,9 +83,9 @@ Ethan Hu -->
       <div class="filecard" id="fileCard">
         <div class="name" id="fileName">—</div>
         <div class="stats">
-          <span>Pages <b id="pageCount">—</b></span>
-          <span>Size <b id="fileSize">—</b></span>
-          <span>Status <b id="fileStatus" role="status" aria-live="polite" aria-atomic="true">ready</b></span>
+          <span><span data-i18n="file.pages">Pages</span> <b id="pageCount">—</b></span>
+          <span><span data-i18n="file.size">Size</span> <b id="fileSize">—</b></span>
+          <span><span data-i18n="file.status">Status</span> <b id="fileStatus" role="status" aria-live="polite" aria-atomic="true">ready</b></span>
         </div>
       </div>
 
@@ -95,28 +95,28 @@ Ethan Hu -->
       <!-- ═══ ORGANIZE PANEL ═══ -->
       <div class="tool-panel" id="tool-organize" role="tabpanel" aria-labelledby="tab-organize" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span>II. Organize Pages</span><span id="organizeHint">ready</span></div>
+          <div class="section-label"><span data-i18n="sections.organize">II. Organize Pages</span><span id="organizeHint">ready</span></div>
           <div class="organize-summary" id="organizeSummary">Upload a PDF to reorder or remove pages.</div>
           <div class="split-panel" id="splitPanel" hidden>
             <div class="split-panel-head">
-              <span>Split Export</span>
-              <button type="button" id="clearSplitBtn">Clear</button>
+              <span data-i18n="split.title">Split Export</span>
+              <button type="button" id="clearSplitBtn" data-i18n="actions.clear">Clear</button>
             </div>
             <div class="split-summary" id="splitSummary">Choose a split point.</div>
             <div class="split-parts-list" id="splitPartsList"></div>
           </div>
-          <button class="btn-secondary" id="resetPagesBtn" disabled>Restore original order</button>
+          <button class="btn-secondary" id="resetPagesBtn" disabled data-i18n="actions.restoreOrder">Restore original order</button>
         </div>
       </div>
 
       <!-- ═══ CROP / ROTATE PANEL ═══ -->
       <div class="tool-panel" id="tool-edit" role="tabpanel" aria-labelledby="tab-edit" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span>II. Crop & Rotate</span><span id="editHint">select page</span></div>
+          <div class="section-label"><span data-i18n="sections.cropRotate">II. Crop & Rotate</span><span id="editHint">select page</span></div>
           <div class="organize-summary" id="editSummary">Upload a PDF, then choose a page from the editor to crop or rotate it.</div>
           <div class="edit-controls">
             <div class="edit-control-head">
-              <span>Fine Rotation</span>
+              <span data-i18n="edit.fineRotation">Fine Rotation</span>
               <b id="editRotateNum">0.0°</b>
             </div>
             <input type="range" min="-5" max="5" value="0" step="0.1" class="slider edit-slider" id="editRotateSlider">
@@ -128,31 +128,31 @@ Ethan Hu -->
           </div>
           <div class="edit-controls">
             <div class="edit-control-head">
-              <span>Crop Frame</span>
+              <span data-i18n="edit.cropFrame">Crop Frame</span>
               <b id="cropHint">0%</b>
             </div>
             <div class="crop-readout" id="cropReadout">Full page</div>
           </div>
           <div class="quality-toggle">
             <div class="quality-copy">
-              <span>Fine Rotation Quality</span>
+              <span data-i18n="edit.fineRotationQuality">Fine Rotation Quality</span>
               <b id="fineQualityLabel">High · 600 dpi</b>
             </div>
-            <button type="button" class="circle-switch" id="fineQualityToggle" aria-label="Use ultra 900 dpi for fine rotation export" aria-pressed="false"></button>
+            <button type="button" class="circle-switch" id="fineQualityToggle" aria-label="Use ultra 900 dpi for fine rotation export" data-i18n-aria-label="edit.fineQualityAria" aria-pressed="false"></button>
           </div>
-          <button class="btn-secondary" id="resetEditBtn" disabled>Reset selected page</button>
+          <button class="btn-secondary" id="resetEditBtn" disabled data-i18n="actions.resetSelectedPage">Reset selected page</button>
         </div>
       </div>
 
       <!-- ═══ MERGE PANEL ═══ -->
       <div class="tool-panel" id="tool-merge" role="tabpanel" aria-labelledby="tab-merge" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span>II. Merge PDFs</span><span id="mergeHint">ready</span></div>
+          <div class="section-label"><span data-i18n="sections.merge">II. Merge PDFs</span><span id="mergeHint">ready</span></div>
           <div class="organize-summary" id="mergeSummary">Choose multiple PDFs, arrange their order, then merge into the organizer.</div>
           <div class="merge-list" id="mergeList"></div>
           <div class="merge-actions">
-            <button class="btn-secondary" id="mergeClearBtn" disabled>Clear list</button>
-            <button class="btn-secondary btn-secondary-accent" id="mergeRunBtn" disabled>Merge into Organize</button>
+            <button class="btn-secondary" id="mergeClearBtn" disabled data-i18n="actions.clearList">Clear list</button>
+            <button class="btn-secondary btn-secondary-accent" id="mergeRunBtn" disabled data-i18n="actions.mergeIntoOrganize">Merge into Organize</button>
           </div>
         </div>
       </div>
@@ -160,12 +160,12 @@ Ethan Hu -->
       <!-- ═══ COMPRESS PANEL ═══ -->
       <div class="tool-panel" id="tool-compress" role="tabpanel" aria-labelledby="tab-compress" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span>II. Compress PDF</span><span id="compressHint">original</span></div>
+          <div class="section-label"><span data-i18n="sections.compress">II. Compress PDF</span><span id="compressHint">original</span></div>
           <div class="organize-summary" id="compressSummary">Compact the PDF while keeping original page content.</div>
           <div class="toggles compress-options">
-            <div class="toggle on" id="compressOriginal" role="button" tabindex="0" aria-pressed="true">Original</div>
-            <div class="toggle" id="compressBalanced" role="button" tabindex="0" aria-pressed="false">Balanced</div>
-            <div class="toggle" id="compressSmall" role="button" tabindex="0" aria-pressed="false">Small</div>
+            <div class="toggle on" id="compressOriginal" role="button" tabindex="0" aria-pressed="true" data-i18n="compress.original">Original</div>
+            <div class="toggle" id="compressBalanced" role="button" tabindex="0" aria-pressed="false" data-i18n="compress.balanced">Balanced</div>
+            <div class="toggle" id="compressSmall" role="button" tabindex="0" aria-pressed="false" data-i18n="compress.small">Small</div>
           </div>
         </div>
       </div>
@@ -173,7 +173,7 @@ Ethan Hu -->
       <!-- ═══ THRESHOLD PANEL ═══ -->
       <div class="tool-panel" id="tool-threshold" role="tabpanel" aria-labelledby="tab-threshold" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span>II. Threshold</span><span id="threshHint">mid range</span></div>
+          <div class="section-label"><span data-i18n="sections.threshold">II. Threshold</span><span id="threshHint">mid range</span></div>
           <div class="big-display">
             <span class="num" id="threshNum">128</span>
             <span class="denom">/255</span>
@@ -185,11 +185,11 @@ Ethan Hu -->
           </div>
           <input type="range" min="0" max="255" value="128" class="slider" id="threshSlider">
           <div class="slider-tags">
-            <span>0 · white</span>
-            <span>255 · black</span>
+            <span data-i18n="threshold.whiteTag">0 · white</span>
+            <span data-i18n="threshold.blackTag">255 · black</span>
           </div>
           <div class="toggles">
-            <div class="toggle" id="invertToggle" role="button" tabindex="0" aria-pressed="false">↻ Invert</div>
+            <div class="toggle" id="invertToggle" role="button" tabindex="0" aria-pressed="false"><span aria-hidden="true">↻</span> <span data-i18n="actions.invert">Invert</span></div>
           </div>
         </div>
       </div>
@@ -197,16 +197,16 @@ Ethan Hu -->
       <!-- ═══ GREYSCALE PANEL ═══ -->
       <div class="tool-panel" id="tool-greyscale" role="tabpanel" aria-labelledby="tab-greyscale" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span>II. Grayscale</span><span id="greyHint">neutral</span></div>
+          <div class="section-label"><span data-i18n="sections.greyscale">II. Grayscale</span><span id="greyHint">neutral</span></div>
 
           <div class="grey-row">
             <div class="big-display">
               <span class="num md" id="brightNum">0</span>
-              <span class="denom">brightness</span>
+              <span class="denom" data-i18n="greyscale.brightness">brightness</span>
               <span class="tag" id="brightTag">neutral</span>
             </div>
             <input type="range" min="-100" max="100" value="0" class="slider" id="brightSlider">
-            <div class="slider-tags"><span>−100 · dark</span><span>+100 · light</span></div>
+            <div class="slider-tags"><span data-i18n="greyscale.darkTag">−100 · dark</span><span data-i18n="greyscale.lightTag">+100 · light</span></div>
           </div>
 
           <div class="grey-row">
@@ -216,28 +216,28 @@ Ethan Hu -->
               <span class="tag" id="contrastTag">normal</span>
             </div>
             <input type="range" min="50" max="200" value="100" class="slider" id="contrastSlider">
-            <div class="slider-tags"><span>50% · low</span><span>200% · high</span></div>
+            <div class="slider-tags"><span data-i18n="greyscale.lowTag">50% · low</span><span data-i18n="greyscale.highTag">200% · high</span></div>
           </div>
 
           <div class="toggles">
-            <div class="toggle" id="greyInvertToggle" role="button" tabindex="0" aria-pressed="false">↻ Invert</div>
-            <div class="toggle" id="sepiaToggle" role="button" tabindex="0" aria-pressed="false">◈ Sepia</div>
+            <div class="toggle" id="greyInvertToggle" role="button" tabindex="0" aria-pressed="false"><span aria-hidden="true">↻</span> <span data-i18n="actions.invert">Invert</span></div>
+            <div class="toggle" id="sepiaToggle" role="button" tabindex="0" aria-pressed="false"><span aria-hidden="true">◈</span> <span data-i18n="actions.sepia">Sepia</span></div>
           </div>
         </div>
       </div>
 
       <!-- SHARED: Pages -->
-      <div class="section-label" style="margin-top:26px"><span>III. Pages</span><span>—</span></div>
+      <div class="section-label" style="margin-top:26px"><span data-i18n="sections.pages">III. Pages</span><span>—</span></div>
       <div class="pagenav">
         <button id="prevPage" disabled>‹</button>
-        <div class="num">Page <b id="curPage">—</b> / <b id="totPage">—</b></div>
+        <div class="num"><span data-i18n="file.pagePrefix">Page </span><b id="curPage">—</b> / <b id="totPage">—</b><span data-i18n="file.pageSuffix"></span></div>
         <button id="nextPage" disabled>›</button>
       </div>
 
       <!-- SHARED: Download -->
       <div class="actions">
         <div class="toggles resolution-options hidden" id="resolutionOptions" style="margin-bottom:14px">
-          <div class="toggle" id="resFast" role="button" tabindex="0" aria-pressed="false">Fast</div>
+          <div class="toggle" id="resFast" role="button" tabindex="0" aria-pressed="false" data-i18n="resolution.fast">Fast</div>
           <div class="toggle" id="res300" role="button" tabindex="0" aria-pressed="false">300 dpi</div>
           <div class="toggle on" id="res600" role="button" tabindex="0" aria-pressed="true">600 dpi</div>
         </div>
@@ -247,31 +247,31 @@ Ethan Hu -->
         </button>
         <div class="advanced-options hidden" id="advancedOptions">
           <button class="advanced-toggle" id="advancedToggle" type="button" aria-expanded="false" aria-controls="advancedPanel">
-            <span>Advanced options</span>
+            <span data-i18n="advanced.title">Advanced options</span>
             <span class="advanced-chevron" aria-hidden="true"></span>
           </button>
           <div class="advanced-panel" id="advancedPanel" hidden>
             <label class="advanced-row">
               <input id="advancedCurrentOnly" type="checkbox">
               <span>
-                <b>Current page only</b>
-                <small>Export just the selected page.</small>
+                <b data-i18n="advanced.currentOnly">Current page only</b>
+                <small data-i18n="advanced.currentOnlySub">Export just the selected page.</small>
               </span>
             </label>
             <label class="advanced-row" id="advancedRangeRow">
               <input id="advancedRangeToggle" type="checkbox">
               <span>
-                <b>Page range</b>
+                <b data-i18n="advanced.pageRange">Page range</b>
               </span>
             </label>
             <input class="advanced-text-input" id="advancedRangeInput" type="text" placeholder="1-3, 8, 12-15" inputmode="text" disabled>
             <label class="advanced-row" id="advancedPasswordRow">
               <input id="advancedPasswordToggle" type="checkbox">
               <span>
-                <b>Password lock</b>
+                <b data-i18n="advanced.passwordLock">Password lock</b>
               </span>
             </label>
-            <input class="advanced-password" id="advancedPasswordInput" type="password" placeholder="Password" autocomplete="new-password" disabled>
+            <input class="advanced-password" id="advancedPasswordInput" type="password" placeholder="Password" data-i18n-placeholder="advanced.passwordPlaceholder" autocomplete="new-password" disabled>
           </div>
         </div>
       </div>
@@ -293,8 +293,8 @@ Ethan Hu -->
       </div>
       <div class="preview-stage" id="previewStage">
         <div class="empty" id="emptyState">
-          <div class="big">No preview yet</div>
-          <div class="small">Upload a PDF to begin</div>
+          <div class="big" data-i18n="empty.noPreview">No preview yet</div>
+          <div class="small" data-i18n="empty.uploadToBegin">Upload a PDF to begin</div>
         </div>
         <div class="preview-canvas-wrap" id="canvasWrap" style="display:none">
           <canvas id="previewCanvas"></canvas>
@@ -348,13 +348,22 @@ Ethan Hu -->
   </main>
 
   <footer>
-    <span>Set in SF Pro / Inter</span>
-    <em>Client-side PDF processing</em>
+    <span data-i18n="footer.type">Set in SF Pro / Inter</span>
+    <em data-i18n="footer.clientSide">Client-side PDF processing</em>
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="Turn on dark mode" aria-pressed="false">
       <span id="themeToggleText">Dark mode</span>
       <span class="theme-toggle-track" aria-hidden="true"><span class="theme-toggle-thumb"></span></span>
     </button>
-    <span>Runs entirely in your browser</span>
+    <div class="language-switcher" id="languageSwitcher" aria-label="Language">
+      <button type="button" data-lang="en" aria-pressed="true">English</button>
+      <button type="button" data-lang="zh-Hans" aria-pressed="false">简体中文</button>
+      <button type="button" data-lang="zh-Hant-TW" aria-pressed="false">繁體中文（台灣）</button>
+      <button type="button" data-lang="ko" aria-pressed="false">한국어</button>
+      <button type="button" data-lang="ja" aria-pressed="false">日本語</button>
+      <button type="button" data-lang="es" aria-pressed="false">Español</button>
+      <button type="button" data-lang="fr" aria-pressed="false">Français</button>
+    </div>
+    <span data-i18n="footer.local">Runs entirely in your browser</span>
   </footer>
 
 </div>
