@@ -416,6 +416,20 @@ Ethan Hu -->
     --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
 
+  body.dark-mode {
+    --paper: #111113;
+    --paper-2: #1c1c1e;
+    --ink: #f5f5f7;
+    --ink-soft: #e8e8ed;
+    --ink-mute: #a1a1a6;
+    --accent-soft: rgba(0, 113, 227, 0.18);
+    --line: rgba(255, 255, 255, 0.14);
+    --line-strong: rgba(255, 255, 255, 0.24);
+    --shadow-soft: 0 18px 55px rgba(0, 0, 0, 0.46);
+    --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.34);
+    color-scheme: dark;
+  }
+
   * { letter-spacing: 0 !important; }
 
   html, body {
@@ -426,6 +440,13 @@ Ethan Hu -->
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
+  }
+
+  body.dark-mode {
+    background:
+      radial-gradient(circle at 50% -20%, rgba(78, 78, 82, 0.32), rgba(17, 17, 19, 0) 34%),
+      var(--paper);
+    color: var(--ink);
   }
 
   body::before { display: none; }
@@ -483,6 +504,7 @@ Ethan Hu -->
     box-shadow: var(--shadow-soft);
     padding: 22px 28px;
     backdrop-filter: blur(22px) saturate(1.3);
+    transition: padding .85s cubic-bezier(.2, .8, .2, 1), border-radius .85s cubic-bezier(.2, .8, .2, 1), box-shadow .85s cubic-bezier(.2, .8, .2, 1);
   }
 
   .kicker,
@@ -493,11 +515,24 @@ Ethan Hu -->
   h1.title {
     font-weight: 800;
     letter-spacing: 0 !important;
+    transition: font-size .85s cubic-bezier(.2, .8, .2, 1), line-height .85s cubic-bezier(.2, .8, .2, 1), margin .85s cubic-bezier(.2, .8, .2, 1);
   }
 
   h1.title em {
     color: var(--accent);
     font-weight: 600;
+  }
+
+  body.title-condensed header.masthead {
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    padding: 18px 24px;
+  }
+
+  body.title-condensed h1.title {
+    font-size: clamp(31px, 4vw, 48px);
+    line-height: 1.02;
+    margin: 12px 0 4px;
   }
 
   .title-sub,
@@ -869,6 +904,160 @@ Ethan Hu -->
     color: var(--ink-mute);
   }
 
+  .theme-toggle {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.74);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-soft);
+    cursor: pointer;
+    display: inline-flex;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 700;
+    gap: 9px;
+    padding: 7px 8px 7px 12px;
+    transition: background .18s, border-color .18s, color .18s, box-shadow .18s;
+    white-space: nowrap;
+  }
+
+  .theme-toggle:hover {
+    background: #fff;
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-card);
+  }
+
+  .theme-toggle-track {
+    align-items: center;
+    background: #d2d2d7;
+    border-radius: 999px;
+    display: inline-flex;
+    height: 24px;
+    padding: 2px;
+    transition: background .18s;
+    width: 44px;
+  }
+
+  .theme-toggle-thumb {
+    background: #fff;
+    border-radius: 999px;
+    box-shadow: 0 2px 7px rgba(0, 0, 0, .2);
+    height: 20px;
+    transform: translateX(0);
+    transition: transform .22s cubic-bezier(.2, .8, .2, 1);
+    width: 20px;
+  }
+
+  body.dark-mode header.masthead {
+    background: rgba(38, 38, 41, 0.78);
+  }
+
+  body.dark-mode main {
+    background: var(--paper-2);
+  }
+
+  body.dark-mode .tool-nav,
+  body.dark-mode .drop,
+  body.dark-mode .filecard,
+  body.dark-mode .organize-summary,
+  body.dark-mode .edit-controls,
+  body.dark-mode .quality-toggle,
+  body.dark-mode .split-panel,
+  body.dark-mode .merge-file-item,
+  body.dark-mode .split-part-row,
+  body.dark-mode .page-context-menu,
+  body.dark-mode .page-editor-bottom,
+  body.dark-mode .theme-toggle {
+    background: #242426;
+  }
+
+  body.dark-mode .panel-left {
+    background: #1a1a1c;
+  }
+
+  body.dark-mode .panel-right {
+    background: #171719;
+  }
+
+  body.dark-mode .preview-stage,
+  body.dark-mode .preview-stage.organizing,
+  body.dark-mode .preview-stage.editing,
+  body.dark-mode .page-editor-main {
+    background: #202023;
+  }
+
+  body.dark-mode .tool-tab:hover:not(.active),
+  body.dark-mode .btn-secondary:hover:not(:disabled),
+  body.dark-mode .merge-file-actions button:hover:not(:disabled),
+  body.dark-mode .page-context-menu button:hover:not(:disabled),
+  body.dark-mode .page-editor-bottom button:hover:not(:disabled) {
+    background: #303033;
+  }
+
+  body.dark-mode .tool-tab.active,
+  body.dark-mode .tool-indicator,
+  body.dark-mode .toggle.on,
+  body.dark-mode .btn-print {
+    background: #3a3a3c;
+    color: #fff;
+  }
+
+  body.dark-mode .btn-print:hover:not(:disabled) {
+    background: var(--accent);
+  }
+
+  body.dark-mode .filecard .name:hover,
+  body.dark-mode .filecard .name:focus,
+  body.dark-mode .file-name-input,
+  body.dark-mode .split-name-input,
+  body.dark-mode .page-editor-bottom button,
+  body.dark-mode .zoom-btn,
+  body.dark-mode .pagenav button,
+  body.dark-mode .btn-secondary,
+  body.dark-mode .toggle,
+  body.dark-mode .crop-readout {
+    background: #2c2c2e;
+    color: var(--ink);
+  }
+
+  body.dark-mode .page-card,
+  body.dark-mode .page-edit-card {
+    background: #242426;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+  }
+
+  body.dark-mode .page-card-actions {
+    background: rgba(36, 36, 38, 0.94);
+  }
+
+  body.dark-mode .page-thumb-placeholder {
+    background-color: #fff;
+  }
+
+  body.dark-mode .loader {
+    background: rgba(28, 28, 30, 0.88);
+  }
+
+  body.dark-mode .loader .bar {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  body.dark-mode .theme-toggle {
+    color: var(--ink);
+  }
+
+  body.dark-mode .theme-toggle:hover {
+    background: #303033;
+  }
+
+  body.dark-mode .theme-toggle-track {
+    background: var(--accent);
+  }
+
+  body.dark-mode .theme-toggle-thumb {
+    transform: translateX(20px);
+  }
+
   .err {
     border-left: 0;
     border-radius: var(--radius-sm);
@@ -903,6 +1092,14 @@ Ethan Hu -->
   .tool-tab.active {
     background: transparent;
     box-shadow: none;
+  }
+
+  body.dark-mode .tool-indicator {
+    background: #3a3a3c;
+  }
+
+  body.dark-mode .tool-tab.active {
+    color: #fff;
   }
 
   .btn-secondary {
@@ -1122,8 +1319,7 @@ Ethan Hu -->
     font-weight: 750;
   }
 
-  .edit-control-head b,
-  .crop-row b {
+  .edit-control-head b {
     color: var(--accent);
     font-size: 12px;
     font-weight: 800;
@@ -1133,19 +1329,14 @@ Ethan Hu -->
     margin-bottom: 2px;
   }
 
-  .crop-row {
-    align-items: center;
-    color: var(--ink-soft);
-    display: grid;
+  .crop-readout {
+    background: var(--accent-soft);
+    border-radius: 999px;
+    color: var(--accent);
+    display: inline-flex;
     font-size: 12px;
-    font-weight: 700;
-    gap: 8px;
-    grid-template-columns: 48px minmax(0, 1fr) 34px;
-    margin-top: 10px;
-  }
-
-  .crop-slider {
-    height: 20px !important;
+    font-weight: 750;
+    padding: 7px 11px;
   }
 
   .split-panel {
@@ -1314,13 +1505,14 @@ Ethan Hu -->
 
   .page-editor-canvas-wrap {
     background: #fff;
-    border-radius: var(--radius-sm);
+    border-radius: 0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 18px 46px rgba(0, 0, 0, 0.13);
     display: none;
     flex-shrink: 0;
     max-height: 100%;
     max-width: 100%;
-    overflow: hidden;
+    overflow: visible;
+    position: relative;
   }
 
   .page-editor-canvas-wrap canvas {
@@ -1335,6 +1527,186 @@ Ethan Hu -->
   .page-editor-canvas-wrap.zoomed canvas {
     max-height: none;
     max-width: none;
+  }
+
+  .crop-overlay {
+    --crop-left: 0%;
+    --crop-top: 0%;
+    --crop-right: 0%;
+    --crop-bottom: 0%;
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 3;
+  }
+
+  .crop-overlay[hidden] {
+    display: none;
+  }
+
+  .crop-shade {
+    background: rgba(0, 0, 0, .18);
+    position: absolute;
+  }
+
+  .crop-shade-top {
+    height: var(--crop-top);
+    inset: 0 0 auto;
+  }
+
+  .crop-shade-right {
+    bottom: var(--crop-bottom);
+    right: 0;
+    top: var(--crop-top);
+    width: var(--crop-right);
+  }
+
+  .crop-shade-bottom {
+    bottom: 0;
+    height: var(--crop-bottom);
+    left: 0;
+    right: 0;
+  }
+
+  .crop-shade-left {
+    bottom: var(--crop-bottom);
+    left: 0;
+    top: var(--crop-top);
+    width: var(--crop-left);
+  }
+
+  .crop-box {
+    --crop-bar: #8e8e93;
+    --crop-bar-shadow: 0 1px 3px rgba(255, 255, 255, .36), 0 2px 8px rgba(0, 0, 0, .12);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    cursor: move;
+    pointer-events: auto;
+    position: absolute;
+    touch-action: none;
+  }
+
+  .crop-box::before,
+  .crop-box::after {
+    content: "";
+    inset: 33.333% 0 33.333%;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .crop-box::before {
+    border-top: 1px solid rgba(255, 255, 255, .42);
+    border-bottom: 1px solid rgba(255, 255, 255, .42);
+  }
+
+  .crop-box::after {
+    border-left: 1px solid rgba(255, 255, 255, .42);
+    border-right: 1px solid rgba(255, 255, 255, .42);
+    inset: 0 33.333%;
+  }
+
+  .crop-edge,
+  .crop-handle {
+    pointer-events: auto;
+    position: absolute;
+    touch-action: none;
+  }
+
+  .crop-edge-n,
+  .crop-edge-s {
+    height: 18px;
+    left: 20px;
+    right: 20px;
+  }
+
+  .crop-edge-n { cursor: ns-resize; top: -9px; }
+  .crop-edge-s { bottom: -9px; cursor: ns-resize; }
+
+  .crop-edge-e,
+  .crop-edge-w {
+    bottom: 20px;
+    top: 20px;
+    width: 18px;
+  }
+
+  .crop-edge-e { cursor: ew-resize; right: -9px; }
+  .crop-edge-w { cursor: ew-resize; left: -9px; }
+
+  .crop-handle {
+    background: var(--crop-bar);
+    border: 0;
+    border-radius: 1px;
+    box-shadow: var(--crop-bar-shadow);
+  }
+
+  .crop-handle-n,
+  .crop-handle-s {
+    height: 6px;
+    left: 50%;
+    width: 56px;
+  }
+
+  .crop-handle-n { cursor: ns-resize; top: -6px; transform: translateX(-50%); }
+  .crop-handle-s { bottom: -6px; cursor: ns-resize; transform: translateX(-50%); }
+
+  .crop-handle-e,
+  .crop-handle-w {
+    height: 56px;
+    top: 50%;
+    width: 6px;
+  }
+
+  .crop-handle-e { cursor: ew-resize; right: -6px; transform: translateY(-50%); }
+  .crop-handle-w { cursor: ew-resize; left: -6px; transform: translateY(-50%); }
+
+  .crop-handle-nw,
+  .crop-handle-ne,
+  .crop-handle-se,
+  .crop-handle-sw {
+    background: transparent;
+    border-color: var(--crop-bar);
+    border-radius: 0;
+    border-style: solid;
+    box-shadow: none;
+    height: 44px;
+    width: 44px;
+  }
+
+  .crop-handle-nw {
+    border-width: 6px 0 0 6px;
+    cursor: nwse-resize;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .16));
+    left: -6px;
+    top: -6px;
+  }
+
+  .crop-handle-ne {
+    border-width: 6px 6px 0 0;
+    cursor: nesw-resize;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .16));
+    right: -6px;
+    top: -6px;
+  }
+
+  .crop-handle-se {
+    border-width: 0 6px 6px 0;
+    bottom: -6px;
+    cursor: nwse-resize;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .16));
+    right: -6px;
+  }
+
+  .crop-handle-sw {
+    border-width: 0 0 6px 6px;
+    bottom: -6px;
+    cursor: nesw-resize;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .16));
+    left: -6px;
+  }
+
+  .crop-overlay.dragging .crop-box {
+    box-shadow: none;
   }
 
   .page-editor-bottom {
@@ -1711,6 +2083,120 @@ Ethan Hu -->
     opacity: .55;
   }
 
+  body.dark-mode header.masthead {
+    background: rgba(38, 38, 41, 0.78);
+  }
+
+  body.dark-mode .tool-nav,
+  body.dark-mode .drop,
+  body.dark-mode .filecard,
+  body.dark-mode .organize-summary,
+  body.dark-mode .edit-controls,
+  body.dark-mode .quality-toggle,
+  body.dark-mode .split-panel,
+  body.dark-mode .split-part-row,
+  body.dark-mode .merge-file,
+  body.dark-mode .pagenav,
+  body.dark-mode .zoom-bar,
+  body.dark-mode .page-card,
+  body.dark-mode .page-edit-card,
+  body.dark-mode .page-context-menu,
+  body.dark-mode .theme-toggle {
+    background: #242426;
+  }
+
+  body.dark-mode .drop {
+    border-color: var(--line-strong);
+    box-shadow: none;
+  }
+
+  body.dark-mode .panel-left {
+    background: #1a1a1c;
+  }
+
+  body.dark-mode .panel-right {
+    background: #171719;
+  }
+
+  body.dark-mode .preview-stage,
+  body.dark-mode .preview-stage.organizing,
+  body.dark-mode .preview-stage.editing,
+  body.dark-mode .page-editor-main {
+    background: #202023;
+  }
+
+  body.dark-mode .btn-secondary,
+  body.dark-mode .toggle,
+  body.dark-mode .zoom-btn,
+  body.dark-mode .pagenav button,
+  body.dark-mode .page-editor-bottom,
+  body.dark-mode .page-editor-bottom button,
+  body.dark-mode .file-name-input,
+  body.dark-mode .split-name-input,
+  body.dark-mode .crop-readout {
+    background: #2c2c2e;
+    color: var(--ink);
+  }
+
+  body.dark-mode .pagenav,
+  body.dark-mode .zoom-bar {
+    border-color: var(--line);
+  }
+
+  body.dark-mode .pagenav .num,
+  body.dark-mode .zoom-val {
+    color: var(--ink);
+  }
+
+  body.dark-mode .btn-secondary:hover:not(:disabled),
+  body.dark-mode .toggle:hover,
+  body.dark-mode .zoom-btn:hover:not(:disabled),
+  body.dark-mode .pagenav button:hover:not(:disabled),
+  body.dark-mode .page-editor-bottom button:hover:not(:disabled),
+  body.dark-mode .theme-toggle:hover {
+    background: #303033;
+  }
+
+  body.dark-mode .tool-indicator,
+  body.dark-mode .toggle.on,
+  body.dark-mode .btn-print {
+    background: #3a3a3c;
+    color: #fff;
+  }
+
+  body.dark-mode .tool-tab.active {
+    color: #fff;
+  }
+
+  body.dark-mode .btn-print:hover:not(:disabled),
+  body.dark-mode .btn-secondary-accent,
+  body.dark-mode .btn-secondary-accent:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  body.dark-mode .filecard .name:hover,
+  body.dark-mode .filecard .name:focus {
+    background: #2c2c2e;
+  }
+
+  body.dark-mode .page-card-actions {
+    background: rgba(36, 36, 38, 0.94);
+  }
+
+  body.dark-mode .loader {
+    background: rgba(28, 28, 30, 0.88);
+  }
+
+  body.dark-mode .theme-toggle-track {
+    background: var(--accent);
+  }
+
+  body.dark-mode .theme-toggle-thumb {
+    transform: translateX(20px);
+  }
+
   @media (max-width: 700px) {
     .organizer-grid {
       grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
@@ -1745,6 +2231,13 @@ Ethan Hu -->
     .page-edit-card .page-thumb-placeholder {
       height: 188px;
       min-height: 188px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    header.masthead,
+    h1.title {
+      transition: none;
     }
   }
 </style>
@@ -1848,13 +2341,10 @@ Ethan Hu -->
           </div>
           <div class="edit-controls">
             <div class="edit-control-head">
-              <span>Crop Margins</span>
+              <span>Crop Frame</span>
               <b id="cropHint">0%</b>
             </div>
-            <label class="crop-row">Left <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropLeftSlider"><b id="cropLeftNum">0%</b></label>
-            <label class="crop-row">Top <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropTopSlider"><b id="cropTopNum">0%</b></label>
-            <label class="crop-row">Right <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropRightSlider"><b id="cropRightNum">0%</b></label>
-            <label class="crop-row">Bottom <input type="range" min="0" max="45" value="0" step="1" class="slider crop-slider" id="cropBottomSlider"><b id="cropBottomNum">0%</b></label>
+            <div class="crop-readout" id="cropReadout">Full page</div>
           </div>
           <div class="quality-toggle">
             <div class="quality-copy">
@@ -1990,6 +2480,26 @@ Ethan Hu -->
             <div class="organizer-empty" id="pageEditorEmpty">Upload a PDF to crop or rotate pages.</div>
             <div class="page-editor-canvas-wrap" id="pageEditorCanvasWrap">
               <canvas id="pageEditorCanvas"></canvas>
+              <div class="crop-overlay" id="cropOverlay" hidden>
+                <div class="crop-shade crop-shade-top"></div>
+                <div class="crop-shade crop-shade-right"></div>
+                <div class="crop-shade crop-shade-bottom"></div>
+                <div class="crop-shade crop-shade-left"></div>
+                <div class="crop-box" id="cropBox" data-crop-handle="move">
+                  <span class="crop-edge crop-edge-n" data-crop-handle="n"></span>
+                  <span class="crop-edge crop-edge-e" data-crop-handle="e"></span>
+                  <span class="crop-edge crop-edge-s" data-crop-handle="s"></span>
+                  <span class="crop-edge crop-edge-w" data-crop-handle="w"></span>
+                  <span class="crop-handle crop-handle-nw" data-crop-handle="nw"></span>
+                  <span class="crop-handle crop-handle-n" data-crop-handle="n"></span>
+                  <span class="crop-handle crop-handle-ne" data-crop-handle="ne"></span>
+                  <span class="crop-handle crop-handle-e" data-crop-handle="e"></span>
+                  <span class="crop-handle crop-handle-se" data-crop-handle="se"></span>
+                  <span class="crop-handle crop-handle-s" data-crop-handle="s"></span>
+                  <span class="crop-handle crop-handle-sw" data-crop-handle="sw"></span>
+                  <span class="crop-handle crop-handle-w" data-crop-handle="w"></span>
+                </div>
+              </div>
             </div>
             <div class="page-editor-bottom" id="pageEditorBottom">
               <button type="button" id="bottomRotateLeftBtn" disabled>↺</button>
@@ -2011,6 +2521,10 @@ Ethan Hu -->
   <footer>
     <span>Set in SF Pro / Inter</span>
     <em>Client-side PDF processing</em>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Turn on dark mode" aria-pressed="false">
+      <span id="themeToggleText">Dark mode</span>
+      <span class="theme-toggle-track" aria-hidden="true"><span class="theme-toggle-thumb"></span></span>
+    </button>
     <span>Runs entirely in your browser</span>
   </footer>
 
@@ -2050,7 +2564,7 @@ Ethan Hu -->
     },
     edit: {
       lede: 'Crop and rotate individual pages before export.',
-      meta: 'Select one page at a time<br/>Crop page margins<br/>Fine rotate with a low-sensitivity slider<br/>Use 90° rotate buttons for page turns',
+      meta: 'Select one page at a time<br/>Drag the crop frame on the page<br/>Fine rotate with a low-sensitivity slider<br/>Use 90° rotate buttons for page turns',
       downloadLabel: 'Export Edited PDF',
       downloadSub: 'apply page crops and rotations',
       suffix: '_edited',
@@ -2180,18 +2694,11 @@ Ethan Hu -->
   const bottomRotateLeftBtn = $('bottomRotateLeftBtn');
   const bottomRotateRightBtn = $('bottomRotateRightBtn');
   const cropHint      = $('cropHint');
-  const cropSliders   = {
-    left: $('cropLeftSlider'),
-    top: $('cropTopSlider'),
-    right: $('cropRightSlider'),
-    bottom: $('cropBottomSlider'),
-  };
-  const cropNums      = {
-    left: $('cropLeftNum'),
-    top: $('cropTopNum'),
-    right: $('cropRightNum'),
-    bottom: $('cropBottomNum'),
-  };
+  const cropReadout   = $('cropReadout');
+  const cropOverlay   = $('cropOverlay');
+  const cropBox       = $('cropBox');
+  const themeToggle   = $('themeToggle');
+  const themeToggleText = $('themeToggleText');
   const fineQualityLabel = $('fineQualityLabel');
   const fineQualityToggle = $('fineQualityToggle');
   const resetEditBtn  = $('resetEditBtn');
@@ -2233,6 +2740,38 @@ Ethan Hu -->
     el.classList.toggle('on', pressed);
     el.setAttribute('aria-pressed', pressed ? 'true' : 'false');
   }
+
+  const THEME_STORAGE_KEY = 'pdf-atelier-theme';
+
+  function readSavedTheme() {
+    try {
+      return localStorage.getItem(THEME_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function saveTheme(theme) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Storage can be unavailable in private contexts; the theme still changes for this session.
+    }
+  }
+
+  function setDarkMode(enabled, persist = false) {
+    document.body.classList.toggle('dark-mode', enabled);
+    themeToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    themeToggle.setAttribute('aria-label', enabled ? 'Turn off dark mode' : 'Turn on dark mode');
+    themeToggleText.textContent = enabled ? 'Light mode' : 'Dark mode';
+    if (persist) saveTheme(enabled ? 'dark' : 'light');
+    syncPreviewStageHeight();
+    updateToolIndicator();
+  }
+
+  themeToggle.addEventListener('click', () => {
+    setDarkMode(!document.body.classList.contains('dark-mode'), true);
+  });
 
   function syncToolTabA11y() {
     toolTabs.forEach(tab => {
@@ -2331,6 +2870,7 @@ Ethan Hu -->
           : 'Preview <em>— processed output</em>';
     organizer.style.display = organizing ? 'block' : 'none';
     pageEditor.style.display = editing ? 'flex' : 'none';
+    if (!editing) cropOverlay.hidden = true;
     if (organizing) {
       emptyState.style.display = 'none';
       canvasWrap.style.display = 'none';
@@ -3362,6 +3902,7 @@ Ethan Hu -->
     pageEditorBottom.style.display = state.pdfDoc && count ? 'flex' : 'none';
     if (!state.pdfDoc || count === 0) {
       pageEditorEmpty.textContent = 'Upload a PDF to crop or rotate pages.';
+      cropOverlay.hidden = true;
       return;
     }
     for (let outputIndex = 0; outputIndex < count; outputIndex++) {
@@ -3396,13 +3937,25 @@ Ethan Hu -->
     }
   }
 
+  const cropDrag = {
+    active: false,
+    handle: null,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startCrop: null,
+    overlayRect: null,
+  };
+
   function syncCropLabels(edit) {
-    cropNums.left.textContent = edit.crop.left + '%';
-    cropNums.top.textContent = edit.crop.top + '%';
-    cropNums.right.textContent = edit.crop.right + '%';
-    cropNums.bottom.textContent = edit.crop.bottom + '%';
     const total = edit.crop.left + edit.crop.top + edit.crop.right + edit.crop.bottom;
-    cropHint.textContent = total ? total + '% total' : '0%';
+    const retainedW = Math.max(0, 100 - edit.crop.left - edit.crop.right);
+    const retainedH = Math.max(0, 100 - edit.crop.top - edit.crop.bottom);
+    cropHint.textContent = total ? roundCropValue(total) + '% total' : '0%';
+    cropReadout.textContent = total
+      ? roundCropValue(retainedW) + '% × ' + roundCropValue(retainedH) + '% kept'
+      : 'Full page';
+    updateCropOverlay();
   }
 
   function syncEditControls() {
@@ -3416,40 +3969,162 @@ Ethan Hu -->
     editSummary.textContent = hasPages
       ? 'Editing page ' + state.curPage + ' of ' + activePageCount() + '. Changes apply only to this page.'
       : 'Upload a PDF, then choose a page from the editor to crop or rotate it.';
-    Object.values(cropSliders).forEach(slider => { slider.disabled = !hasPages; });
     editRotateSlider.disabled = !hasPages;
     bottomRotateSlider.disabled = !hasPages;
-    if (!hasPages) return;
+    cropOverlay.hidden = !hasPages;
+    if (!hasPages) {
+      cropHint.textContent = '0%';
+      cropReadout.textContent = 'Full page';
+      return;
+    }
     const edit = currentPageEdit();
     editRotateSlider.value = edit.fineRotation;
     bottomRotateSlider.value = edit.fineRotation;
     editRotateNum.textContent = (Math.round(editAngle(edit) * 10) / 10).toFixed(1) + '°';
     bottomRotateNum.textContent = editRotateNum.textContent;
-    cropSliders.left.value = edit.crop.left;
-    cropSliders.top.value = edit.crop.top;
-    cropSliders.right.value = edit.crop.right;
-    cropSliders.bottom.value = edit.crop.bottom;
     syncCropLabels(edit);
   }
 
-  function clampCropPair(edit, axis, changedSide) {
-    const a = axis === 'x' ? 'left' : 'top';
-    const b = axis === 'x' ? 'right' : 'bottom';
-    const total = edit.crop[a] + edit.crop[b];
-    if (total <= 88) return;
-    const other = changedSide === a ? b : a;
-    edit.crop[other] = Math.max(0, 88 - edit.crop[changedSide]);
+  function roundCropValue(value) {
+    return Math.round((+value || 0) * 10) / 10;
+  }
+
+  function clampCropValue(value, min = 0, max = 88) {
+    return Math.max(min, Math.min(max, +value || 0));
+  }
+
+  function normalizeCrop(crop, changedSide) {
+    const changedSides = Array.isArray(changedSide) ? changedSide : [changedSide];
+    crop.left = roundCropValue(clampCropValue(crop.left));
+    crop.top = roundCropValue(clampCropValue(crop.top));
+    crop.right = roundCropValue(clampCropValue(crop.right));
+    crop.bottom = roundCropValue(clampCropValue(crop.bottom));
+    [['left', 'right'], ['top', 'bottom']].forEach(([a, b]) => {
+      if (crop[a] + crop[b] <= 88) return;
+      const changed = changedSides.includes(a) || changedSides.includes(b)
+        ? changedSides.find(side => side === a || side === b)
+        : a;
+      const other = changed === a ? b : a;
+      crop[changed] = roundCropValue(Math.max(0, 88 - crop[other]));
+    });
   }
 
   function setCropValue(side, value) {
     const edit = currentPageEdit();
-    edit.crop[side] = Math.max(0, Math.min(45, Math.round(+value || 0)));
-    clampCropPair(edit, side === 'left' || side === 'right' ? 'x' : 'y', side);
+    edit.crop[side] = value;
+    normalizeCrop(edit.crop, side);
     syncEditControls();
-    requestEditedPreviewRender();
+    renderPageEditor();
   }
 
-  async function renderEditedColorPreviewToCanvas(sourceIndex, edit, canvas) {
+  function canShowCropOverlay() {
+    return activeTool === 'edit' && !!state.pdfDoc && activePageCount() > 0 && !!pageEditorCanvas.width;
+  }
+
+  function updateCropOverlay() {
+    if (!cropOverlay || !cropBox) return;
+    if (!canShowCropOverlay()) {
+      cropOverlay.hidden = true;
+      return;
+    }
+    const edit = currentPageEdit();
+    normalizeCrop(edit.crop);
+    const left = edit.crop.left;
+    const top = edit.crop.top;
+    const right = edit.crop.right;
+    const bottom = edit.crop.bottom;
+    const width = Math.max(12, 100 - left - right);
+    const height = Math.max(12, 100 - top - bottom);
+    cropOverlay.hidden = false;
+    cropOverlay.style.setProperty('--crop-left', left + '%');
+    cropOverlay.style.setProperty('--crop-top', top + '%');
+    cropOverlay.style.setProperty('--crop-right', right + '%');
+    cropOverlay.style.setProperty('--crop-bottom', bottom + '%');
+    cropBox.style.left = left + '%';
+    cropBox.style.top = top + '%';
+    cropBox.style.width = width + '%';
+    cropBox.style.height = height + '%';
+  }
+
+  function cropChangedSides(handle) {
+    if (handle === 'move') return [];
+    const sides = [];
+    if (handle.includes('w')) sides.push('left');
+    if (handle.includes('e')) sides.push('right');
+    if (handle.includes('n')) sides.push('top');
+    if (handle.includes('s')) sides.push('bottom');
+    return sides;
+  }
+
+  function cropFromPointer(handle, dxPct, dyPct) {
+    const start = cropDrag.startCrop;
+    const crop = { ...start };
+    if (handle === 'move') {
+      const dx = clampCropValue(dxPct, -start.left, start.right);
+      const dy = clampCropValue(dyPct, -start.top, start.bottom);
+      crop.left = start.left + dx;
+      crop.right = start.right - dx;
+      crop.top = start.top + dy;
+      crop.bottom = start.bottom - dy;
+      normalizeCrop(crop);
+      return crop;
+    }
+
+    if (handle.includes('w')) crop.left = clampCropValue(start.left + dxPct, 0, 88 - start.right);
+    if (handle.includes('e')) crop.right = clampCropValue(start.right - dxPct, 0, 88 - start.left);
+    if (handle.includes('n')) crop.top = clampCropValue(start.top + dyPct, 0, 88 - start.bottom);
+    if (handle.includes('s')) crop.bottom = clampCropValue(start.bottom - dyPct, 0, 88 - start.top);
+    normalizeCrop(crop, cropChangedSides(handle));
+    return crop;
+  }
+
+  function updateCropDrag(e, final = false) {
+    if (!cropDrag.active || e.pointerId !== cropDrag.pointerId || !cropDrag.overlayRect) return;
+    const dxPct = ((e.clientX - cropDrag.startX) / cropDrag.overlayRect.width) * 100;
+    const dyPct = ((e.clientY - cropDrag.startY) / cropDrag.overlayRect.height) * 100;
+    const edit = currentPageEdit();
+    edit.crop = cropFromPointer(cropDrag.handle, dxPct, dyPct);
+    syncCropLabels(edit);
+    resetEditBtn.disabled = !isPageEdited(edit);
+    proofMeta.textContent = 'page ' + state.curPage + '/' + activePageCount() + ' · ' + editedLabel(edit);
+    if (final) renderPageEditor();
+  }
+
+  function beginCropDrag(e) {
+    if (!canShowCropOverlay() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const target = e.target.closest('[data-crop-handle]');
+    if (!target || !cropOverlay.contains(target)) return;
+    const rect = cropOverlay.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const edit = currentPageEdit();
+    cropDrag.active = true;
+    cropDrag.handle = target.dataset.cropHandle || 'move';
+    cropDrag.pointerId = e.pointerId;
+    cropDrag.startX = e.clientX;
+    cropDrag.startY = e.clientY;
+    cropDrag.startCrop = { ...edit.crop };
+    cropDrag.overlayRect = rect;
+    cropOverlay.classList.add('dragging');
+    cropOverlay.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function finishCropDrag(e) {
+    if (!cropDrag.active || e.pointerId !== cropDrag.pointerId) return;
+    updateCropDrag(e, true);
+    cropOverlay.classList.remove('dragging');
+    if (cropOverlay.hasPointerCapture(e.pointerId)) cropOverlay.releasePointerCapture(e.pointerId);
+    cropDrag.active = false;
+    cropDrag.handle = null;
+    cropDrag.pointerId = null;
+    cropDrag.startCrop = null;
+    cropDrag.overlayRect = null;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  async function renderEditedColorPreviewToCanvas(sourceIndex, edit, canvas, includeCrop = true) {
     const page = await state.pdfDoc.getPage(sourceIndex + 1);
     const baseVp = page.getViewport({ scale: 1 });
     const scale = getRasterPreviewScale(baseVp);
@@ -3463,6 +4138,7 @@ Ethan Hu -->
     await page.render({ canvasContext: bctx, viewport: vp }).promise;
 
     const e = clonePageEdit(edit);
+    if (!includeCrop) e.crop = { left: 0, top: 0, right: 0, bottom: 0 };
     const cropLeft = Math.round(base.width * e.crop.left / 100);
     const cropTop = Math.round(base.height * e.crop.top / 100);
     const cropRight = Math.round(base.width * e.crop.right / 100);
@@ -3505,7 +4181,7 @@ Ethan Hu -->
     const token = ++editedPreviewRenderToken;
     if (sourceIndex == null || !state.pdfDoc) return;
     const tmp = document.createElement('canvas');
-    const size = await renderEditedColorPreviewToCanvas(sourceIndex, currentPageEdit(), tmp);
+    const size = await renderEditedColorPreviewToCanvas(sourceIndex, currentPageEdit(), tmp, false);
     if (!size || token !== editedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'edit') {
       tmp.width = 0;
       tmp.height = 0;
@@ -3521,6 +4197,7 @@ Ethan Hu -->
     pageEditorCanvasWrap.style.display = 'block';
     proofMeta.textContent = 'page ' + state.curPage + '/' + activePageCount() + ' · ' + editedLabel(currentPageEdit());
     applyZoom({ preserveCenter: false });
+    updateCropOverlay();
   }
 
   async function renderEditedPageImageToCanvas(sourceIndex, edit, canvas) {
@@ -4169,9 +4846,15 @@ Ethan Hu -->
   rotateRightBtn.addEventListener('click', () => rotateSelectedPage90(1));
   bottomRotateRightBtn.addEventListener('click', () => rotateSelectedPage90(1));
 
-  Object.entries(cropSliders).forEach(([side, slider]) => {
-    slider.addEventListener('input', e => setCropValue(side, e.target.value));
+  cropOverlay.addEventListener('pointerdown', beginCropDrag);
+  cropOverlay.addEventListener('pointermove', e => {
+    if (!cropDrag.active || e.pointerId !== cropDrag.pointerId) return;
+    updateCropDrag(e);
+    e.preventDefault();
+    e.stopPropagation();
   });
+  cropOverlay.addEventListener('pointerup', finishCropDrag);
+  cropOverlay.addEventListener('pointercancel', finishCropDrag);
 
   fineQualityToggle.addEventListener('click', () => {
     state.fineRotationQuality = state.fineRotationQuality === 'ultra' ? 'high' : 'ultra';
@@ -4461,9 +5144,11 @@ Ethan Hu -->
       pageEditorCanvasWrap.classList.toggle('zoomed', isZoomedIn);
       pageEditorCanvas.style.width = (getEditorFitCanvasWidth() * z) + 'px';
       pageEditorCanvas.style.height = 'auto';
+      updateCropOverlay();
       requestAnimationFrame(() => {
         if (isZoomedIn) restoreEditorScrollCenter(center);
         else { pageEditorMain.scrollLeft = 0; pageEditorMain.scrollTop = 0; }
+        updateCropOverlay();
       });
       return;
     }
@@ -4573,6 +5258,11 @@ Ethan Hu -->
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(syncPreviewStageHeight);
   }
+  setTimeout(() => {
+    document.body.classList.add('title-condensed');
+    syncPreviewStageHeight();
+  }, 1000);
+  setDarkMode(readSavedTheme() === 'dark');
   syncPreviewStageHeight();
   syncToolTabA11y();
   updateSourceDropMode();
