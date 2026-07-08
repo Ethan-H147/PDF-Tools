@@ -2617,16 +2617,12 @@
 
   @media (max-width: 700px) {
     .frame {
-      padding: calc(86px + env(safe-area-inset-top, 0px)) 8px 42px;
+      padding-top: calc(86px + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(168px + env(safe-area-inset-bottom, 0px));
     }
 
-    main {
-      border-radius: 18px;
-      margin-top: 12px;
-    }
-
-    .panel {
-      padding: 18px 10px;
+    body.preview-only-mode .frame {
+      padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
     }
 
     .tool-nav {
@@ -2654,6 +2650,73 @@
 
     .preview-stage.zoomed {
       padding: 14px 12px;
+    }
+
+    .pagenav {
+      background: rgba(245, 245, 247, 0.94);
+      -webkit-backdrop-filter: blur(18px) saturate(1.2);
+      backdrop-filter: blur(18px) saturate(1.2);
+      border-color: var(--line-strong);
+      border-radius: 16px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+      left: 12px;
+      margin: 0;
+      position: fixed;
+      right: 12px;
+      bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+      z-index: 1000;
+    }
+
+    .pagenav button {
+      height: 42px;
+    }
+
+    body.preview-only-mode .pagenav {
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .actions {
+      background: rgba(245, 245, 247, 0.94);
+      -webkit-backdrop-filter: blur(18px) saturate(1.2);
+      backdrop-filter: blur(18px) saturate(1.2);
+      border: 1px solid var(--line-strong);
+      border-radius: 18px;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+      left: 12px;
+      margin: 0;
+      padding: 8px;
+      position: fixed;
+      right: 12px;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      z-index: 1000;
+    }
+
+    .actions[style*="display: none"] {
+      display: none !important;
+    }
+
+    .actions .resolution-options {
+      margin: 0 0 8px !important;
+    }
+
+    .btn-print {
+      border-radius: 12px;
+      font-size: 17px;
+      padding: 12px 42px 12px 14px;
+    }
+
+    .btn-print::after {
+      right: 14px;
+    }
+
+    .btn-print .small {
+      font-size: 8.5px;
+      letter-spacing: 0.08em;
+    }
+
+    body.dark-mode .pagenav,
+    body.dark-mode .actions {
+      background: rgba(28, 28, 30, 0.94);
     }
 
     .preview-canvas-wrap,
@@ -2694,11 +2757,7 @@
     }
 
     .preview-stage.organizing {
-      border-radius: 18px;
-      margin-left: -2px;
-      margin-right: -2px;
-      padding: 8px;
-      width: calc(100% + 4px);
+      padding: 12px;
     }
 
     .preview-stage.editing {

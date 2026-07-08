@@ -545,6 +545,10 @@
     return div.textContent.trim();
   }
 
+  function syncBottomDockState() {
+    document.body.classList.toggle('preview-only-mode', activeTool === 'preview');
+  }
+
   function switchTool(id) {
     if (!TOOLS[id]) return;
     if (id === activeTool) {
@@ -557,6 +561,7 @@
     applyToolLocale();
     resolutionOptions.classList.toggle('hidden', !isRasterTool(id));
     downloadBtn.parentElement.style.display = id === 'preview' ? 'none' : '';
+    syncBottomDockState();
     syncAdvancedOptions();
     updateSourceDropMode();
     if (id === 'merge') {
@@ -6518,6 +6523,7 @@
   updateSourceDropMode();
   resolutionOptions.classList.toggle('hidden', !isRasterTool(activeTool));
   downloadBtn.parentElement.style.display = activeTool === 'preview' ? 'none' : '';
+  syncBottomDockState();
   syncAdvancedOptions();
   updateMergeState();
   updatePageState();
