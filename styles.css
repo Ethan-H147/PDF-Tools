@@ -2326,6 +2326,21 @@
   }
 
   @media (max-width: 700px) {
+    .preview-stage {
+      height: var(--preview-stage-height, min(46vh, 430px));
+      min-height: 280px;
+      padding: 14px 12px;
+    }
+
+    .preview-stage.zoomed {
+      padding: 14px 12px;
+    }
+
+    .preview-canvas-wrap,
+    .preview-canvas-wrap canvas {
+      max-width: 100%;
+    }
+
     .organizer-grid {
       grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
       gap: 18px;

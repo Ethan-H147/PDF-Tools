@@ -5230,16 +5230,19 @@
     if (previewHeightRaf) cancelAnimationFrame(previewHeightRaf);
     previewHeightRaf = requestAnimationFrame(() => {
       previewHeightRaf = null;
-      const minHeight = window.matchMedia('(max-width: 900px)').matches ? 520 : 620;
-      const maxHeight = window.matchMedia('(max-width: 900px)').matches ? 820 : 1100;
+      const isTablet = window.matchMedia('(max-width: 900px)').matches;
+      const isPhone = window.matchMedia('(max-width: 700px)').matches;
+      const minHeight = isPhone ? 280 : (isTablet ? 520 : 620);
+      const maxHeight = isPhone ? 430 : (isTablet ? 820 : 1100);
       const mainPanel = previewStage.closest('main');
       const stageRect = previewStage.getBoundingClientRect();
       const mainRect = mainPanel ? mainPanel.getBoundingClientRect() : null;
       const panelStyle = getComputedStyle(previewStage.parentElement);
       const panelBottomInset = parseFloat(panelStyle.paddingBottom) || 0;
       const panelBottom = mainRect ? Math.max(0, mainRect.bottom - stageRect.top - panelBottomInset) : 0;
-      const viewportHeight = window.innerHeight * 0.82;
-      const targetHeight = Math.max(minHeight, Math.min(maxHeight, Math.max(viewportHeight, panelBottom)));
+      const viewportHeight = window.innerHeight * (isPhone ? 0.46 : 0.82);
+      const preferredHeight = isPhone ? viewportHeight : Math.max(viewportHeight, panelBottom);
+      const targetHeight = Math.max(minHeight, Math.min(maxHeight, preferredHeight));
       previewStage.style.setProperty('--preview-stage-height', Math.round(targetHeight) + 'px');
       if (state.pdfDoc) applyZoom();
     });
