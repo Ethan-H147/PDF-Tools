@@ -54,17 +54,20 @@ Ethan Hu -->
     <div class="tool-tab" id="tab-edit" data-tool="edit" role="tab" aria-selected="false" aria-controls="tool-edit" tabindex="-1">
       <span class="tab-num">III.</span> <span data-tool-label="edit">Crop/Rotate</span>
     </div>
+    <div class="tool-tab" id="tab-sign" data-tool="sign" role="tab" aria-selected="false" aria-controls="tool-sign" tabindex="-1">
+      <span class="tab-num">IV.</span> <span data-tool-label="sign">Sign</span>
+    </div>
     <div class="tool-tab" id="tab-merge" data-tool="merge" role="tab" aria-selected="false" aria-controls="tool-merge" tabindex="-1">
-      <span class="tab-num">IV.</span> <span data-tool-label="merge">Merge</span>
+      <span class="tab-num">V.</span> <span data-tool-label="merge">Merge</span>
     </div>
     <div class="tool-tab" id="tab-compress" data-tool="compress" role="tab" aria-selected="false" aria-controls="tool-compress" tabindex="-1">
-      <span class="tab-num">V.</span> <span data-tool-label="compress">Compress</span>
+      <span class="tab-num">VI.</span> <span data-tool-label="compress">Compress</span>
     </div>
     <div class="tool-tab" id="tab-threshold" data-tool="threshold" role="tab" aria-selected="false" aria-controls="tool-threshold" tabindex="-1">
-      <span class="tab-num">VI.</span> <span data-tool-label="threshold">Threshold</span>
+      <span class="tab-num">VII.</span> <span data-tool-label="threshold">Threshold</span>
     </div>
     <div class="tool-tab" id="tab-greyscale" data-tool="greyscale" role="tab" aria-selected="false" aria-controls="tool-greyscale" tabindex="-1">
-      <span class="tab-num">VII.</span> <span data-tool-label="greyscale">Grayscale</span>
+      <span class="tab-num">VIII.</span> <span data-tool-label="greyscale">Grayscale</span>
     </div>
   </nav>
 
@@ -82,7 +85,10 @@ Ethan Hu -->
       <div class="err" id="errBox" role="alert" aria-live="assertive" aria-atomic="true" aria-hidden="true"></div>
 
       <div class="filecard" id="fileCard">
-        <div class="name" id="fileName">—</div>
+        <div class="filecard-head">
+          <div class="name" id="fileName">—</div>
+          <button class="file-remove" id="fileRemoveBtn" type="button" aria-label="Remove current PDF"><span aria-hidden="true">×</span></button>
+        </div>
         <div class="stats">
           <span><span data-i18n="file.pages">Pages</span> <b id="pageCount">—</b></span>
           <span><span data-i18n="file.size">Size</span> <b id="fileSize">—</b></span>
@@ -142,6 +148,27 @@ Ethan Hu -->
             <button type="button" class="circle-switch" id="fineQualityToggle" aria-label="Use ultra 900 dpi for fine rotation export" data-i18n-aria-label="edit.fineQualityAria" aria-pressed="false"></button>
           </div>
           <button class="btn-secondary" id="resetEditBtn" disabled data-i18n="actions.resetSelectedPage">Reset selected page</button>
+        </div>
+      </div>
+
+      <!-- ═══ SIGN PANEL ═══ -->
+      <div class="tool-panel" id="tool-sign" role="tabpanel" aria-labelledby="tab-sign" aria-hidden="true">
+        <div style="margin-top:26px">
+          <div class="section-label"><span data-i18n="sections.sign">II. Sign PDF</span><span id="signHint">draw signature</span></div>
+          <div class="sign-panel">
+            <div class="sign-pad-wrap">
+              <canvas id="signaturePad" data-i18n-aria-label="sign.padAria" aria-label="Signature drawing pad"></canvas>
+            </div>
+            <div class="sign-actions">
+              <button class="btn-secondary" id="signatureClearBtn" type="button" data-i18n="sign.clear">Clear</button>
+              <button class="btn-secondary" id="signatureRemoveBtn" type="button" data-i18n="sign.removeSelected">Remove selected</button>
+            </div>
+            <div class="signature-drag-source is-empty" id="signatureDragSource" role="button" tabindex="0" aria-label="Drag signature to the PDF">
+              <img class="signature-drag-preview" id="signatureDragPreview" alt="" hidden>
+              <span id="signatureDragLabel" data-i18n="sign.drawFirst">Draw a signature first</span>
+            </div>
+            <div class="organize-summary" id="signSummary">Draw a signature, then drag it onto the page.</div>
+          </div>
         </div>
       </div>
 
@@ -306,6 +333,7 @@ Ethan Hu -->
         </div>
         <div class="preview-canvas-wrap" id="canvasWrap" style="display:none">
           <canvas id="previewCanvas"></canvas>
+          <div class="signature-layer" id="signatureOverlay" hidden></div>
         </div>
         <div class="organizer" id="organizer" style="display:none">
           <div class="organizer-empty" id="organizerEmpty">Upload a PDF to organize pages.</div>

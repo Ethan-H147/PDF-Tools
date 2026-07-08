@@ -70,6 +70,13 @@
       downloadSub: 'apply page crops and rotations',
       suffix: '_edited',
     },
+    sign: {
+      lede: 'Draw a signature and place it directly on a PDF page.',
+      meta: 'Draw your signature locally<br/>Drag it onto the page preview<br/>Export without rasterizing the PDF',
+      downloadLabel: 'Export Signed PDF',
+      downloadSub: 'stamp the signature onto the PDF',
+      suffix: '_signed',
+    },
     merge: {
       lede: 'Merge multiple PDFs into one organized document.',
       meta: 'Select any number of PDFs<br/>Reorder files before merging<br/>Merged output opens in Organize',
@@ -140,6 +147,7 @@
   const fileInput     = $('fileInput');
   const fileCard      = $('fileCard');
   const fileNameEl    = $('fileName');
+  const fileRemoveBtn = $('fileRemoveBtn');
   const pageCountEl   = $('pageCount');
   const fileSizeEl    = $('fileSize');
   const fileStatusEl  = $('fileStatus');
@@ -231,6 +239,15 @@
   const fineQualityLabel = $('fineQualityLabel');
   const fineQualityToggle = $('fineQualityToggle');
   const resetEditBtn  = $('resetEditBtn');
+  const signHint      = $('signHint');
+  const signaturePad  = $('signaturePad');
+  const signatureClearBtn = $('signatureClearBtn');
+  const signatureRemoveBtn = $('signatureRemoveBtn');
+  const signatureDragSource = $('signatureDragSource');
+  const signatureDragPreview = $('signatureDragPreview');
+  const signatureDragLabel = $('signatureDragLabel');
+  const signSummary   = $('signSummary');
+  const signatureOverlay = $('signatureOverlay');
   const previewTitle  = $('previewTitle');
   const previewTools  = $('previewTools');
   const toolIndicator = $('toolIndicator');
@@ -249,6 +266,18 @@
   const contextMenuState = {
     outputIndex: null,
     sourceIndex: null,
+  };
+  const signatureState = {
+    hasInk: false,
+    dataUrl: '',
+    ratio: 3,
+    stamps: [],
+    selectedId: null,
+    nextId: 1,
+    padDrawing: false,
+    padPointerId: null,
+    lastPadPoint: null,
+    drag: null,
   };
 
   let errorHideTimer = null;
@@ -511,6 +540,7 @@
     updatePreviewMode();
     updateToolIndicator();
     syncPreviewStageHeight();
+    if (id === 'sign') syncSignatureControls();
     if (state.pdfDoc && id !== 'organize' && id !== 'edit') requestPreviewRender(isRasterTool(id));
     if (state.pdfDoc && id === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
   }
@@ -529,7 +559,9 @@
       ? t('preview.titleOrganize')
       : editing
         ? t('preview.titleEdit')
-        : activeTool === 'preview'
+        : activeTool === 'sign'
+          ? t('preview.titleSign')
+          : activeTool === 'preview'
           ? t('preview.titleOriginal')
           : activeTool === 'compress'
             ? t('preview.titleCompress')
@@ -542,26 +574,37 @@
       canvasWrap.style.display = 'none';
       pageEditor.style.display = 'none';
       renderOrganizer();
+      updateSignatureOverlay();
       return;
     }
     if (editing) {
       emptyState.style.display = 'none';
       canvasWrap.style.display = 'none';
       renderPageEditor();
+      updateSignatureOverlay();
       return;
     }
     const hasPages = state.pdfDoc && activePageCount() > 0;
     emptyState.style.display = hasPages ? 'none' : 'block';
     canvasWrap.style.display = hasPages ? 'block' : 'none';
+    updateSignatureOverlay();
   }
 
   function updateSourceDropMode() {
     const merging = activeTool === 'merge';
+    const hasCurrentPdf = !!state.pdfBytes || !!state.pdfDoc;
+    const collapseDrop = hasCurrentPdf && !merging;
     fileInput.multiple = merging;
+    dropZone.classList.toggle('is-collapsed', collapseDrop);
+    dropZone.setAttribute('aria-hidden', collapseDrop ? 'true' : 'false');
+    dropZone.tabIndex = collapseDrop ? -1 : 0;
     dropGlyph.textContent = merging ? '∑' : '¶';
     dropLabel.textContent = merging ? t('drop.uploadPdfs') : t('drop.uploadPdf');
     dropSub.textContent = merging ? t('drop.multiSub') : t('drop.singleSub');
     dropZone.setAttribute('aria-label', merging ? t('drop.multiAria') : t('drop.singleAria'));
+    fileRemoveBtn.disabled = !hasCurrentPdf;
+    fileRemoveBtn.hidden = !hasCurrentPdf;
+    fileRemoveBtn.setAttribute('aria-label', t('file.removeAria', { name: state.fileName || 'PDF' }));
   }
 
   // ── Helpers ──
@@ -783,6 +826,7 @@
       'file.size': 'Size',
       'file.status': 'Status',
       'file.renameTitle': 'Click to rename',
+      'file.removeAria': 'Remove {name}',
       'status.ready': 'ready',
       'status.readySafe': 'ready · safe',
       'status.loading': 'loading',
@@ -1004,6 +1048,7 @@
       'file.size': '大小',
       'file.status': '状态',
       'file.renameTitle': '点击重命名',
+      'file.removeAria': '移除 {name}',
       'status.ready': '就绪',
       'status.readySafe': '就绪 · 安全',
       'status.loading': '加载中',
@@ -1207,6 +1252,7 @@
       'file.size': '大小',
       'file.status': '狀態',
       'file.renameTitle': '點擊重新命名',
+      'file.removeAria': '移除 {name}',
       'status.ready': '就緒',
       'status.readySafe': '就緒 · 安全',
       'status.loading': '載入中',
@@ -1425,6 +1471,7 @@
       'file.size': '크기',
       'file.status': '상태',
       'file.renameTitle': '이름 바꾸기',
+      'file.removeAria': '{name} 제거',
       'status.ready': '준비됨',
       'status.readySafe': '준비됨 · 안전 모드',
       'status.loading': '불러오는 중',
@@ -1643,6 +1690,7 @@
       'file.size': 'サイズ',
       'file.status': '状態',
       'file.renameTitle': '名前を変更',
+      'file.removeAria': '{name}を削除',
       'status.ready': '準備完了',
       'status.readySafe': '準備完了 · 安全モード',
       'status.loading': '読み込み中',
@@ -1860,6 +1908,7 @@
       'file.size': 'Tamaño',
       'file.status': 'Estado',
       'file.renameTitle': 'Haz clic para cambiar el nombre',
+      'file.removeAria': 'Quitar {name}',
       'status.ready': 'listo',
       'status.readySafe': 'listo · seguro',
       'status.loading': 'cargando',
@@ -2077,6 +2126,7 @@
       'file.size': 'Taille',
       'file.status': 'État',
       'file.renameTitle': 'Cliquer pour renommer',
+      'file.removeAria': 'Supprimer {name}',
       'status.ready': 'prêt',
       'status.readySafe': 'prêt · sécurisé',
       'status.loading': 'chargement',
@@ -2276,6 +2326,188 @@
       'tool.greyscale.downloadLabel': 'Exporter le PDF en gris',
       'tool.greyscale.downloadSub': 'rendre et télécharger toutes les pages',
     },
+  });
+
+  const SIGN_LOCALES = {
+    en: {
+      'sections.sign': 'II. Sign PDF',
+      'preview.titleSign': 'Sign <em>— drag your signature onto the page</em>',
+      'progress.exportingSignedPdf': 'Exporting signed PDF…',
+      'errors.noSignature': 'Draw a signature and place it on the PDF before exporting.',
+      'errors.signaturePageMissing': 'The signed page is not included in this export.',
+      'sign.padAria': 'Signature drawing pad',
+      'sign.clear': 'Clear',
+      'sign.removeSelected': 'Remove selected',
+      'sign.drawSignature': 'draw signature',
+      'sign.ready': 'ready to place',
+      'sign.drawFirst': 'Draw a signature first',
+      'sign.dragToPage': 'Drag signature to the PDF',
+      'sign.uploadPdf': 'Upload a PDF to place it',
+      'sign.summaryEmpty': 'Draw a signature, then drag it onto the page.',
+      'sign.summaryNoPdf': 'Upload a PDF after drawing your signature.',
+      'sign.summaryReady': 'Drag the signature onto the page preview.',
+      'sign.summaryPlaced': 'Signature placed on page {page}. Drag it again to adjust.',
+      'sign.summaryPlacedCount': '{count} signatures placed. Drag to move; drag corners to resize.',
+      'tool.sign.label': 'Sign',
+      'tool.sign.lede': 'Draw a signature and place it directly on a PDF page.',
+      'tool.sign.meta': 'Draw your signature locally<br/>Drag it onto the page preview<br/>Export without rasterizing the PDF',
+      'tool.sign.downloadLabel': 'Export Signed PDF',
+      'tool.sign.downloadSub': 'stamp the signature onto the PDF',
+    },
+    'zh-Hans': {
+      'sections.sign': 'II. 签署 PDF',
+      'preview.titleSign': '签署 <em>— 将签名拖到页面上</em>',
+      'progress.exportingSignedPdf': '正在导出签署后的 PDF…',
+      'errors.noSignature': '请先绘制签名并放到 PDF 上，再进行导出。',
+      'errors.signaturePageMissing': '包含签名的页面不在本次导出范围内。',
+      'sign.padAria': '签名绘制区域',
+      'sign.clear': '清除',
+      'sign.removeSelected': '移除所选',
+      'sign.drawSignature': '绘制签名',
+      'sign.ready': '可放置',
+      'sign.drawFirst': '请先绘制签名',
+      'sign.dragToPage': '将签名拖到 PDF 上',
+      'sign.uploadPdf': '上传 PDF 后即可放置',
+      'sign.summaryEmpty': '绘制签名后，将它拖到页面上。',
+      'sign.summaryNoPdf': '绘制签名后请上传 PDF。',
+      'sign.summaryReady': '将签名拖到页面预览中。',
+      'sign.summaryPlaced': '签名已放在第 {page} 页。可继续拖动调整位置。',
+      'sign.summaryPlacedCount': '已放置 {count} 个签名。拖动可移动，拖动角点可调整大小。',
+      'tool.sign.label': '签署',
+      'tool.sign.lede': '绘制签名并直接放到 PDF 页面上。',
+      'tool.sign.meta': '本地绘制签名<br/>拖到页面预览中<br/>导出时不栅格化 PDF',
+      'tool.sign.downloadLabel': '导出签署后的 PDF',
+      'tool.sign.downloadSub': '将签名盖到 PDF 上',
+    },
+    'zh-Hant-TW': {
+      'sections.sign': 'II. 簽署 PDF',
+      'preview.titleSign': '簽署 <em>— 將簽名拖到頁面上</em>',
+      'progress.exportingSignedPdf': '正在匯出簽署後的 PDF…',
+      'errors.noSignature': '請先繪製簽名並放到 PDF 上，再進行匯出。',
+      'errors.signaturePageMissing': '包含簽名的頁面不在本次匯出範圍內。',
+      'sign.padAria': '簽名繪製區域',
+      'sign.clear': '清除',
+      'sign.removeSelected': '移除所選',
+      'sign.drawSignature': '繪製簽名',
+      'sign.ready': '可放置',
+      'sign.drawFirst': '請先繪製簽名',
+      'sign.dragToPage': '將簽名拖到 PDF 上',
+      'sign.uploadPdf': '上傳 PDF 後即可放置',
+      'sign.summaryEmpty': '繪製簽名後，將它拖到頁面上。',
+      'sign.summaryNoPdf': '繪製簽名後請上傳 PDF。',
+      'sign.summaryReady': '將簽名拖到頁面預覽中。',
+      'sign.summaryPlaced': '簽名已放在第 {page} 頁。可繼續拖曳調整位置。',
+      'sign.summaryPlacedCount': '已放置 {count} 個簽名。拖曳可移動，拖曳角點可調整大小。',
+      'tool.sign.label': '簽署',
+      'tool.sign.lede': '繪製簽名並直接放到 PDF 頁面上。',
+      'tool.sign.meta': '本機繪製簽名<br/>拖到頁面預覽中<br/>匯出時不光柵化 PDF',
+      'tool.sign.downloadLabel': '匯出簽署後的 PDF',
+      'tool.sign.downloadSub': '將簽名加到 PDF 上',
+    },
+    ko: {
+      'sections.sign': 'II. PDF 서명',
+      'preview.titleSign': '서명 <em>— 서명을 페이지 위로 끌어 놓기</em>',
+      'progress.exportingSignedPdf': '서명된 PDF 내보내는 중…',
+      'errors.noSignature': '내보내기 전에 서명을 그리고 PDF에 배치하세요.',
+      'errors.signaturePageMissing': '서명된 페이지가 이번 내보내기에 포함되어 있지 않습니다.',
+      'sign.padAria': '서명 입력 패드',
+      'sign.clear': '지우기',
+      'sign.removeSelected': '선택 항목 제거',
+      'sign.drawSignature': '서명 그리기',
+      'sign.ready': '배치 가능',
+      'sign.drawFirst': '먼저 서명을 그리세요',
+      'sign.dragToPage': '서명을 PDF로 끌어 놓기',
+      'sign.uploadPdf': 'PDF를 업로드하면 배치할 수 있습니다',
+      'sign.summaryEmpty': '서명을 그린 뒤 페이지 위로 끌어 놓으세요.',
+      'sign.summaryNoPdf': '서명을 그린 뒤 PDF를 업로드하세요.',
+      'sign.summaryReady': '서명을 페이지 미리보기 위로 끌어 놓으세요.',
+      'sign.summaryPlaced': '{page}페이지에 서명이 배치되었습니다. 다시 끌어 위치를 조정하세요.',
+      'sign.summaryPlacedCount': '서명 {count}개가 배치되었습니다. 끌어서 이동하고 모서리를 끌어 크기를 조정하세요.',
+      'tool.sign.label': '서명',
+      'tool.sign.lede': '서명을 그려 PDF 페이지에 바로 배치합니다.',
+      'tool.sign.meta': '브라우저에서 서명 그리기<br/>페이지 미리보기로 끌어 놓기<br/>PDF를 래스터화하지 않고 내보내기',
+      'tool.sign.downloadLabel': '서명된 PDF 내보내기',
+      'tool.sign.downloadSub': 'PDF에 서명 추가',
+    },
+    ja: {
+      'sections.sign': 'II. PDFに署名',
+      'preview.titleSign': '署名 <em>— 署名をページ上へドラッグ</em>',
+      'progress.exportingSignedPdf': '署名済みPDFを書き出しています…',
+      'errors.noSignature': '書き出す前に署名を描いてPDF上に配置してください。',
+      'errors.signaturePageMissing': '署名したページが今回の書き出し範囲に含まれていません。',
+      'sign.padAria': '署名入力パッド',
+      'sign.clear': '消去',
+      'sign.removeSelected': '選択を削除',
+      'sign.drawSignature': '署名を描く',
+      'sign.ready': '配置できます',
+      'sign.drawFirst': '先に署名を描いてください',
+      'sign.dragToPage': '署名をPDFへドラッグ',
+      'sign.uploadPdf': 'PDFをアップロードすると配置できます',
+      'sign.summaryEmpty': '署名を描いてからページ上へドラッグしてください。',
+      'sign.summaryNoPdf': '署名を描いたあと、PDFをアップロードしてください。',
+      'sign.summaryReady': '署名をページプレビュー上へドラッグしてください。',
+      'sign.summaryPlaced': '{page}ページに署名を配置しました。ドラッグして位置を調整できます。',
+      'sign.summaryPlacedCount': '{count}個の署名を配置しました。ドラッグで移動、角をドラッグしてサイズ調整できます。',
+      'tool.sign.label': '署名',
+      'tool.sign.lede': '署名を描いてPDFページに直接配置します。',
+      'tool.sign.meta': 'ブラウザ内で署名を描画<br/>ページプレビューへドラッグ<br/>PDFをラスタライズせずに書き出し',
+      'tool.sign.downloadLabel': '署名済みPDFを書き出し',
+      'tool.sign.downloadSub': 'PDFに署名を追加',
+    },
+    es: {
+      'sections.sign': 'II. Firmar PDF',
+      'preview.titleSign': 'Firmar <em>— arrastra tu firma a la página</em>',
+      'progress.exportingSignedPdf': 'Exportando PDF firmado…',
+      'errors.noSignature': 'Dibuja una firma y colócala en el PDF antes de exportar.',
+      'errors.signaturePageMissing': 'La página firmada no está incluida en esta exportación.',
+      'sign.padAria': 'Área para dibujar la firma',
+      'sign.clear': 'Borrar',
+      'sign.removeSelected': 'Quitar selección',
+      'sign.drawSignature': 'dibujar firma',
+      'sign.ready': 'lista para colocar',
+      'sign.drawFirst': 'Dibuja una firma primero',
+      'sign.dragToPage': 'Arrastra la firma al PDF',
+      'sign.uploadPdf': 'Sube un PDF para colocarla',
+      'sign.summaryEmpty': 'Dibuja una firma y luego arrástrala a la página.',
+      'sign.summaryNoPdf': 'Sube un PDF después de dibujar la firma.',
+      'sign.summaryReady': 'Arrastra la firma a la vista previa de la página.',
+      'sign.summaryPlaced': 'Firma colocada en la página {page}. Arrástrala de nuevo para ajustarla.',
+      'sign.summaryPlacedCount': '{count} firmas colocadas. Arrastra para mover; arrastra las esquinas para redimensionar.',
+      'tool.sign.label': 'Firmar',
+      'tool.sign.lede': 'Dibuja una firma y colócala directamente en una página del PDF.',
+      'tool.sign.meta': 'Dibuja tu firma localmente<br/>Arrástrala a la vista previa<br/>Exporta sin rasterizar el PDF',
+      'tool.sign.downloadLabel': 'Exportar PDF firmado',
+      'tool.sign.downloadSub': 'estampar la firma en el PDF',
+    },
+    fr: {
+      'sections.sign': 'II. Signer le PDF',
+      'preview.titleSign': 'Signer <em>— faites glisser votre signature sur la page</em>',
+      'progress.exportingSignedPdf': 'Export du PDF signé…',
+      'errors.noSignature': 'Dessinez une signature et placez-la sur le PDF avant d’exporter.',
+      'errors.signaturePageMissing': 'La page signée n’est pas incluse dans cet export.',
+      'sign.padAria': 'Zone de dessin de la signature',
+      'sign.clear': 'Effacer',
+      'sign.removeSelected': 'Supprimer la sélection',
+      'sign.drawSignature': 'dessiner la signature',
+      'sign.ready': 'prête à placer',
+      'sign.drawFirst': 'Dessinez d’abord une signature',
+      'sign.dragToPage': 'Faites glisser la signature sur le PDF',
+      'sign.uploadPdf': 'Importez un PDF pour la placer',
+      'sign.summaryEmpty': 'Dessinez une signature, puis faites-la glisser sur la page.',
+      'sign.summaryNoPdf': 'Importez un PDF après avoir dessiné votre signature.',
+      'sign.summaryReady': 'Faites glisser la signature sur l’aperçu de la page.',
+      'sign.summaryPlaced': 'Signature placée sur la page {page}. Faites-la glisser à nouveau pour l’ajuster.',
+      'sign.summaryPlacedCount': '{count} signatures placées. Faites glisser pour déplacer ; tirez les coins pour redimensionner.',
+      'tool.sign.label': 'Signer',
+      'tool.sign.lede': 'Dessinez une signature et placez-la directement sur une page du PDF.',
+      'tool.sign.meta': 'Dessinez votre signature localement<br/>Faites-la glisser sur l’aperçu<br/>Exportez sans pixelliser le PDF',
+      'tool.sign.downloadLabel': 'Exporter le PDF signé',
+      'tool.sign.downloadSub': 'apposer la signature sur le PDF',
+    },
+  };
+
+  Object.entries(SIGN_LOCALES).forEach(([locale, additions]) => {
+    Object.assign(LOCALES[locale], additions);
   });
 
   function concatBytes(...parts) {
@@ -3125,7 +3357,9 @@
       ? true
       : activeTool === 'merge'
         ? state.mergeFiles.length === 0
-        : !state.pdfDoc || count === 0;
+        : activeTool === 'sign'
+          ? !signatureCanExport()
+          : !state.pdfDoc || count === 0;
     resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
     organizeHint.textContent = state.pdfDoc
       ? (state.splitPoints.length
@@ -3142,6 +3376,8 @@
       ? (count ? t('proof.outputPages', { count }) : t('proof.noPages'))
       : t('proof.awaiting');
     syncAdvancedOptions();
+    syncSignatureControls();
+    updateSignatureOverlay();
     updatePreviewMode();
     if (activeTool === 'edit') {
       syncEditControls();
@@ -3210,6 +3446,7 @@
       else state.fileName = currentName;
       fileNameEl.textContent = state.fileName;
       fileNameEl.title = t('file.renameTitle');
+      updateSourceDropMode();
     };
 
     input.addEventListener('keydown', e => {
@@ -3226,6 +3463,55 @@
       beginFileNameEdit();
     }
   });
+
+  function clearCurrentPdf() {
+    clearError();
+    if (state.pdfDoc?.destroy) {
+      try { state.pdfDoc.destroy(); } catch {}
+    }
+    state.mergeFiles = state.mergeFiles.filter(file => !isCurrentPdfMergeFile(file));
+    resetRenderCaches();
+    state.pdfDoc = null;
+    state.numPages = 0;
+    state.curPage = 1;
+    state.pages = [];
+    state.pageOrder = [];
+    state.splitPoints = [];
+    state.splitNames = [];
+    state.pageEdits = [];
+    state.fileName = '';
+    state.fileSize = 0;
+    state.pdfBytes = null;
+    signatureState.stamps = [];
+    signatureState.selectedId = null;
+    signatureState.drag = null;
+    signatureState.nextId = 1;
+    state.largePdfSafeMode = false;
+    state.fullPageCacheOrder = [];
+    previewCanvas.width = 0;
+    previewCanvas.height = 0;
+    pageEditorCanvas.width = 0;
+    pageEditorCanvas.height = 0;
+    canvasWrap.style.display = 'none';
+    pageEditorCanvasWrap.style.display = 'none';
+    fileNameEl.textContent = '—';
+    fileNameEl.title = '';
+    fileNameEl.removeAttribute('tabindex');
+    fileSizeEl.textContent = '—';
+    fileStatusEl.textContent = t('status.ready');
+    fileCard.classList.remove('on');
+    downloadBtn.disabled = activeTool !== 'merge';
+    zoomLevel = 1;
+    updateSourceDropMode();
+    updateMergeState();
+    syncSignatureControls();
+    updateSignatureOverlay();
+    updatePageState();
+    syncPreviewStageHeight();
+    applyZoom({ preserveCenter: false });
+  }
+
+  fileRemoveBtn.addEventListener('click', clearCurrentPdf);
 
   function renderMergeList() {
     mergeList.innerHTML = '';
@@ -3411,6 +3697,10 @@
 
   async function loadPdfBytes(buf, fileName, fileSize, loadingLabel = t('progress.loadingPdf')) {
     resetRenderCaches();
+    signatureState.stamps = [];
+    signatureState.selectedId = null;
+    signatureState.drag = null;
+    signatureState.nextId = 1;
     state.fileName = normalizePdfName(fileName);
     state.fileSize = fileSize;
     fileNameEl.textContent = state.fileName;
@@ -3419,8 +3709,9 @@
     fileSizeEl.textContent = fmtBytes(fileSize);
     fileStatusEl.textContent = t('status.loading');
     fileCard.classList.add('on');
-    setLoader(true, loadingLabel, 0);
     state.pdfBytes = buf.slice(0);
+    updateSourceDropMode();
+    setLoader(true, loadingLabel, 0);
     const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
     state.pdfDoc = pdf;
     state.numPages = pdf.numPages;
@@ -3432,7 +3723,7 @@
     state.splitPoints = [];
     state.splitNames = [];
     updatePageState();
-    const lazyOpen = state.largePdfSafeMode || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit' || activeTool === 'compress';
+    const lazyOpen = state.largePdfSafeMode || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit' || activeTool === 'sign' || activeTool === 'compress';
     if (lazyOpen) {
       setLoader(true, state.largePdfSafeMode ? t('progress.openingLargePdf') : t('progress.openingPdf'), 45);
       await ensurePageMeta(0);
@@ -3449,6 +3740,7 @@
     zoomInBtn.disabled = false;
     zoomOutBtn.disabled = false;
     updatePageState();
+    updateSourceDropMode();
     syncPreviewStageHeight();
     drawPreview();
     drawHistogram();
@@ -3482,7 +3774,7 @@
   }
 
   function isOriginalPreviewTool(id = activeTool) {
-    return id === 'preview' || id === 'merge' || id === 'compress';
+    return id === 'preview' || id === 'merge' || id === 'compress' || id === 'sign';
   }
 
   function getOriginalPreviewScale(baseVp, targetCssWidth) {
@@ -3630,11 +3922,395 @@
 
   function applyThumbnailToElements(sourceIndex, thumbUrl) {
     document.querySelectorAll('[data-thumb-source="' + sourceIndex + '"]').forEach(el => {
+      if (el.dataset.editThumbSource != null && isPageEdited(getPageEdit(sourceIndex))) return;
       if (el.tagName === 'IMG') el.src = thumbUrl;
       else el.style.backgroundImage = 'url("' + thumbUrl + '")';
       el.textContent = '';
       el.setAttribute('aria-label', 'Page thumbnail ' + (sourceIndex + 1));
     });
+  }
+
+  function applyEditedThumbnailToElements(sourceIndex, thumbUrl) {
+    document.querySelectorAll('[data-edit-thumb-source="' + sourceIndex + '"]').forEach(el => {
+      if (el.tagName === 'IMG') el.src = thumbUrl;
+      else el.style.backgroundImage = 'url("' + thumbUrl + '")';
+      el.textContent = '';
+      el.setAttribute('aria-label', 'Edited page thumbnail ' + (sourceIndex + 1));
+    });
+  }
+
+  let editThumbnailTimer = null;
+  let editThumbnailToken = 0;
+  function requestEditedThumbnailRender(sourceIndex = currentSourceIndex(), delay = 500) {
+    if (sourceIndex == null) return;
+    if (editThumbnailTimer) clearTimeout(editThumbnailTimer);
+    editThumbnailTimer = setTimeout(async () => {
+      editThumbnailTimer = null;
+      const token = ++editThumbnailToken;
+      if (!state.pdfDoc) return;
+      const edit = clonePageEdit(getPageEdit(sourceIndex));
+      try {
+        const thumbUrl = isPageEdited(edit)
+          ? await renderEditedThumbnail(sourceIndex, edit)
+          : await ensureThumbnail(sourceIndex, 'high');
+        if (token === editThumbnailToken && thumbUrl) applyEditedThumbnailToElements(sourceIndex, thumbUrl);
+      } catch (err) {
+        console.warn('Edited thumbnail render failed', err);
+      }
+    }, delay);
+  }
+
+  function resetSignaturePadCanvas() {
+    if (!signaturePad) return;
+    signaturePad.width = 900;
+    signaturePad.height = 300;
+    const ctx = signaturePad.getContext('2d');
+    ctx.clearRect(0, 0, signaturePad.width, signaturePad.height);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#0c0a08';
+  }
+
+  function signaturePadPoint(e) {
+    const rect = signaturePad.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / Math.max(1, rect.width)) * signaturePad.width,
+      y: ((e.clientY - rect.top) / Math.max(1, rect.height)) * signaturePad.height,
+    };
+  }
+
+  function trimmedSignatureFromPad() {
+    if (!signaturePad) return null;
+    const ctx = signaturePad.getContext('2d');
+    const width = signaturePad.width;
+    const height = signaturePad.height;
+    const img = ctx.getImageData(0, 0, width, height);
+    const data = img.data;
+    let minX = width;
+    let minY = height;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        if (data[i + 3] <= 8) continue;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+    if (maxX < minX || maxY < minY) return null;
+    const pad = 18;
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX = Math.min(width - 1, maxX + pad);
+    maxY = Math.min(height - 1, maxY + pad);
+    const trimW = Math.max(1, maxX - minX + 1);
+    const trimH = Math.max(1, maxY - minY + 1);
+    const out = document.createElement('canvas');
+    out.width = trimW;
+    out.height = trimH;
+    out.getContext('2d').drawImage(signaturePad, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+    return {
+      dataUrl: out.toDataURL('image/png'),
+      ratio: trimW / Math.max(1, trimH),
+    };
+  }
+
+  function updateSignatureFromPad() {
+    const trimmed = trimmedSignatureFromPad();
+    if (!trimmed) {
+      clearSignature();
+      return;
+    }
+    signatureState.hasInk = true;
+    signatureState.dataUrl = trimmed.dataUrl;
+    signatureState.ratio = trimmed.ratio;
+    syncSignatureControls();
+    updateSignatureOverlay();
+  }
+
+  function clearSignature() {
+    resetSignaturePadCanvas();
+    signatureState.hasInk = false;
+    signatureState.dataUrl = '';
+    syncSignatureControls();
+    updateSignatureOverlay();
+    updatePageState();
+  }
+
+  function activeSignatureStamps(pageOrder = state.pageOrder) {
+    const includedPages = new Set(pageOrder);
+    return signatureState.stamps.filter(stamp => includedPages.has(stamp.pageIndex));
+  }
+
+  function currentPageSignatureStamps() {
+    const sourceIndex = currentSourceIndex();
+    return signatureState.stamps.filter(stamp => stamp.pageIndex === sourceIndex);
+  }
+
+  function getSignatureStamp(id) {
+    return signatureState.stamps.find(stamp => stamp.id === id) || null;
+  }
+
+  function signatureCanExport(pageOrder = state.pageOrder) {
+    return !!state.pdfDoc && activeSignatureStamps(pageOrder).length > 0;
+  }
+
+  function syncSignatureControls() {
+    if (!signaturePad) return;
+    const hasPdf = !!state.pdfDoc;
+    const hasInk = !!signatureState.dataUrl;
+    const placedCount = activeSignatureStamps().length;
+    const selected = !!getSignatureStamp(signatureState.selectedId);
+    signHint.textContent = hasInk ? t('sign.ready') : t('sign.drawSignature');
+    signatureClearBtn.disabled = !hasInk;
+    signatureRemoveBtn.disabled = !selected;
+    signatureDragSource.classList.toggle('is-empty', !hasInk);
+    if (signatureDragPreview) {
+      signatureDragPreview.hidden = !hasInk;
+      signatureDragPreview.src = hasInk ? signatureState.dataUrl : '';
+    }
+    signatureDragLabel.textContent = !hasInk
+      ? t('sign.drawFirst')
+      : hasPdf
+        ? t('sign.dragToPage')
+        : t('sign.uploadPdf');
+    signatureDragLabel.hidden = hasInk;
+    signatureDragSource.setAttribute('aria-label', hasInk ? t('sign.dragToPage') : t('sign.drawFirst'));
+    if (!hasInk && !placedCount) signSummary.textContent = t('sign.summaryEmpty');
+    else if (!hasPdf) signSummary.textContent = t('sign.summaryNoPdf');
+    else if (!placedCount) signSummary.textContent = t('sign.summaryReady');
+    else signSummary.textContent = t('sign.summaryPlacedCount', { count: placedCount });
+  }
+
+  function defaultSignaturePlacement(rect, dataUrl = signatureState.dataUrl, ratio = signatureState.ratio) {
+    const wPct = Math.max(18, Math.min(38, (190 / Math.max(1, rect.width)) * 100));
+    const hPct = (rect.width * wPct / 100 / Math.max(0.1, ratio)) / Math.max(1, rect.height) * 100;
+    return {
+      id: signatureState.nextId++,
+      pageIndex: currentSourceIndex(),
+      dataUrl,
+      ratio,
+      xPct: 50 - wPct / 2,
+      yPct: 50 - hPct / 2,
+      wPct,
+      hPct,
+    };
+  }
+
+  function clampSignatureStamp(stamp) {
+    stamp.wPct = Math.max(5, Math.min(100, stamp.wPct));
+    stamp.hPct = Math.max(2, Math.min(100, stamp.hPct));
+    stamp.xPct = Math.max(0, Math.min(100 - stamp.wPct, stamp.xPct));
+    stamp.yPct = Math.max(0, Math.min(100 - stamp.hPct, stamp.yPct));
+    return stamp;
+  }
+
+  function setSignatureStampFromPoint(clientX, clientY, drag) {
+    const rect = previewCanvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return false;
+    let stamp = getSignatureStamp(drag.id);
+    if (!stamp && drag.mode === 'new') {
+      stamp = defaultSignaturePlacement(rect, drag.dataUrl, drag.ratio);
+      signatureState.stamps.push(stamp);
+      drag.id = stamp.id;
+      signatureState.selectedId = stamp.id;
+    }
+    if (!stamp) return false;
+    const wPx = rect.width * stamp.wPct / 100;
+    const hPx = rect.height * stamp.hPct / 100;
+    stamp.pageIndex = currentSourceIndex();
+    stamp.xPct = ((clientX - rect.left - wPx * drag.offsetX) / rect.width) * 100;
+    stamp.yPct = ((clientY - rect.top - hPx * drag.offsetY) / rect.height) * 100;
+    clampSignatureStamp(stamp);
+    syncSignatureControls();
+    updateSignatureOverlay();
+    downloadBtn.disabled = !signatureCanExport();
+    return true;
+  }
+
+  function resizeSignatureStampFromPointer(e, drag) {
+    const stamp = getSignatureStamp(drag.id);
+    const rect = drag.pageRect || previewCanvas.getBoundingClientRect();
+    if (!stamp || !drag.startStamp || !rect.width || !rect.height) return false;
+    const start = drag.startStamp;
+    const ratio = Math.max(0.1, start.ratio || stamp.ratio || signatureState.ratio);
+    const left = rect.width * start.xPct / 100;
+    const top = rect.height * start.yPct / 100;
+    const width = rect.width * start.wPct / 100;
+    const height = rect.height * start.hPct / 100;
+    const right = left + width;
+    const bottom = top + height;
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    const handle = drag.handle || 'se';
+    const widthFromX = handle.includes('w') ? right - localX : localX - left;
+    const widthFromY = (handle.includes('n') ? bottom - localY : localY - top) * ratio;
+    const minW = Math.min(rect.width, Math.max(36, rect.width * 0.05));
+    const maxByX = handle.includes('w') ? right : rect.width - left;
+    const maxByY = (handle.includes('n') ? bottom : rect.height - top) * ratio;
+    const maxW = Math.max(8, Math.min(maxByX, maxByY));
+    const nextW = Math.max(8, Math.min(maxW, Math.max(minW, widthFromX, widthFromY)));
+    const nextH = nextW / ratio;
+    const nextLeft = handle.includes('w') ? right - nextW : left;
+    const nextTop = handle.includes('n') ? bottom - nextH : top;
+    stamp.xPct = (nextLeft / rect.width) * 100;
+    stamp.yPct = (nextTop / rect.height) * 100;
+    stamp.wPct = (nextW / rect.width) * 100;
+    stamp.hPct = (nextH / rect.height) * 100;
+    clampSignatureStamp(stamp);
+    syncSignatureControls();
+    updateSignatureOverlay();
+    downloadBtn.disabled = !signatureCanExport();
+    return true;
+  }
+
+  function createSignatureStampElement(stamp) {
+    const el = document.createElement('div');
+    el.className = 'signature-stamp';
+    if (stamp.id === signatureState.selectedId) el.classList.add('selected');
+    if (signatureState.drag?.id === stamp.id) el.classList.add('dragging');
+    el.dataset.signatureId = String(stamp.id);
+    el.style.left = stamp.xPct + '%';
+    el.style.top = stamp.yPct + '%';
+    el.style.width = stamp.wPct + '%';
+    el.style.height = stamp.hPct + '%';
+
+    const img = document.createElement('img');
+    img.alt = '';
+    img.src = stamp.dataUrl;
+    el.appendChild(img);
+
+    ['nw', 'ne', 'se', 'sw'].forEach(handle => {
+      const resizeHandle = document.createElement('span');
+      resizeHandle.className = 'signature-resize-handle';
+      resizeHandle.dataset.signatureHandle = handle;
+      el.appendChild(resizeHandle);
+    });
+    return el;
+  }
+
+  function updateSignatureOverlay() {
+    if (!signatureOverlay) return;
+    const visible = activeTool === 'sign'
+      && !!state.pdfDoc
+      && canvasWrap.style.display !== 'none';
+    signatureOverlay.hidden = !visible;
+    signatureOverlay.innerHTML = '';
+    if (!visible) return;
+    currentPageSignatureStamps().forEach(stamp => {
+      signatureOverlay.appendChild(createSignatureStampElement(stamp));
+    });
+  }
+
+  function deleteSelectedSignatureStamp() {
+    if (signatureState.selectedId == null) return false;
+    const before = signatureState.stamps.length;
+    signatureState.stamps = signatureState.stamps.filter(stamp => stamp.id !== signatureState.selectedId);
+    if (signatureState.stamps.length === before) return false;
+    signatureState.selectedId = null;
+    syncSignatureControls();
+    updateSignatureOverlay();
+    updatePageState();
+    return true;
+  }
+
+  function createSignatureGhost(dataUrl = signatureState.dataUrl) {
+    const ghost = document.createElement('div');
+    ghost.className = 'signature-ghost';
+    ghost.style.backgroundImage = 'url("' + dataUrl + '")';
+    document.body.appendChild(ghost);
+    return ghost;
+  }
+
+  function moveSignatureDrag(e) {
+    const drag = signatureState.drag;
+    if (!drag) return;
+    if (drag.mode === 'resize') {
+      resizeSignatureStampFromPointer(e, drag);
+      return;
+    }
+    const rect = previewCanvas.getBoundingClientRect();
+    const overPage = activeTool === 'sign' && state.pdfDoc && rect.width && rect.height
+      && e.clientX >= rect.left && e.clientX <= rect.right
+      && e.clientY >= rect.top && e.clientY <= rect.bottom;
+    if (overPage || drag.id) {
+      setSignatureStampFromPoint(e.clientX, e.clientY, drag);
+      if (drag.ghost) drag.ghost.style.display = 'none';
+    } else if (drag.ghost) {
+      drag.ghost.style.display = 'block';
+      drag.ghost.style.left = e.clientX + 'px';
+      drag.ghost.style.top = e.clientY + 'px';
+    }
+  }
+
+  function endSignatureDrag(e) {
+    if (!signatureState.drag) return;
+    moveSignatureDrag(e);
+    signatureDragSource.classList.remove('dragging');
+    if (signatureState.drag.ghost) signatureState.drag.ghost.remove();
+    window.removeEventListener('pointermove', moveSignatureDrag);
+    window.removeEventListener('pointerup', endSignatureDrag);
+    window.removeEventListener('pointercancel', endSignatureDrag);
+    signatureState.drag = null;
+    updatePageState();
+  }
+
+  function beginSignatureDragFromSource(e) {
+    if (!signatureState.dataUrl || !state.pdfDoc || activeTool !== 'sign') return;
+    e.preventDefault();
+    signatureState.drag = {
+      mode: 'new',
+      id: null,
+      dataUrl: signatureState.dataUrl,
+      ratio: signatureState.ratio,
+      offsetX: 0.5,
+      offsetY: 0.5,
+      ghost: createSignatureGhost(),
+    };
+    signatureDragSource.classList.add('dragging');
+    window.addEventListener('pointermove', moveSignatureDrag);
+    window.addEventListener('pointerup', endSignatureDrag);
+    window.addEventListener('pointercancel', endSignatureDrag);
+    moveSignatureDrag(e);
+  }
+
+  function beginSignatureOverlayDrag(e) {
+    if (activeTool !== 'sign' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const stampEl = e.target.closest('.signature-stamp');
+    if (!stampEl || !signatureOverlay.contains(stampEl)) return;
+    const stamp = getSignatureStamp(Number(stampEl.dataset.signatureId));
+    if (!stamp) return;
+    e.preventDefault();
+    e.stopPropagation();
+    signatureState.selectedId = stamp.id;
+    const handleEl = e.target.closest('[data-signature-handle]');
+    if (handleEl && stampEl.contains(handleEl)) {
+      signatureState.drag = {
+        mode: 'resize',
+        id: stamp.id,
+        handle: handleEl.dataset.signatureHandle || 'se',
+        startStamp: { ...stamp },
+        pageRect: previewCanvas.getBoundingClientRect(),
+        ghost: null,
+      };
+    } else {
+      const rect = stampEl.getBoundingClientRect();
+      signatureState.drag = {
+        mode: 'move',
+        id: stamp.id,
+        offsetX: (e.clientX - rect.left) / Math.max(1, rect.width),
+        offsetY: (e.clientY - rect.top) / Math.max(1, rect.height),
+        ghost: null,
+      };
+    }
+    updateSignatureOverlay();
+    window.addEventListener('pointermove', moveSignatureDrag);
+    window.addEventListener('pointerup', endSignatureDrag);
+    window.addEventListener('pointercancel', endSignatureDrag);
   }
 
   async function ensureThumbnail(sourceIndex, quality = 'low') {
@@ -3820,6 +4496,7 @@
     state.pages[sourceIndex] = updated;
     if (sourceIndex === currentSourceIndex()) {
       proofMeta.textContent = t('proof.pagePixels', { w: nextW, h: nextH, page: state.curPage, count: activePageCount() });
+      updateSignatureOverlay();
     }
     return true;
   }
@@ -3842,7 +4519,10 @@
         const rendered = await renderOriginalPreviewPass(pd, sourceIndex, targetScale, token, true);
         if (rendered && token === originalPreviewRenderToken && isOriginalPreviewTool() && sourceIndex === currentSourceIndex()) {
           applyZoom({ preserveCenter: false });
-          if (zoomLevel > 1.001) requestAnimationFrame(() => restoreScrollCenter(center));
+          if (zoomLevel > 1.001) requestAnimationFrame(() => {
+            restoreScrollCenter(center);
+            updateSignatureOverlay();
+          });
         }
       } catch (err) {
         console.warn('High quality preview failed', err);
@@ -3858,9 +4538,9 @@
       return;
     }
     const token = ++processedPreviewRenderToken;
-    if ((activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress') && sourceIndex != null) {
+    if (isOriginalPreviewTool() && sourceIndex != null) {
       const pd = await ensurePageMeta(sourceIndex);
-      if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || (activeTool !== 'preview' && activeTool !== 'merge' && activeTool !== 'compress')) return;
+      if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || !isOriginalPreviewTool()) return;
       renderOriginalPreview(pd, sourceIndex);
       proofMeta.textContent = t('proof.pagePixels', { w: pd.w, h: pd.h, page: state.curPage, count: activePageCount() });
       return;
@@ -3976,13 +4656,24 @@
       card.dataset.outputIndex = outputIndex;
       card.dataset.sourceIndex = sourceIndex;
 
-      card.appendChild(createPageThumb(sourceIndex, 'Page ' + (outputIndex + 1)));
+      const thumb = createPageThumb(sourceIndex, 'Page ' + (outputIndex + 1));
+      thumb.dataset.editThumbSource = sourceIndex;
+      const edit = getPageEdit(sourceIndex);
+      const editedThumbUrl = state.pages[sourceIndex]?.editedThumbUrl;
+      if (isPageEdited(edit) && editedThumbUrl) {
+        if (thumb.tagName === 'IMG') thumb.src = editedThumbUrl;
+        else {
+          thumb.style.backgroundImage = 'url("' + editedThumbUrl + '")';
+          thumb.textContent = '';
+        }
+      }
+      card.appendChild(thumb);
 
       const actions = document.createElement('div');
       actions.className = 'page-card-actions';
       const badge = document.createElement('span');
       badge.className = 'page-edit-badge';
-      badge.textContent = editedLabel(getPageEdit(sourceIndex));
+      badge.textContent = editedLabel(edit);
       const num = document.createElement('div');
       num.className = 'page-number';
       num.textContent = outputIndex + 1;
@@ -4078,6 +4769,7 @@
     normalizeCrop(edit.crop, side);
     syncEditControls();
     renderPageEditor();
+    requestEditedThumbnailRender();
   }
 
   function canShowCropOverlay() {
@@ -4150,7 +4842,10 @@
     syncCropLabels(edit);
     resetEditBtn.disabled = !isPageEdited(edit);
     proofMeta.textContent = t('proof.editPage', { page: state.curPage, count: activePageCount(), edit: editedLabel(edit) });
-    if (final) renderPageEditor();
+    if (final) {
+      renderPageEditor();
+      requestEditedThumbnailRender();
+    }
   }
 
   function beginCropDrag(e) {
@@ -4235,6 +4930,18 @@
     crop.width = 0;
     crop.height = 0;
     return { w: outW, h: outH };
+  }
+
+  async function renderEditedThumbnail(sourceIndex, edit) {
+    const tmp = document.createElement('canvas');
+    const size = await renderEditedColorPreviewToCanvas(sourceIndex, edit, tmp);
+    if (!size) return null;
+    const thumbUrl = makeThumbnailUrl(tmp, 520, 720);
+    const pd = await ensurePageMeta(sourceIndex);
+    state.pages[sourceIndex] = { ...(pd || {}), editedThumbUrl: thumbUrl };
+    tmp.width = 0;
+    tmp.height = 0;
+    return thumbUrl;
   }
 
   let editedPreviewRenderToken = 0;
@@ -4820,6 +5527,68 @@
     });
   }
 
+  function pngDataUrlToBytes(dataUrl) {
+    const comma = String(dataUrl || '').indexOf(',');
+    const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  async function createSignedPdfArtifact(pageOrder, fileBase, context) {
+    const pdfLib = await ensurePdfLib();
+    if (!state.pdfBytes) throw new Error(t('errors.originalMissing'));
+    if (!pageOrder.length) throw new Error(t('errors.noPagesExport'));
+    if (!signatureState.stamps.length) throw new Error(t('errors.noSignature'));
+    const exportStamps = activeSignatureStamps(pageOrder);
+    if (!exportStamps.length) {
+      throw new Error(t('errors.signaturePageMissing'));
+    }
+
+    const src = await pdfLib.PDFDocument.load(state.pdfBytes);
+    const out = await pdfLib.PDFDocument.create();
+    const imageCache = new Map();
+    async function signatureImageFor(dataUrl) {
+      if (!imageCache.has(dataUrl)) {
+        imageCache.set(dataUrl, out.embedPng(pngDataUrlToBytes(dataUrl)));
+      }
+      return imageCache.get(dataUrl);
+    }
+    const count = pageOrder.length;
+
+    for (let i = 0; i < count; i++) {
+      const sourceIndex = pageOrder[i];
+      const [copied] = await out.copyPages(src, [sourceIndex]);
+      const pageStamps = exportStamps.filter(stamp => stamp.pageIndex === sourceIndex);
+      for (const stamp of pageStamps) {
+        const signatureImage = await signatureImageFor(stamp.dataUrl);
+        const width = copied.getWidth();
+        const height = copied.getHeight();
+        const drawWidth = width * stamp.wPct / 100;
+        const drawHeight = height * stamp.hPct / 100;
+        const x = width * stamp.xPct / 100;
+        const y = height - (height * stamp.yPct / 100) - drawHeight;
+        copied.drawImage(signatureImage, {
+          x,
+          y,
+          width: drawWidth,
+          height: drawHeight,
+        });
+      }
+      out.addPage(copied);
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    const bytes = await out.save({ useObjectStreams: !context?.advanced?.password });
+    return createPdfArtifact(bytes, fileBase, {
+      source: 'pdf-lib',
+      rasterized: false,
+      preservesOriginalQuality: true,
+      signed: true,
+    });
+  }
+
   async function exportEditedPdf(pageOrder = state.pageOrder, fileBase = outputBaseName() + TOOLS.edit.suffix) {
     const context = createExportContext('edit', pageOrder, fileBase);
     await runExportPipeline(context, () => createEditedPdfArtifact(pageOrder, fileBase, context));
@@ -5024,6 +5793,7 @@
     edit.fineRotation = Math.round((+value || 0) * 10) / 10;
     syncEditControls();
     requestEditedPreviewRender();
+    requestEditedThumbnailRender();
   }
 
   function rotateSelectedPage90(delta) {
@@ -5033,6 +5803,7 @@
     syncEditControls();
     renderPageEditor();
     drawEditedPagePreview();
+    requestEditedThumbnailRender();
   }
 
   editRotateSlider.addEventListener('input', e => setFineRotation(e.target.value));
@@ -5054,6 +5825,43 @@
   cropOverlay.addEventListener('pointerup', finishCropDrag);
   cropOverlay.addEventListener('pointercancel', finishCropDrag);
 
+  signaturePad.addEventListener('pointerdown', e => {
+    signatureState.padDrawing = true;
+    signatureState.padPointerId = e.pointerId;
+    signatureState.lastPadPoint = signaturePadPoint(e);
+    signaturePad.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  signaturePad.addEventListener('pointermove', e => {
+    if (!signatureState.padDrawing || e.pointerId !== signatureState.padPointerId) return;
+    const point = signaturePadPoint(e);
+    const ctx = signaturePad.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(signatureState.lastPadPoint.x, signatureState.lastPadPoint.y);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+    signatureState.lastPadPoint = point;
+    e.preventDefault();
+  });
+
+  function finishSignaturePadStroke(e) {
+    if (!signatureState.padDrawing || e.pointerId !== signatureState.padPointerId) return;
+    if (signaturePad.hasPointerCapture(e.pointerId)) signaturePad.releasePointerCapture(e.pointerId);
+    signatureState.padDrawing = false;
+    signatureState.padPointerId = null;
+    signatureState.lastPadPoint = null;
+    updateSignatureFromPad();
+    e.preventDefault();
+  }
+
+  signaturePad.addEventListener('pointerup', finishSignaturePadStroke);
+  signaturePad.addEventListener('pointercancel', finishSignaturePadStroke);
+  signatureClearBtn.addEventListener('click', clearSignature);
+  signatureRemoveBtn.addEventListener('click', deleteSelectedSignatureStamp);
+  signatureDragSource.addEventListener('pointerdown', beginSignatureDragFromSource);
+  signatureOverlay.addEventListener('pointerdown', beginSignatureOverlayDrag);
+
   fineQualityToggle.addEventListener('click', () => {
     state.fineRotationQuality = state.fineRotationQuality === 'ultra' ? 'high' : 'ultra';
     syncFineQualityToggle();
@@ -5066,6 +5874,7 @@
     syncEditControls();
     renderPageEditor();
     drawEditedPagePreview();
+    requestEditedThumbnailRender(sourceIndex);
   });
 
   contextSplitBtn.addEventListener('click', () => {
@@ -5085,6 +5894,13 @@
   });
 
   document.addEventListener('keydown', e => {
+    const editingText = e.target.closest?.('input, textarea, [contenteditable="true"]');
+    if ((e.key === 'Delete' || e.key === 'Backspace') && activeTool === 'sign' && !editingText) {
+      if (deleteSelectedSignatureStamp()) {
+        e.preventDefault();
+        return;
+      }
+    }
     if (e.key === 'Escape') hidePageContextMenu();
   });
 
@@ -5191,6 +6007,9 @@
       } else if (activeTool === 'edit') {
         setLoader(true, t('progress.exportingPageEdits'), 15);
         await runExportPipeline(context, () => createEditedPdfArtifact(exportOrder, context.fileBase, context));
+      } else if (activeTool === 'sign') {
+        setLoader(true, t('progress.exportingSignedPdf'), 20);
+        await runExportPipeline(context, () => createSignedPdfArtifact(exportOrder, context.fileBase, context));
       } else if (activeTool === 'compress') {
         setLoader(true, t('progress.compressingPdf'), 10);
         await runExportPipeline(context, createCompressedPdfArtifact);
@@ -5364,6 +6183,7 @@
       previewStage.classList.remove('zoomed', 'pannable', 'panning');
       previewCanvas.style.width = '';
       previewCanvas.style.height = '';
+      updateSignatureOverlay();
       return;
     }
 
@@ -5371,6 +6191,7 @@
     previewStage.classList.toggle('zoomed', isZoomedIn);
     previewCanvas.style.width = (getFitCanvasWidth(pd) * z) + 'px';
     previewCanvas.style.height = 'auto';
+    updateSignatureOverlay();
     if (isOriginalPreviewTool() && previewCanvas.width && currentSourceIndex() != null) {
       queueOriginalPreviewUpgrade(currentSourceIndex(), originalPreviewRenderToken);
     }
@@ -5379,6 +6200,7 @@
       if (isZoomedIn) restoreScrollCenter(center);
       else { previewStage.scrollLeft = 0; previewStage.scrollTop = 0; }
       updatePanCursor();
+      updateSignatureOverlay();
     });
   }
 
@@ -5413,7 +6235,7 @@
 
   // ctrl/cmd + scroll (or trackpad pinch) = continuous zoom
   previewStage.addEventListener('wheel', e => {
-    const canZoomTool = activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress' || isRasterTool(activeTool) || activeTool === 'edit';
+    const canZoomTool = activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress' || activeTool === 'sign' || isRasterTool(activeTool) || activeTool === 'edit';
     const overPdf = e.target.closest('.preview-canvas-wrap, .page-editor-canvas-wrap');
     if (!state.pdfDoc || !canZoomTool || !overPdf || (!e.ctrlKey && !e.metaKey)) return;
     e.preventDefault();
@@ -5460,6 +6282,7 @@
   window.addEventListener('resize', () => {
     syncPreviewStageHeight();
     updateToolIndicator();
+    updateSignatureOverlay();
   });
   document.querySelector('.tool-nav').addEventListener('scroll', updateToolIndicator);
 
@@ -5490,6 +6313,9 @@
   syncFineQualityToggle();
   syncToneLabels();
   syncEditControls();
+  resetSignaturePadCanvas();
+  syncSignatureControls();
+  updateSignatureOverlay();
   updatePreviewMode();
   updateToolIndicator();
 
