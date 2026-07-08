@@ -5051,9 +5051,14 @@
     sourcePageIndex: null,
     sourceFlowIndex: null,
     insertIndex: null,
+    targetInsertIndex: null,
     clone: null,
     offsetX: 0,
     offsetY: 0,
+    pointerX: 0,
+    pointerY: 0,
+    autoScrollFrame: null,
+    dragAnimationTimer: null,
   };
 
   function buildOrganizerFlow() {
@@ -5101,10 +5106,15 @@
     return rects;
   }
 
-  function animateOrganizerFrom(firstRects) {
+  function animateOrganizerFrom(firstRects, opts = {}) {
     if (!firstRects || !firstRects.size || !organizerGrid) return;
+    const baseDuration = opts.duration ?? 200;
+    const maxDuration = opts.maxDuration ?? baseDuration;
+    const distanceDuration = opts.distanceDuration ?? 0;
+    const easing = opts.easing || 'cubic-bezier(.2, .8, .2, 1)';
     const moving = [];
     organizerGrid.querySelectorAll('.page-card[data-source-index], .page-placeholder, .page-split-divider').forEach(el => {
+      if (opts.skipPlaceholder && el.classList.contains('page-placeholder')) return;
       const key = el.classList.contains('page-placeholder')
         ? '__placeholder__'
         : el.classList.contains('page-split-divider')
@@ -5118,12 +5128,14 @@
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
       el.style.transition = 'none';
       el.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
-      moving.push(el);
+      const distance = Math.hypot(dx, dy);
+      const duration = Math.min(maxDuration, Math.max(baseDuration, baseDuration + distance * distanceDuration));
+      moving.push({ el, duration });
     });
     if (!moving.length) return;
     organizerGrid.getBoundingClientRect();
     requestAnimationFrame(() => {
-      moving.forEach(el => {
+      moving.forEach(({ el, duration }) => {
         let cleared = false;
         const clear = () => {
           if (cleared) return;
@@ -5132,17 +5144,27 @@
           el.removeEventListener('transitionend', clear);
         };
         el.addEventListener('transitionend', clear, { once: true });
-        setTimeout(clear, 260);
-        el.style.transition = 'transform .2s cubic-bezier(.2, .8, .2, 1), box-shadow .16s, opacity .16s';
+        setTimeout(clear, duration + 80);
+        el.style.transition = 'transform ' + Math.round(duration) + 'ms ' + easing + ', box-shadow .16s, opacity .16s';
         el.style.transform = '';
       });
     });
   }
 
-  function rerenderOrganizerAnimated() {
+  function rerenderOrganizerAnimated(opts) {
     const firstRects = captureOrganizerRects();
     renderOrganizer();
-    animateOrganizerFrom(firstRects);
+    animateOrganizerFrom(firstRects, opts);
+  }
+
+  function rerenderOrganizerDuringDrag() {
+    rerenderOrganizerAnimated({
+      duration: 220,
+      maxDuration: 380,
+      distanceDuration: 0.24,
+      easing: 'cubic-bezier(.16, 1, .3, 1)',
+      skipPlaceholder: true,
+    });
   }
 
   function renderOrganizer() {
@@ -5344,17 +5366,21 @@
     organizerDrag.sourceOutputIndex = outputIndex;
     organizerDrag.sourcePageIndex = sourceIndex;
     organizerDrag.sourceFlowIndex = sourceFlowIndex;
-    organizerDrag.insertIndex = null;
+    organizerDrag.insertIndex = sourceFlowIndex < 0 ? null : sourceFlowIndex;
+    organizerDrag.targetInsertIndex = organizerDrag.insertIndex;
     organizerDrag.clone = clone;
     organizerDrag.offsetX = e.clientX - rect.left;
     organizerDrag.offsetY = e.clientY - rect.top;
+    organizerDrag.pointerX = e.clientX;
+    organizerDrag.pointerY = e.clientY;
 
     moveOrganizerClone(e.clientX, e.clientY);
+    startOrganizerAutoScroll();
     window.addEventListener('pointermove', onOrganizerPointerMove, { passive: false });
     window.addEventListener('pointerup', finishOrganizerDrag, { once: true });
     window.addEventListener('pointercancel', cancelOrganizerDrag, { once: true });
     e.preventDefault();
-    rerenderOrganizerAnimated();
+    rerenderOrganizerDuringDrag();
   }
 
   function moveOrganizerClone(x, y) {
@@ -5407,37 +5433,113 @@
     return rows[rows.length - 1].items.at(-1).index + 1;
   }
 
+  function clearOrganizerDragAnimationTimer() {
+    if (!organizerDrag.dragAnimationTimer) return;
+    clearTimeout(organizerDrag.dragAnimationTimer);
+    organizerDrag.dragAnimationTimer = null;
+  }
+
+  function scheduleOrganizerDragAnimation() {
+    clearOrganizerDragAnimationTimer();
+    if (!organizerDrag.active || organizerDrag.targetInsertIndex === organizerDrag.insertIndex) return;
+    organizerDrag.dragAnimationTimer = setTimeout(() => {
+      organizerDrag.dragAnimationTimer = null;
+      if (!organizerDrag.active || organizerDrag.targetInsertIndex === organizerDrag.insertIndex) return;
+      organizerDrag.insertIndex = organizerDrag.targetInsertIndex;
+      rerenderOrganizerDuringDrag();
+    }, 500);
+  }
+
+  function updateOrganizerInsertIndex(x, y) {
+    if (!organizerDrag.active) return;
+    const nextIndex = getOrganizerInsertIndex(x, y);
+    if (nextIndex !== organizerDrag.targetInsertIndex) {
+      organizerDrag.targetInsertIndex = nextIndex;
+      scheduleOrganizerDragAnimation();
+    }
+  }
+
+  function organizerAutoScrollDelta(pointerY) {
+    const rect = previewStage.getBoundingClientRect();
+    const visibleTop = Math.max(rect.top, 0);
+    const visibleBottom = Math.min(rect.bottom, window.innerHeight || document.documentElement.clientHeight || rect.bottom);
+    const visibleHeight = Math.max(1, visibleBottom - visibleTop);
+    const edge = Math.min(130, Math.max(72, visibleHeight * 0.18));
+    const maxStep = 9;
+    if (pointerY < visibleTop + edge && previewStage.scrollTop > 0) {
+      const pressure = (visibleTop + edge - pointerY) / edge;
+      return -Math.max(1, Math.round(maxStep * pressure * pressure));
+    }
+    const maxTop = Math.max(0, previewStage.scrollHeight - previewStage.clientHeight);
+    if (pointerY > visibleBottom - edge && previewStage.scrollTop < maxTop) {
+      const pressure = (pointerY - (visibleBottom - edge)) / edge;
+      return Math.max(1, Math.round(maxStep * pressure * pressure));
+    }
+    return 0;
+  }
+
+  function runOrganizerAutoScroll() {
+    if (!organizerDrag.active) {
+      organizerDrag.autoScrollFrame = null;
+      return;
+    }
+    const delta = organizerAutoScrollDelta(organizerDrag.pointerY);
+    if (delta) {
+      const before = previewStage.scrollTop;
+      previewStage.scrollTop += delta;
+      if (previewStage.scrollTop !== before) {
+        updateOrganizerInsertIndex(organizerDrag.pointerX, organizerDrag.pointerY);
+      }
+    }
+    organizerDrag.autoScrollFrame = requestAnimationFrame(runOrganizerAutoScroll);
+  }
+
+  function startOrganizerAutoScroll() {
+    if (organizerDrag.autoScrollFrame) return;
+    organizerDrag.autoScrollFrame = requestAnimationFrame(runOrganizerAutoScroll);
+  }
+
+  function stopOrganizerAutoScroll() {
+    if (!organizerDrag.autoScrollFrame) return;
+    cancelAnimationFrame(organizerDrag.autoScrollFrame);
+    organizerDrag.autoScrollFrame = null;
+  }
+
   function onOrganizerPointerMove(e) {
     if (!organizerDrag.active) return;
     e.preventDefault();
+    organizerDrag.pointerX = e.clientX;
+    organizerDrag.pointerY = e.clientY;
     moveOrganizerClone(e.clientX, e.clientY);
-    const nextIndex = getOrganizerInsertIndex(e.clientX, e.clientY);
-    if (nextIndex !== organizerDrag.insertIndex) {
-      organizerDrag.insertIndex = nextIndex;
-      rerenderOrganizerAnimated();
-    }
+    updateOrganizerInsertIndex(e.clientX, e.clientY);
   }
 
   function cleanupOrganizerDrag() {
     window.removeEventListener('pointermove', onOrganizerPointerMove);
+    clearOrganizerDragAnimationTimer();
+    stopOrganizerAutoScroll();
     if (organizerDrag.clone) organizerDrag.clone.remove();
     organizerDrag.active = false;
     organizerDrag.sourceOutputIndex = null;
     organizerDrag.sourcePageIndex = null;
     organizerDrag.sourceFlowIndex = null;
     organizerDrag.insertIndex = null;
+    organizerDrag.targetInsertIndex = null;
     organizerDrag.clone = null;
+    organizerDrag.pointerX = 0;
+    organizerDrag.pointerY = 0;
   }
 
   function finishOrganizerDrag() {
     if (!organizerDrag.active) return;
     const firstRects = captureOrganizerRects();
     const sourceIndex = organizerDrag.sourcePageIndex;
+    const targetInsertIndex = organizerDrag.targetInsertIndex ?? organizerDrag.insertIndex;
     const nextFlow = buildOrganizerFlow().filter(item =>
       item.type !== 'page' || item.sourceIndex !== sourceIndex);
-    const insertionIndex = organizerDrag.insertIndex == null
+    const insertionIndex = targetInsertIndex == null
       ? Math.max(0, Math.min(organizerDrag.sourceFlowIndex ?? 0, nextFlow.length))
-      : Math.max(0, Math.min(organizerDrag.insertIndex, nextFlow.length));
+      : Math.max(0, Math.min(targetInsertIndex, nextFlow.length));
     cleanupOrganizerDrag();
     nextFlow.splice(insertionIndex, 0, { type: 'page', sourceIndex });
     applyOrganizerFlow(nextFlow);
