@@ -17,6 +17,28 @@
     font-family: 'Bodoni Moda', serif;
     min-height: 100vh;
     overflow-x: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  .tool-tab,
+  .toggle,
+  .slider,
+  .zoom-val {
+    touch-action: manipulation;
   }
 
   body::before {
@@ -2589,6 +2611,13 @@
   }
 
   @media (max-width: 700px) {
+    .tool-nav {
+      background: var(--paper);
+      position: sticky;
+      top: env(safe-area-inset-top, 0);
+      z-index: 30;
+    }
+
     .preview-stage {
       height: var(--preview-stage-height, min(46vh, 430px));
       min-height: 280px;
