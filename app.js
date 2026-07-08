@@ -201,6 +201,7 @@
   const nextBtn       = $('nextPage');
   const curPageEl     = $('curPage');
   const totPageEl     = $('totPage');
+  const pageNav       = prevBtn.closest('.pagenav');
   const downloadBtn   = $('downloadBtn');
   const actionsDock   = downloadBtn.parentElement;
   const downloadLabel = $('downloadLabel');
@@ -549,6 +550,25 @@
 
   function syncBottomDockState() {
     document.body.classList.toggle('preview-only-mode', activeTool === 'preview');
+    syncMobileDockLayout();
+  }
+
+  function isPhoneViewport() {
+    return window.matchMedia('(max-width: 700px)').matches;
+  }
+
+  function syncMobileDockLayout() {
+    if (!pageNav || !actionsDock) {
+      syncMobileDockMetrics();
+      return;
+    }
+    const dockPageNav = isPhoneViewport() && activeTool !== 'preview';
+    if (dockPageNav && pageNav.parentElement !== actionsDock) {
+      actionsDock.insertBefore(pageNav, actionsDock.firstChild);
+    } else if (!dockPageNav && pageNav.parentElement === actionsDock) {
+      actionsDock.parentElement.insertBefore(pageNav, actionsDock);
+    }
+    document.body.classList.toggle('page-nav-in-actions', dockPageNav);
     syncMobileDockMetrics();
   }
 
@@ -3163,12 +3183,12 @@
     advancedPasswordToggle.disabled = !passwordAvailable;
     advancedPasswordRow.classList.toggle('is-disabled', !passwordAvailable);
     advancedPasswordInput.disabled = !passwordAvailable || !advancedPasswordToggle.checked;
-    syncMobileDockMetrics();
     if (!rangeAvailable) advancedRangeToggle.checked = false;
     if (!passwordAvailable) {
       advancedPasswordToggle.checked = false;
       advancedPasswordInput.value = '';
     }
+    syncMobileDockMetrics();
   }
 
   function currentPageData() {
@@ -6534,10 +6554,10 @@
   });
   previewStage.addEventListener('scroll', updatePanCursor);
   window.addEventListener('resize', () => {
+    syncMobileDockLayout();
     syncPreviewStageHeight();
     updateToolIndicator();
     updateSignatureOverlay();
-    syncMobileDockMetrics();
   });
   document.querySelector('.tool-nav').addEventListener('scroll', updateToolIndicator);
 

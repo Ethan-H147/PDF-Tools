@@ -2618,7 +2618,7 @@
   @media (max-width: 700px) {
     .frame {
       padding-top: calc(86px + env(safe-area-inset-top, 0px));
-      padding-bottom: calc(var(--mobile-actions-height, 86px) + 82px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(var(--mobile-actions-height, 132px) + 24px + env(safe-area-inset-bottom, 0px));
     }
 
     body.preview-only-mode .frame {
@@ -2652,6 +2652,49 @@
       padding: 14px 12px;
     }
 
+    .preview-bar {
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .preview-bar .title {
+      font-size: 30px;
+      line-height: 1.08;
+    }
+
+    .preview-bar .title em {
+      display: block;
+      font-size: 17px;
+      font-weight: 500;
+      line-height: 1.35;
+      margin-top: 3px;
+    }
+
+    #previewTools {
+      flex: 0 0 auto;
+      gap: 6px !important;
+      max-width: 46%;
+    }
+
+    #proofMeta {
+      display: none;
+    }
+
+    .zoom-bar {
+      max-width: 100%;
+    }
+
+    .zoom-btn {
+      height: 34px;
+      width: 34px;
+    }
+
+    .zoom-val {
+      font-size: 11px;
+      letter-spacing: 0;
+      width: 62px;
+    }
+
     .pagenav {
       background: rgba(245, 245, 247, 0.94);
       -webkit-backdrop-filter: blur(18px) saturate(1.2);
@@ -2682,6 +2725,9 @@
       border: 1px solid var(--line-strong);
       border-radius: 18px;
       box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
       left: 12px;
       margin: 0;
       padding: 8px;
@@ -2691,12 +2737,35 @@
       z-index: 1000;
     }
 
+    .actions .pagenav {
+      background: rgba(255, 255, 255, 0.72);
+      bottom: auto;
+      box-shadow: none;
+      flex: 0 0 auto;
+      left: auto;
+      order: 0;
+      position: static;
+      right: auto;
+      width: 100%;
+      z-index: auto;
+    }
+
     .actions[style*="display: none"] {
       display: none !important;
     }
 
     .actions .resolution-options {
-      margin: 0 0 8px !important;
+      margin: 0 !important;
+      order: 1;
+    }
+
+    .actions .btn-print {
+      order: 2;
+    }
+
+    .actions .advanced-options {
+      margin: 0;
+      order: 3;
     }
 
     .btn-print {
