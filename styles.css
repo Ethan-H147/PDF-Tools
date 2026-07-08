@@ -223,9 +223,13 @@
   .filecard.on { display: block; }
   .filecard-head { display: flex; align-items: flex-start; gap: 10px; }
   .filecard .name { font-family: 'Bodoni Moda', serif; font-weight: 700; font-size: 17px; margin-bottom: 4px; word-break: break-all; line-height: 1.2; flex: 1 1 auto; min-width: 0; }
-  .file-remove { width: 30px; height: 30px; border: 1px solid var(--ink); background: transparent; color: var(--ink); border-radius: 50%; cursor: pointer; flex: 0 0 auto; font-family: var(--font-ui); font-size: 20px; font-weight: 800; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: background .16s, border-color .16s, color .16s, opacity .16s; }
+  .file-remove { width: 30px; height: 30px; border: 1px solid var(--ink); background: transparent; color: var(--ink); border-radius: 50%; cursor: pointer; flex: 0 0 auto; font-size: 0; line-height: 0; display: inline-flex; align-items: center; justify-content: center; position: relative; transition: background .16s, border-color .16s, color .16s, opacity .16s; }
   .file-remove[hidden] { display: none; }
-  .file-remove span { display: block; line-height: 1; transform: translateY(-1px); }
+  .file-remove span { display: none; }
+  .file-remove::before,
+  .file-remove::after { background: currentColor; border-radius: 999px; content: ''; height: 3px; left: 50%; position: absolute; top: 50%; transform-origin: center; width: 13px; }
+  .file-remove::before { transform: translate(-50%, -50%) rotate(45deg); }
+  .file-remove::after { transform: translate(-50%, -50%) rotate(-45deg); }
   .file-remove:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
   .file-remove:disabled { cursor: not-allowed; opacity: .35; }
   .filecard .stats { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute); display: flex; gap: 14px; flex-wrap: wrap; }

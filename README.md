@@ -11,7 +11,7 @@ Files are processed locally in the browser. They are not uploaded to a server.
 - Merge multiple PDFs and send the result into the organizer
 - Crop and rotate pages, including fine rotation when needed
 - Compress PDFs with original-quality, balanced, and small-size modes
-- Convert pages to black and white or grayscale
+- Convert pages to black and white or grayscale with Fast, 300 dpi, 600 dpi, and warned 900 dpi render options
 - Export with page ranges, current-page-only export, and password protection
 - Switch between light and dark mode
 - Use the interface in English, Simplified Chinese, Traditional Chinese, Korean, Japanese, Spanish, and French
@@ -20,7 +20,7 @@ Files are processed locally in the browser. They are not uploaded to a server.
 
 PDF Atelier tries to preserve original PDF quality whenever possible. Organize, split, merge, crop-only, and 90-degree rotation exports keep PDF page content intact where practical. Tools that alter pixels, such as threshold, grayscale, small-size compression, and fine rotation, may rasterize pages because those operations change the rendered page image.
 
-Because processing happens in the browser, performance depends on the device and the PDF. Very large files can still be slow or memory-heavy, especially on phones and tablets.
+Because processing happens in the browser, performance depends on the device and the PDF. Very large files can still be slow or memory-heavy, especially on phones and tablets. The 900 dpi raster option is intentionally guarded by a warning because it can make exports very large and significantly increase render/export time.
 
 ## Using It Locally
 

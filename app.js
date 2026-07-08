@@ -901,6 +901,7 @@
       'compress.summaryBalanced': 'Create a smaller color PDF with balanced quality.',
       'compress.summarySmall': 'Create the smallest PDF with lighter page images.',
       'resolution.fast': 'Fast',
+      'resolution.900Warning': '900 dpi can make the exported PDF extremely large and make rendering/exporting take a very long time. Continue?',
       'threshold.whiteTag': '0 · white',
       'threshold.blackTag': '255 · black',
       'greyscale.brightness': 'brightness',
@@ -3764,6 +3765,7 @@
 
   // ── Page luminance cache ──
   function getRenderScale(baseVp) {
+    if (state.resolution === '900') return 900 / 72;
     if (state.resolution === '600') return 600 / 72;
     if (state.resolution === '300') return 300 / 72;
     return Math.min(2.5, 1800 / Math.max(baseVp.width, baseVp.height));
@@ -5917,7 +5919,7 @@
   });
 
   // ── Resolution toggles ──
-  const resButtons = { fast: $('resFast'), '300': $('res300'), '600': $('res600') };
+  const resButtons = { fast: $('resFast'), '300': $('res300'), '600': $('res600'), '900': $('res900') };
 
   function syncResolutionToggles() {
     Object.entries(resButtons).forEach(([key, btn]) => setTogglePressed(btn, state.resolution === key));
@@ -5926,6 +5928,10 @@
   Object.entries(resButtons).forEach(([key, btn]) => {
     btn.addEventListener('click', async () => {
       if (state.resolution === key) return;
+      if (key === '900' && !window.confirm(t('resolution.900Warning'))) {
+        syncResolutionToggles();
+        return;
+      }
       state.resolution = key;
       syncResolutionToggles();
       if (!state.pdfDoc) return;
@@ -6043,6 +6049,13 @@
     applyZoom(opts);
   }
   let previewHeightRaf = null;
+  const previewLayoutState = {
+    phoneViewportHeight: 0,
+    width: 0,
+    orientation: '',
+    height: 0,
+    isPhone: false,
+  };
   const panState = { active: false, pointerId: null, x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
 
   function syncPreviewStageHeight() {
@@ -6053,17 +6066,44 @@
       const isPhone = window.matchMedia('(max-width: 700px)').matches;
       const minHeight = isPhone ? 280 : (isTablet ? 520 : 620);
       const maxHeight = isPhone ? 430 : (isTablet ? 820 : 1100);
+      const viewportWidth = Math.round(document.documentElement.clientWidth || window.innerWidth || 0);
+      const rawViewportHeight = Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
+      const orientation = (screen.orientation && screen.orientation.type)
+        || (viewportWidth > rawViewportHeight ? 'landscape' : 'portrait');
+      const widthTolerance = isPhone ? 2 : 0;
+      const widthChanged = previewLayoutState.width > 0
+        && Math.abs(previewLayoutState.width - viewportWidth) > widthTolerance;
+      const phoneLayoutChanged = !previewLayoutState.isPhone
+        || widthChanged
+        || previewLayoutState.orientation !== orientation;
+      let stableViewportHeight = rawViewportHeight;
+      if (isPhone) {
+        if (!previewLayoutState.phoneViewportHeight || phoneLayoutChanged) {
+          previewLayoutState.phoneViewportHeight = rawViewportHeight;
+        }
+        stableViewportHeight = previewLayoutState.phoneViewportHeight;
+      } else {
+        previewLayoutState.phoneViewportHeight = 0;
+      }
       const mainPanel = previewStage.closest('main');
       const stageRect = previewStage.getBoundingClientRect();
       const mainRect = mainPanel ? mainPanel.getBoundingClientRect() : null;
       const panelStyle = getComputedStyle(previewStage.parentElement);
       const panelBottomInset = parseFloat(panelStyle.paddingBottom) || 0;
       const panelBottom = mainRect ? Math.max(0, mainRect.bottom - stageRect.top - panelBottomInset) : 0;
-      const viewportHeight = window.innerHeight * (isPhone ? 0.46 : 0.82);
+      const viewportHeight = stableViewportHeight * (isPhone ? 0.46 : 0.82);
       const preferredHeight = isPhone ? viewportHeight : Math.max(viewportHeight, panelBottom);
       const targetHeight = Math.max(minHeight, Math.min(maxHeight, preferredHeight));
-      previewStage.style.setProperty('--preview-stage-height', Math.round(targetHeight) + 'px');
-      if (state.pdfDoc) applyZoom();
+      const roundedHeight = Math.round(targetHeight);
+      const heightChanged = previewLayoutState.height !== roundedHeight;
+      previewLayoutState.width = viewportWidth;
+      previewLayoutState.orientation = orientation;
+      previewLayoutState.height = roundedHeight;
+      previewLayoutState.isPhone = isPhone;
+      if (heightChanged) {
+        previewStage.style.setProperty('--preview-stage-height', roundedHeight + 'px');
+      }
+      if (state.pdfDoc && (heightChanged || widthChanged)) applyZoom();
     });
   }
 
