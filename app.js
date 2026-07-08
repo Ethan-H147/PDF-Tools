@@ -202,6 +202,7 @@
   const curPageEl     = $('curPage');
   const totPageEl     = $('totPage');
   const downloadBtn   = $('downloadBtn');
+  const actionsDock   = downloadBtn.parentElement;
   const downloadLabel = $('downloadLabel');
   const downloadSub   = $('downloadSub');
   const resolutionOptions = $('resolutionOptions');
@@ -476,6 +477,7 @@
     const expanded = advancedToggle.getAttribute('aria-expanded') === 'true';
     advancedToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
     advancedPanel.hidden = expanded;
+    syncMobileDockMetrics();
   });
   advancedCurrentOnly.addEventListener('change', () => {
     if (advancedCurrentOnly.checked) advancedRangeToggle.checked = false;
@@ -547,6 +549,35 @@
 
   function syncBottomDockState() {
     document.body.classList.toggle('preview-only-mode', activeTool === 'preview');
+    syncMobileDockMetrics();
+  }
+
+  function syncMobileDockMetrics() {
+    requestAnimationFrame(() => {
+      const visible = actionsDock && activeTool !== 'preview' && getComputedStyle(actionsDock).display !== 'none';
+      const height = visible ? Math.ceil(actionsDock.getBoundingClientRect().height) : 0;
+      document.documentElement.style.setProperty('--mobile-actions-height', height + 'px');
+    });
+  }
+
+  function scrollPreviewIntoViewOnPhone() {
+    if (!window.matchMedia('(max-width: 700px)').matches || !state.pdfDoc) return;
+    const target = previewStage.closest('.panel-right') || previewStage;
+    const toolNav = document.querySelector('.tool-nav');
+    const navHeight = toolNav ? Math.ceil(toolNav.getBoundingClientRect().height) : 0;
+    const offset = navHeight + 20;
+    const top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({
+      top: Math.max(0, top),
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  }
+
+  function queuePhonePreviewScroll() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollPreviewIntoViewOnPhone);
+    });
   }
 
   function switchTool(id) {
@@ -560,7 +591,7 @@
     syncToolTabA11y();
     applyToolLocale();
     resolutionOptions.classList.toggle('hidden', !isRasterTool(id));
-    downloadBtn.parentElement.style.display = id === 'preview' ? 'none' : '';
+    actionsDock.style.display = id === 'preview' ? 'none' : '';
     syncBottomDockState();
     syncAdvancedOptions();
     updateSourceDropMode();
@@ -3132,6 +3163,7 @@
     advancedPasswordToggle.disabled = !passwordAvailable;
     advancedPasswordRow.classList.toggle('is-disabled', !passwordAvailable);
     advancedPasswordInput.disabled = !passwordAvailable || !advancedPasswordToggle.checked;
+    syncMobileDockMetrics();
     if (!rangeAvailable) advancedRangeToggle.checked = false;
     if (!passwordAvailable) {
       advancedPasswordToggle.checked = false;
@@ -3787,6 +3819,7 @@
     }
     try {
       await loadPdfBytes(await file.arrayBuffer(), file.name, file.size);
+      queuePhonePreviewScroll();
     } catch (err) {
       console.error(err);
       showError(t('errors.readPdfFailed', { error: err.message || err }));
@@ -6504,6 +6537,7 @@
     syncPreviewStageHeight();
     updateToolIndicator();
     updateSignatureOverlay();
+    syncMobileDockMetrics();
   });
   document.querySelector('.tool-nav').addEventListener('scroll', updateToolIndicator);
 
@@ -6522,7 +6556,7 @@
   syncToolTabA11y();
   updateSourceDropMode();
   resolutionOptions.classList.toggle('hidden', !isRasterTool(activeTool));
-  downloadBtn.parentElement.style.display = activeTool === 'preview' ? 'none' : '';
+  actionsDock.style.display = activeTool === 'preview' ? 'none' : '';
   syncBottomDockState();
   syncAdvancedOptions();
   updateMergeState();

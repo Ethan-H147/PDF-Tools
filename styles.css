@@ -2618,7 +2618,7 @@
   @media (max-width: 700px) {
     .frame {
       padding-top: calc(86px + env(safe-area-inset-top, 0px));
-      padding-bottom: calc(168px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(var(--mobile-actions-height, 86px) + 82px + env(safe-area-inset-bottom, 0px));
     }
 
     body.preview-only-mode .frame {
@@ -2663,8 +2663,8 @@
       margin: 0;
       position: fixed;
       right: 12px;
-      bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-      z-index: 1000;
+      bottom: calc(var(--mobile-actions-height, 86px) + 20px + env(safe-area-inset-bottom, 0px));
+      z-index: 1001;
     }
 
     .pagenav button {
