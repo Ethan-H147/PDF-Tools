@@ -48,6 +48,33 @@
     },
   };
 
+  let lastSingleTapAt = 0;
+  let lastSingleTapX = 0;
+  let lastSingleTapY = 0;
+  let touchStartedWithMultipleFingers = false;
+
+  document.addEventListener('touchstart', e => {
+    touchStartedWithMultipleFingers = e.touches.length > 1;
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (touchStartedWithMultipleFingers || e.changedTouches.length !== 1) return;
+    if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const touch = e.changedTouches[0];
+    const now = Date.now();
+    const deltaT = now - lastSingleTapAt;
+    const deltaX = Math.abs(touch.clientX - lastSingleTapX);
+    const deltaY = Math.abs(touch.clientY - lastSingleTapY);
+    if (deltaT > 0 && deltaT < 330 && deltaX < 28 && deltaY < 28) {
+      e.preventDefault();
+      lastSingleTapAt = 0;
+      return;
+    }
+    lastSingleTapAt = now;
+    lastSingleTapX = touch.clientX;
+    lastSingleTapY = touch.clientY;
+  }, { passive: false });
+
   const TOOLS = {
     preview: {
       lede: 'View a PDF cleanly with fast page navigation and zoom.',
