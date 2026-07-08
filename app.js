@@ -5060,6 +5060,13 @@
     autoScrollFrame: null,
     dragAnimationTimer: null,
   };
+  const organizerTapState = {
+    sourceIndex: null,
+    outputIndex: null,
+    time: 0,
+    x: 0,
+    y: 0,
+  };
 
   function buildOrganizerFlow() {
     normalizeSplitState();
@@ -5295,10 +5302,8 @@
     contextMenuState.sourceIndex = null;
   }
 
-  function showPageContextMenu(e, outputIndex, sourceIndex) {
+  function showPageContextMenuAt(x, y, outputIndex, sourceIndex) {
     if (!state.pdfDoc || activeTool !== 'organize' || organizerDrag.active) return;
-    e.preventDefault();
-    e.stopPropagation();
     normalizeSplitState();
     contextMenuState.outputIndex = outputIndex;
     contextMenuState.sourceIndex = sourceIndex;
@@ -5309,7 +5314,14 @@
     contextSplitBtn.textContent = canSplit
       ? (splitExists ? 'Remove split after page ' : 'Split after page ') + (sourceIndex + 1)
       : 'Cannot split after final page';
-    positionPageContextMenu(e.clientX, e.clientY);
+    positionPageContextMenu(x, y);
+  }
+
+  function showPageContextMenu(e, outputIndex, sourceIndex) {
+    if (!state.pdfDoc || activeTool !== 'organize' || organizerDrag.active) return;
+    e.preventDefault();
+    e.stopPropagation();
+    showPageContextMenuAt(e.clientX, e.clientY, outputIndex, sourceIndex);
   }
 
   organizerGrid.addEventListener('contextmenu', e => {
@@ -5346,12 +5358,47 @@
     updatePageState();
   }
 
+  function isOrganizerDoubleTap(e, outputIndex, sourceIndex) {
+    if (e.pointerType === 'mouse') return false;
+    const now = Date.now();
+    return organizerTapState.sourceIndex === sourceIndex
+      && organizerTapState.outputIndex === outputIndex
+      && now - organizerTapState.time < 420
+      && Math.abs(e.clientX - organizerTapState.x) < 36
+      && Math.abs(e.clientY - organizerTapState.y) < 36;
+  }
+
+  function rememberOrganizerTap(e, outputIndex, sourceIndex) {
+    if (e.pointerType === 'mouse') return;
+    organizerTapState.sourceIndex = sourceIndex;
+    organizerTapState.outputIndex = outputIndex;
+    organizerTapState.time = Date.now();
+    organizerTapState.x = e.clientX;
+    organizerTapState.y = e.clientY;
+  }
+
+  function clearOrganizerTap() {
+    organizerTapState.sourceIndex = null;
+    organizerTapState.outputIndex = null;
+    organizerTapState.time = 0;
+    organizerTapState.x = 0;
+    organizerTapState.y = 0;
+  }
+
   function beginOrganizerDrag(e, card, sourceIndex) {
     if (!state.pdfDoc || organizerDrag.active || (e.pointerType === 'mouse' && e.button !== 0)) return;
     if (e.target.closest('.page-delete, .page-split-toggle')) return;
     hidePageContextMenu();
     const outputIndex = state.pageOrder.indexOf(sourceIndex);
     if (outputIndex < 0) return;
+    if (isOrganizerDoubleTap(e, outputIndex, sourceIndex)) {
+      clearOrganizerTap();
+      showPageContextMenuAt(e.clientX, e.clientY, outputIndex, sourceIndex);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    rememberOrganizerTap(e, outputIndex, sourceIndex);
     const sourceFlowIndex = buildOrganizerFlow().findIndex(item =>
       item.type === 'page' && item.sourceIndex === sourceIndex);
     const rect = card.getBoundingClientRect();

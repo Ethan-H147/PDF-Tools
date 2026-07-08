@@ -2617,7 +2617,16 @@
 
   @media (max-width: 700px) {
     .frame {
-      padding-top: calc(86px + env(safe-area-inset-top, 0px));
+      padding: calc(86px + env(safe-area-inset-top, 0px)) 8px 42px;
+    }
+
+    main {
+      border-radius: 18px;
+      margin-top: 12px;
+    }
+
+    .panel {
+      padding: 18px 10px;
     }
 
     .tool-nav {
@@ -2677,9 +2686,7 @@
     }
 
     .organizer-grid .page-split-toggle {
-      font-size: 10px;
-      height: 28px;
-      padding: 0 7px;
+      display: none;
     }
 
     .organizer-grid .page-number {
@@ -2687,7 +2694,11 @@
     }
 
     .preview-stage.organizing {
-      padding: 12px;
+      border-radius: 18px;
+      margin-left: -2px;
+      margin-right: -2px;
+      padding: 8px;
+      width: calc(100% + 4px);
     }
 
     .preview-stage.editing {
