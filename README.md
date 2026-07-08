@@ -11,10 +11,10 @@ Files are processed locally in the browser. They are not uploaded to a server.
 - Merge multiple PDFs and send the result into the organizer
 - Crop and rotate pages, including fine rotation when needed
 - Compress PDFs with original-quality, balanced, and small-size modes
-- Convert pages to black-and-white or grayscale
+- Convert pages to black and white or grayscale
 - Export with page ranges, current-page-only export, and password protection
 - Switch between light and dark mode
-- Use the interface in English, Chinese, Korean, Japanese, Spanish, and French
+- Use the interface in English, Simplified Chinese, Traditional Chinese, Korean, Japanese, Spanish, and French
 
 ## Quality and Privacy
 

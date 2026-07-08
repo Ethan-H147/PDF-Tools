@@ -246,7 +246,12 @@
   input[type=range].slider::-moz-range-track { height: 4px; background: var(--ink); }
   input[type=range].slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 28px; background: var(--accent); border: 1.5px solid var(--ink); margin-top: -12px; cursor: grab; border-radius: 0; }
   input[type=range].slider::-moz-range-thumb { width: 18px; height: 28px; background: var(--accent); border: 1.5px solid var(--ink); cursor: grab; border-radius: 0; }
+  .slider-control { display: block; }
+  .slider-reset { background: var(--paper); border: 1px solid var(--line); border-radius: 999px; color: var(--ink); cursor: pointer; font-family: var(--font-ui); font-size: 12px; font-weight: 700; letter-spacing: 0; line-height: 1; min-height: 28px; padding: 0 11px; text-transform: none; }
+  .slider-reset:hover { background: var(--paper-2); }
   .slider-tags { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute); margin-top: 4px; }
+  .slider-tags-with-reset { align-items: center; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .slider-tags-with-reset span:last-child { text-align: right; }
 
   /* toggles */
   .toggles { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
@@ -1054,7 +1059,7 @@
   body.dark-mode .edit-controls,
   body.dark-mode .quality-toggle,
   body.dark-mode .split-panel,
-  body.dark-mode .merge-file-item,
+  body.dark-mode .merge-file-row,
   body.dark-mode .split-part-row,
   body.dark-mode .page-context-menu,
   body.dark-mode .page-editor-bottom,
@@ -1080,6 +1085,7 @@
   body.dark-mode .tool-tab:hover:not(.active),
   body.dark-mode .btn-secondary:hover:not(:disabled),
   body.dark-mode .merge-file-actions button:hover:not(:disabled),
+  body.dark-mode .slider-reset:hover,
   body.dark-mode .page-context-menu button:hover:not(:disabled),
   body.dark-mode .page-editor-bottom button:hover:not(:disabled) {
     background: #303033;
@@ -1106,6 +1112,8 @@
   body.dark-mode .pagenav button,
   body.dark-mode .btn-secondary,
   body.dark-mode .toggle,
+  body.dark-mode .merge-file-actions button,
+  body.dark-mode .slider-reset,
   body.dark-mode .crop-readout {
     background: #2c2c2e;
     color: var(--ink);
@@ -1305,6 +1313,15 @@
     justify-content: center;
     padding: 0;
     width: 28px;
+  }
+
+  .merge-file-action-glyph {
+    display: block;
+    line-height: 1;
+  }
+
+  .merge-file-action-arrow {
+    transform: translateY(-1px);
   }
 
   .merge-file-actions button:hover:not(:disabled) {
@@ -2186,7 +2203,7 @@
   body.dark-mode .quality-toggle,
   body.dark-mode .split-panel,
   body.dark-mode .split-part-row,
-  body.dark-mode .merge-file,
+  body.dark-mode .merge-file-row,
   body.dark-mode .pagenav,
   body.dark-mode .zoom-bar,
   body.dark-mode .advanced-toggle,
@@ -2222,6 +2239,7 @@
   body.dark-mode .toggle,
   body.dark-mode .zoom-btn,
   body.dark-mode .pagenav button,
+  body.dark-mode .slider-reset,
   body.dark-mode .page-editor-bottom,
   body.dark-mode .page-editor-bottom button,
   body.dark-mode .file-name-input,
@@ -2247,6 +2265,7 @@
   body.dark-mode .toggle:hover,
   body.dark-mode .zoom-btn:hover:not(:disabled),
   body.dark-mode .pagenav button:hover:not(:disabled),
+  body.dark-mode .slider-reset:hover,
   body.dark-mode .page-editor-bottom button:hover:not(:disabled),
   body.dark-mode .advanced-toggle:hover,
   body.dark-mode .theme-toggle:hover {

@@ -184,9 +184,12 @@ Ethan Hu -->
             <canvas id="histoCanvas"></canvas>
             <div class="needle" id="threshNeedle" style="left:50%"></div>
           </div>
-          <input type="range" min="0" max="255" value="128" class="slider" id="threshSlider">
-          <div class="slider-tags">
+          <div class="slider-control">
+            <input type="range" min="0" max="255" value="128" class="slider" id="threshSlider">
+          </div>
+          <div class="slider-tags slider-tags-with-reset">
             <span data-i18n="threshold.whiteTag">0 · white</span>
+            <button type="button" class="slider-reset" id="thresholdResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetThreshold">Reset</button>
             <span data-i18n="threshold.blackTag">255 · black</span>
           </div>
           <div class="toggles">
@@ -206,8 +209,10 @@ Ethan Hu -->
               <span class="denom" data-i18n="greyscale.brightness">brightness</span>
               <span class="tag" id="brightTag">neutral</span>
             </div>
-            <input type="range" min="-100" max="100" value="0" class="slider" id="brightSlider">
-            <div class="slider-tags"><span data-i18n="greyscale.darkTag">−100 · dark</span><span data-i18n="greyscale.lightTag">+100 · light</span></div>
+            <div class="slider-control">
+              <input type="range" min="-100" max="100" value="0" class="slider" id="brightSlider">
+            </div>
+            <div class="slider-tags slider-tags-with-reset"><span data-i18n="greyscale.darkTag">−100 · dark</span><button type="button" class="slider-reset" id="brightnessResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetBrightness">Reset</button><span data-i18n="greyscale.lightTag">+100 · light</span></div>
           </div>
 
           <div class="grey-row">
@@ -216,8 +221,10 @@ Ethan Hu -->
               <span class="denom">%</span>
               <span class="tag" id="contrastTag">normal</span>
             </div>
-            <input type="range" min="50" max="200" value="100" class="slider" id="contrastSlider">
-            <div class="slider-tags"><span data-i18n="greyscale.lowTag">50% · low</span><span data-i18n="greyscale.highTag">200% · high</span></div>
+            <div class="slider-control">
+              <input type="range" min="50" max="200" value="100" class="slider" id="contrastSlider">
+            </div>
+            <div class="slider-tags slider-tags-with-reset"><span data-i18n="greyscale.lowTag">50% · low</span><button type="button" class="slider-reset" id="contrastResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetContrast">Reset</button><span data-i18n="greyscale.highTag">200% · high</span></div>
           </div>
 
           <div class="toggles">

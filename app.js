@@ -145,6 +145,7 @@
   const fileStatusEl  = $('fileStatus');
   const errBox        = $('errBox');
   const threshSlider  = $('threshSlider');
+  const thresholdResetBtn = $('thresholdResetBtn');
   const threshNum     = $('threshNum');
   const threshPct     = $('threshPct');
   const threshHint    = $('threshHint');
@@ -152,9 +153,11 @@
   const histoCanvas   = $('histoCanvas');
   const invertToggle  = $('invertToggle');
   const brightSlider  = $('brightSlider');
+  const brightnessResetBtn = $('brightnessResetBtn');
   const brightNum     = $('brightNum');
   const brightTag     = $('brightTag');
   const contrastSlider= $('contrastSlider');
+  const contrastResetBtn = $('contrastResetBtn');
   const contrastNum   = $('contrastNum');
   const contrastTag   = $('contrastTag');
   const greyInvertToggle = $('greyInvertToggle');
@@ -313,6 +316,7 @@
         button.textContent = LOCALE_NAMES[button.dataset.lang] || button.dataset.lang;
       });
     }
+    syncZoomReadout();
   }
 
   function applyToolLocale() {
@@ -499,7 +503,10 @@
     downloadBtn.parentElement.style.display = id === 'preview' ? 'none' : '';
     syncAdvancedOptions();
     updateSourceDropMode();
-    if (id === 'merge') updateMergeState();
+    if (id === 'merge') {
+      seedCurrentPdfInMergeList();
+      updateMergeState();
+    }
     else updatePageState();
     updatePreviewMode();
     updateToolIndicator();
@@ -704,7 +711,7 @@
     if (context.advanced.password && !artifact.meta?.passwordProtected) {
       processors.push({
         id: 'password',
-        label: 'Locking PDF...',
+        label: t('progress.lockingPdf'),
         progress: 100,
         apply: applyPasswordProcessor,
       });
@@ -790,6 +797,10 @@
       'actions.clearList': 'Clear list',
       'actions.restoreOrder': 'Restore original order',
       'actions.resetSelectedPage': 'Reset selected page',
+      'actions.reset': 'Reset',
+      'actions.resetThreshold': 'Reset threshold',
+      'actions.resetBrightness': 'Reset brightness',
+      'actions.resetContrast': 'Reset contrast',
       'actions.mergeIntoOrganize': 'Merge into Organize',
       'actions.invert': 'Invert',
       'actions.sepia': 'Sepia',
@@ -881,8 +892,45 @@
       'preview.titleCompress': 'Preview <em>— compressed export</em>',
       'preview.titleProcessed': 'Preview <em>— processed output</em>',
       'proof.awaiting': 'awaiting PDF',
+      'zoom.fit': 'fit',
+      'zoom.fitTitle': 'Click to fit',
       'proof.outputPages': '{count} pages in output',
       'proof.noPages': 'no pages selected',
+      'proof.pagePixels': '{w} × {h} px · page {page}/{count}',
+      'proof.editPage': 'page {page}/{count} · {edit}',
+      'proof.mergedPages': '{count} merged pages',
+      'progress.lockingPdf': 'Locking PDF…',
+      'progress.loadingPdf': 'Loading PDF…',
+      'progress.openingPdf': 'Opening PDF…',
+      'progress.openingLargePdf': 'Opening large PDF safely…',
+      'progress.renderingPage': 'Rendering page {page} of {count}',
+      'progress.renderingAtDpi': 'Rendering at {dpi} dpi · page {page} / {count}',
+      'progress.resolutionCurrentPage': 'Resolution set · rendering current page…',
+      'progress.mergingPdfs': 'Merging PDFs…',
+      'progress.mergingFile': 'Merging {name}',
+      'progress.renderingMergedPdf': 'Rendering merged PDF…',
+      'progress.exportingPages': 'Exporting pages…',
+      'progress.exportingOriginalPages': 'Exporting original pages…',
+      'progress.exportingPageEdits': 'Exporting page edits…',
+      'progress.compressingPdf': 'Compressing PDF…',
+      'progress.exportingEditedPage': 'Exporting edited page {page} of {count}',
+      'progress.rasterizingFineRotation': 'Rasterizing fine rotation at {dpi} dpi · page {page} of {count}',
+      'progress.exportingPart': 'Exporting part {part}…',
+      'progress.exportingPage': 'Exporting page {page} of {count}',
+      'progress.compressingPage': 'Compressing page {page} of {count}',
+      'errors.rangeRequired': 'Enter a page range before exporting.',
+      'errors.rangeFormat': 'Use page ranges like 1-3, 8, 12-15.',
+      'errors.rangeBounds': 'Page range must stay between 1 and {count}.',
+      'errors.rangeOrder': 'Page ranges must go from low to high.',
+      'errors.rangeEmpty': 'Enter at least one page to export.',
+      'errors.readPdfFailed': 'Could not read this PDF: {error}',
+      'errors.mergeFailed': 'Merge failed: {error}',
+      'errors.splitExportFailed': 'Split export failed: {error}',
+      'errors.exportFailed': 'Export failed: {error}',
+      'errors.previewFailed': 'Preview failed: {error}',
+      'errors.originalMissing': 'Original PDF data is not available.',
+      'errors.noPagesExport': 'There are no pages to export.',
+      'errors.renderPageFailed': 'Could not render page {page}.',
       'organize.summaryEmpty': 'Upload a PDF to reorder or remove pages.',
       'organize.summarySplit': '{parts} PDFs are ready. Edit names and export each part from the split panel.',
       'organize.summaryPages': '{count} of {total} original pages will be included in export. Use Split on a page to divide the PDF.',
@@ -970,6 +1018,10 @@
       'actions.clearList': '清空列表',
       'actions.restoreOrder': '恢复原顺序',
       'actions.resetSelectedPage': '重置所选页面',
+      'actions.reset': '重置',
+      'actions.resetThreshold': '重置阈值',
+      'actions.resetBrightness': '重置亮度',
+      'actions.resetContrast': '重置对比度',
       'actions.mergeIntoOrganize': '合并到整理页',
       'actions.invert': '反相',
       'actions.sepia': '暖色',
@@ -1052,8 +1104,48 @@
       'preview.titleCompress': '预览 <em>— 压缩导出</em>',
       'preview.titleProcessed': '预览 <em>— 处理结果</em>',
       'proof.awaiting': '等待上传 PDF',
+      'zoom.fit': '适应',
+      'zoom.fitTitle': '点击适应窗口',
       'proof.outputPages': '输出 {count} 页',
       'proof.noPages': '未选择页面',
+      'proof.pagePixels': '{w} × {h} px · 第 {page}/{count} 页',
+      'proof.editPage': '第 {page}/{count} 页 · {edit}',
+      'proof.mergedPages': '已合并 {count} 页',
+      'progress.lockingPdf': '正在加密 PDF…',
+      'progress.loadingPdf': '正在加载 PDF…',
+      'progress.openingPdf': '正在打开 PDF…',
+      'progress.openingLargePdf': '正在安全打开大型 PDF…',
+      'progress.renderingPage': '正在渲染第 {page}/{count} 页',
+      'progress.renderingAtDpi': '正在以 {dpi} dpi 渲染 · 第 {page}/{count} 页',
+      'progress.resolutionCurrentPage': '分辨率已设置，正在渲染当前页…',
+      'progress.mergingPdfs': '正在合并 PDF…',
+      'progress.mergingFile': '正在合并 {name}',
+      'progress.renderingMergedPdf': '正在渲染合并后的 PDF…',
+      'progress.exportingPages': '正在导出页面…',
+      'progress.exportingOriginalPages': '正在导出原始页面…',
+      'progress.exportingPageEdits': '正在导出页面编辑…',
+      'progress.compressingPdf': '正在压缩 PDF…',
+      'progress.exportingEditedPage': '正在导出编辑后的第 {page}/{count} 页',
+      'progress.rasterizingFineRotation': '正在以 {dpi} dpi 栅格化细微旋转 · 第 {page}/{count} 页',
+      'progress.exportingPart': '正在导出第 {part} 部分…',
+      'progress.exportingPage': '正在导出第 {page}/{count} 页',
+      'progress.compressingPage': '正在压缩第 {page}/{count} 页',
+      'errors.rangeRequired': '导出前请输入页码范围。',
+      'errors.rangeFormat': '请使用 1-3、8、12-15 这样的页码范围。',
+      'errors.rangeBounds': '页码范围必须在 1 到 {count} 之间。',
+      'errors.rangeOrder': '页码范围必须从小到大。',
+      'errors.rangeEmpty': '请至少选择一页进行导出。',
+      'errors.readPdfFailed': '无法读取此 PDF：{error}',
+      'errors.mergeFailed': '合并失败：{error}',
+      'errors.splitExportFailed': '分割导出失败：{error}',
+      'errors.exportFailed': '导出失败：{error}',
+      'errors.previewFailed': '预览失败：{error}',
+      'errors.originalMissing': '原始 PDF 数据不可用。',
+      'errors.noPagesExport': '没有可导出的页面。',
+      'errors.renderPageFailed': '无法渲染第 {page} 页。',
+      'errors.chooseMerge': '请选择一个或多个要合并的 PDF 文件。',
+      'errors.password': '导出加密 PDF 前请输入密码。',
+      'errors.notPdf': '这看起来不是 PDF 文件。',
       'organize.summaryEmpty': '上传 PDF 后调整页面顺序或删除页面。',
       'organize.summarySplit': '{parts} 份 PDF 已准备好。可以改名后分别导出。',
       'organize.summaryPages': '将导出 {count}/{total} 页。点击页面上的“拆分”可拆成多份 PDF。',
@@ -1129,6 +1221,10 @@
       'actions.clearList': '清空列表',
       'actions.restoreOrder': '還原原順序',
       'actions.resetSelectedPage': '重設所選頁面',
+      'actions.reset': '重設',
+      'actions.resetThreshold': '重設閾值',
+      'actions.resetBrightness': '重設亮度',
+      'actions.resetContrast': '重設對比',
       'actions.mergeIntoOrganize': '合併到整理頁',
       'actions.invert': '反相',
       'actions.sepia': '暖色',
@@ -1220,8 +1316,48 @@
       'preview.titleCompress': '預覽 <em>— 壓縮匯出</em>',
       'preview.titleProcessed': '預覽 <em>— 處理結果</em>',
       'proof.awaiting': '等待上傳 PDF',
+      'zoom.fit': '適應',
+      'zoom.fitTitle': '點擊適應視窗',
       'proof.outputPages': '輸出 {count} 頁',
       'proof.noPages': '未選擇頁面',
+      'proof.pagePixels': '{w} × {h} px · 第 {page}/{count} 頁',
+      'proof.editPage': '第 {page}/{count} 頁 · {edit}',
+      'proof.mergedPages': '已合併 {count} 頁',
+      'progress.lockingPdf': '正在加密 PDF…',
+      'progress.loadingPdf': '正在載入 PDF…',
+      'progress.openingPdf': '正在開啟 PDF…',
+      'progress.openingLargePdf': '正在安全開啟大型 PDF…',
+      'progress.renderingPage': '正在算繪第 {page}/{count} 頁',
+      'progress.renderingAtDpi': '正在以 {dpi} dpi 算繪 · 第 {page}/{count} 頁',
+      'progress.resolutionCurrentPage': '解析度已設定，正在算繪目前頁面…',
+      'progress.mergingPdfs': '正在合併 PDF…',
+      'progress.mergingFile': '正在合併 {name}',
+      'progress.renderingMergedPdf': '正在算繪合併後的 PDF…',
+      'progress.exportingPages': '正在匯出頁面…',
+      'progress.exportingOriginalPages': '正在匯出原始頁面…',
+      'progress.exportingPageEdits': '正在匯出頁面編輯…',
+      'progress.compressingPdf': '正在壓縮 PDF…',
+      'progress.exportingEditedPage': '正在匯出編輯後的第 {page}/{count} 頁',
+      'progress.rasterizingFineRotation': '正在以 {dpi} dpi 光柵化細微旋轉 · 第 {page}/{count} 頁',
+      'progress.exportingPart': '正在匯出第 {part} 部分…',
+      'progress.exportingPage': '正在匯出第 {page}/{count} 頁',
+      'progress.compressingPage': '正在壓縮第 {page}/{count} 頁',
+      'errors.rangeRequired': '匯出前請輸入頁碼範圍。',
+      'errors.rangeFormat': '請使用 1-3、8、12-15 這樣的頁碼範圍。',
+      'errors.rangeBounds': '頁碼範圍必須在 1 到 {count} 之間。',
+      'errors.rangeOrder': '頁碼範圍必須由小到大。',
+      'errors.rangeEmpty': '請至少選擇一頁進行匯出。',
+      'errors.readPdfFailed': '無法讀取此 PDF：{error}',
+      'errors.mergeFailed': '合併失敗：{error}',
+      'errors.splitExportFailed': '分割匯出失敗：{error}',
+      'errors.exportFailed': '匯出失敗：{error}',
+      'errors.previewFailed': '預覽失敗：{error}',
+      'errors.originalMissing': '原始 PDF 資料不可用。',
+      'errors.noPagesExport': '沒有可匯出的頁面。',
+      'errors.renderPageFailed': '無法算繪第 {page} 頁。',
+      'errors.chooseMerge': '請選擇一個或多個要合併的 PDF 檔案。',
+      'errors.password': '匯出加密 PDF 前請輸入密碼。',
+      'errors.notPdf': '這看起來不是 PDF 檔案。',
       'organize.summaryEmpty': '上傳 PDF 後調整頁面順序或刪除頁面。',
       'organize.summarySplit': '{parts} 份 PDF 已準備好。可以改名後分別匯出。',
       'organize.summaryPages': '將匯出 {count}/{total} 頁。點頁面上的「分割」可拆成多份 PDF。',
@@ -1303,6 +1439,10 @@
       'actions.clearList': '목록 지우기',
       'actions.restoreOrder': '원래 순서로 복원',
       'actions.resetSelectedPage': '선택한 페이지 초기화',
+      'actions.reset': '초기화',
+      'actions.resetThreshold': '임계값 초기화',
+      'actions.resetBrightness': '밝기 초기화',
+      'actions.resetContrast': '대비 초기화',
       'actions.mergeIntoOrganize': '정리 화면으로 병합',
       'actions.invert': '반전',
       'actions.sepia': '따뜻하게',
@@ -1394,8 +1534,45 @@
       'preview.titleCompress': '미리보기 <em>— 압축 내보내기</em>',
       'preview.titleProcessed': '미리보기 <em>— 처리 결과</em>',
       'proof.awaiting': 'PDF 대기 중',
+      'zoom.fit': '맞춤',
+      'zoom.fitTitle': '맞춤으로 보기',
       'proof.outputPages': '출력 {count}페이지',
       'proof.noPages': '선택한 페이지 없음',
+      'proof.pagePixels': '{w} × {h} px · {page}/{count}페이지',
+      'proof.editPage': '{page}/{count}페이지 · {edit}',
+      'proof.mergedPages': '{count}페이지 병합됨',
+      'progress.lockingPdf': 'PDF 암호화 중…',
+      'progress.loadingPdf': 'PDF 불러오는 중…',
+      'progress.openingPdf': 'PDF 여는 중…',
+      'progress.openingLargePdf': '큰 PDF를 안전하게 여는 중…',
+      'progress.renderingPage': '{page}/{count}페이지 렌더링 중',
+      'progress.renderingAtDpi': '{dpi} dpi로 렌더링 중 · {page}/{count}페이지',
+      'progress.resolutionCurrentPage': '해상도 설정 완료 · 현재 페이지 렌더링 중…',
+      'progress.mergingPdfs': 'PDF 병합 중…',
+      'progress.mergingFile': '{name} 병합 중',
+      'progress.renderingMergedPdf': '병합된 PDF 렌더링 중…',
+      'progress.exportingPages': '페이지 내보내는 중…',
+      'progress.exportingOriginalPages': '원본 페이지 내보내는 중…',
+      'progress.exportingPageEdits': '페이지 편집 내보내는 중…',
+      'progress.compressingPdf': 'PDF 압축 중…',
+      'progress.exportingEditedPage': '편집된 {page}/{count}페이지 내보내는 중',
+      'progress.rasterizingFineRotation': '{dpi} dpi로 미세 회전 래스터화 중 · {page}/{count}페이지',
+      'progress.exportingPart': '{part}번째 부분 내보내는 중…',
+      'progress.exportingPage': '{page}/{count}페이지 내보내는 중',
+      'progress.compressingPage': '{page}/{count}페이지 압축 중',
+      'errors.rangeRequired': '내보내기 전에 페이지 범위를 입력하세요.',
+      'errors.rangeFormat': '1-3, 8, 12-15 형식으로 페이지 범위를 입력하세요.',
+      'errors.rangeBounds': '페이지 범위는 1부터 {count} 사이여야 합니다.',
+      'errors.rangeOrder': '페이지 범위는 낮은 번호에서 높은 번호 순서여야 합니다.',
+      'errors.rangeEmpty': '내보낼 페이지를 하나 이상 입력하세요.',
+      'errors.readPdfFailed': '이 PDF를 읽을 수 없습니다: {error}',
+      'errors.mergeFailed': '병합 실패: {error}',
+      'errors.splitExportFailed': '분할 내보내기 실패: {error}',
+      'errors.exportFailed': '내보내기 실패: {error}',
+      'errors.previewFailed': '미리보기 실패: {error}',
+      'errors.originalMissing': '원본 PDF 데이터를 사용할 수 없습니다.',
+      'errors.noPagesExport': '내보낼 페이지가 없습니다.',
+      'errors.renderPageFailed': '{page}페이지를 렌더링할 수 없습니다.',
       'organize.summaryEmpty': 'PDF를 올려 페이지 순서를 바꾸거나 삭제하세요.',
       'organize.summarySplit': 'PDF {parts}개가 준비되었습니다. 이름을 바꾼 뒤 각각 내보낼 수 있습니다.',
       'organize.summaryPages': '{total}페이지 중 {count}페이지를 내보냅니다. 페이지의 분할을 눌러 PDF를 여러 개로 나눌 수 있습니다.',
@@ -1480,6 +1657,10 @@
       'actions.clearList': 'リストをクリア',
       'actions.restoreOrder': '元の順序に戻す',
       'actions.resetSelectedPage': '選択ページをリセット',
+      'actions.reset': 'リセット',
+      'actions.resetThreshold': 'しきい値をリセット',
+      'actions.resetBrightness': '明るさをリセット',
+      'actions.resetContrast': 'コントラストをリセット',
       'actions.mergeIntoOrganize': '整理画面に結合',
       'actions.invert': '反転',
       'actions.sepia': '暖色',
@@ -1571,8 +1752,45 @@
       'preview.titleCompress': 'プレビュー <em>— 圧縮書き出し</em>',
       'preview.titleProcessed': 'プレビュー <em>— 処理結果</em>',
       'proof.awaiting': 'PDF待機中',
+      'zoom.fit': '全体',
+      'zoom.fitTitle': '全体表示にする',
       'proof.outputPages': '出力 {count}ページ',
       'proof.noPages': 'ページ未選択',
+      'proof.pagePixels': '{w} × {h} px · {page}/{count}ページ',
+      'proof.editPage': '{page}/{count}ページ · {edit}',
+      'proof.mergedPages': '{count}ページを結合しました',
+      'progress.lockingPdf': 'PDFを保護しています…',
+      'progress.loadingPdf': 'PDFを読み込んでいます…',
+      'progress.openingPdf': 'PDFを開いています…',
+      'progress.openingLargePdf': '大きなPDFを安全に開いています…',
+      'progress.renderingPage': '{page}/{count}ページをレンダリング中',
+      'progress.renderingAtDpi': '{dpi} dpiでレンダリング中 · {page}/{count}ページ',
+      'progress.resolutionCurrentPage': '解像度を設定しました · 現在のページをレンダリング中…',
+      'progress.mergingPdfs': 'PDFを結合しています…',
+      'progress.mergingFile': '{name}を結合しています',
+      'progress.renderingMergedPdf': '結合したPDFをレンダリングしています…',
+      'progress.exportingPages': 'ページを書き出しています…',
+      'progress.exportingOriginalPages': '元のページを書き出しています…',
+      'progress.exportingPageEdits': 'ページ編集を書き出しています…',
+      'progress.compressingPdf': 'PDFを圧縮しています…',
+      'progress.exportingEditedPage': '編集済みページ {page}/{count} を書き出しています',
+      'progress.rasterizingFineRotation': '{dpi} dpiで微調整回転をラスタライズ中 · {page}/{count}ページ',
+      'progress.exportingPart': 'パート {part} を書き出しています…',
+      'progress.exportingPage': '{page}/{count}ページを書き出しています',
+      'progress.compressingPage': '{page}/{count}ページを圧縮しています',
+      'errors.rangeRequired': '書き出す前にページ範囲を入力してください。',
+      'errors.rangeFormat': '1-3、8、12-15 のようなページ範囲を入力してください。',
+      'errors.rangeBounds': 'ページ範囲は 1 から {count} までにしてください。',
+      'errors.rangeOrder': 'ページ範囲は小さい番号から大きい番号の順にしてください。',
+      'errors.rangeEmpty': '書き出すページを1ページ以上指定してください。',
+      'errors.readPdfFailed': 'このPDFを読み込めませんでした: {error}',
+      'errors.mergeFailed': '結合に失敗しました: {error}',
+      'errors.splitExportFailed': '分割書き出しに失敗しました: {error}',
+      'errors.exportFailed': '書き出しに失敗しました: {error}',
+      'errors.previewFailed': 'プレビューに失敗しました: {error}',
+      'errors.originalMissing': '元のPDFデータを利用できません。',
+      'errors.noPagesExport': '書き出すページがありません。',
+      'errors.renderPageFailed': '{page}ページをレンダリングできませんでした。',
       'organize.summaryEmpty': 'PDFを追加してページ順を変更または削除します。',
       'organize.summarySplit': 'PDF {parts}個の準備ができました。名前を変更して個別に書き出せます。',
       'organize.summaryPages': '{total}ページ中{count}ページを書き出します。ページの分割を使うとPDFを複数に分けられます。',
@@ -1656,6 +1874,10 @@
       'actions.clearList': 'Borrar lista',
       'actions.restoreOrder': 'Restaurar orden original',
       'actions.resetSelectedPage': 'Restablecer página seleccionada',
+      'actions.reset': 'Restablecer',
+      'actions.resetThreshold': 'Restablecer umbral',
+      'actions.resetBrightness': 'Restablecer brillo',
+      'actions.resetContrast': 'Restablecer contraste',
       'actions.mergeIntoOrganize': 'Unir en Organizar',
       'actions.invert': 'Invertir',
       'actions.sepia': 'Sepia',
@@ -1747,8 +1969,48 @@
       'preview.titleCompress': 'Vista previa <em>— exportación comprimida</em>',
       'preview.titleProcessed': 'Vista previa <em>— resultado procesado</em>',
       'proof.awaiting': 'esperando PDF',
+      'zoom.fit': 'ajustar',
+      'zoom.fitTitle': 'Haz clic para ajustar',
       'proof.outputPages': '{count} páginas en la salida',
       'proof.noPages': 'sin páginas seleccionadas',
+      'proof.pagePixels': '{w} × {h} px · página {page}/{count}',
+      'proof.editPage': 'página {page}/{count} · {edit}',
+      'proof.mergedPages': '{count} páginas unidas',
+      'progress.lockingPdf': 'Protegiendo PDF…',
+      'progress.loadingPdf': 'Cargando PDF…',
+      'progress.openingPdf': 'Abriendo PDF…',
+      'progress.openingLargePdf': 'Abriendo PDF grande de forma segura…',
+      'progress.renderingPage': 'Renderizando página {page} de {count}',
+      'progress.renderingAtDpi': 'Renderizando a {dpi} dpi · página {page} / {count}',
+      'progress.resolutionCurrentPage': 'Resolución aplicada · renderizando página actual…',
+      'progress.mergingPdfs': 'Uniendo PDF…',
+      'progress.mergingFile': 'Uniendo {name}',
+      'progress.renderingMergedPdf': 'Renderizando PDF unido…',
+      'progress.exportingPages': 'Exportando páginas…',
+      'progress.exportingOriginalPages': 'Exportando páginas originales…',
+      'progress.exportingPageEdits': 'Exportando ediciones de página…',
+      'progress.compressingPdf': 'Comprimiendo PDF…',
+      'progress.exportingEditedPage': 'Exportando página editada {page} de {count}',
+      'progress.rasterizingFineRotation': 'Rasterizando rotación fina a {dpi} dpi · página {page} de {count}',
+      'progress.exportingPart': 'Exportando parte {part}…',
+      'progress.exportingPage': 'Exportando página {page} de {count}',
+      'progress.compressingPage': 'Comprimiendo página {page} de {count}',
+      'errors.rangeRequired': 'Introduce un rango de páginas antes de exportar.',
+      'errors.rangeFormat': 'Usa rangos como 1-3, 8, 12-15.',
+      'errors.rangeBounds': 'El rango debe estar entre 1 y {count}.',
+      'errors.rangeOrder': 'Los rangos deben ir de menor a mayor.',
+      'errors.rangeEmpty': 'Introduce al menos una página para exportar.',
+      'errors.readPdfFailed': 'No se pudo leer este PDF: {error}',
+      'errors.mergeFailed': 'Error al unir: {error}',
+      'errors.splitExportFailed': 'Error al exportar la división: {error}',
+      'errors.exportFailed': 'Error al exportar: {error}',
+      'errors.previewFailed': 'Error en la vista previa: {error}',
+      'errors.originalMissing': 'Los datos del PDF original no están disponibles.',
+      'errors.noPagesExport': 'No hay páginas para exportar.',
+      'errors.renderPageFailed': 'No se pudo renderizar la página {page}.',
+      'errors.chooseMerge': 'Elige uno o más PDF para unir.',
+      'errors.password': 'Introduce una contraseña antes de exportar un PDF protegido.',
+      'errors.notPdf': 'Ese archivo no parece ser un PDF.',
       'organize.summaryEmpty': 'Sube un PDF para reordenar o quitar páginas.',
       'organize.summarySplit': '{parts} PDF listos. Edita los nombres y exporta cada parte desde el panel de división.',
       'organize.summaryPages': 'Se exportarán {count} de {total} páginas originales. Usa Dividir en una página para separar el PDF.',
@@ -1829,6 +2091,10 @@
       'actions.clearList': 'Vider la liste',
       'actions.restoreOrder': 'Restaurer l’ordre d’origine',
       'actions.resetSelectedPage': 'Réinitialiser la page',
+      'actions.reset': 'Réinitialiser',
+      'actions.resetThreshold': 'Réinitialiser le seuil',
+      'actions.resetBrightness': 'Réinitialiser la luminosité',
+      'actions.resetContrast': 'Réinitialiser le contraste',
       'actions.mergeIntoOrganize': 'Fusionner dans Organiser',
       'actions.invert': 'Inverser',
       'actions.sepia': 'Sépia',
@@ -1920,8 +2186,48 @@
       'preview.titleCompress': 'Aperçu <em>— export compressé</em>',
       'preview.titleProcessed': 'Aperçu <em>— résultat traité</em>',
       'proof.awaiting': 'en attente du PDF',
+      'zoom.fit': 'ajuster',
+      'zoom.fitTitle': 'Cliquer pour ajuster',
       'proof.outputPages': '{count} pages en sortie',
       'proof.noPages': 'aucune page sélectionnée',
+      'proof.pagePixels': '{w} × {h} px · page {page}/{count}',
+      'proof.editPage': 'page {page}/{count} · {edit}',
+      'proof.mergedPages': '{count} pages fusionnées',
+      'progress.lockingPdf': 'Protection du PDF…',
+      'progress.loadingPdf': 'Chargement du PDF…',
+      'progress.openingPdf': 'Ouverture du PDF…',
+      'progress.openingLargePdf': 'Ouverture sécurisée du grand PDF…',
+      'progress.renderingPage': 'Rendu de la page {page} sur {count}',
+      'progress.renderingAtDpi': 'Rendu à {dpi} dpi · page {page} / {count}',
+      'progress.resolutionCurrentPage': 'Résolution appliquée · rendu de la page active…',
+      'progress.mergingPdfs': 'Fusion des PDF…',
+      'progress.mergingFile': 'Fusion de {name}',
+      'progress.renderingMergedPdf': 'Rendu du PDF fusionné…',
+      'progress.exportingPages': 'Export des pages…',
+      'progress.exportingOriginalPages': 'Export des pages originales…',
+      'progress.exportingPageEdits': 'Export des modifications de page…',
+      'progress.compressingPdf': 'Compression du PDF…',
+      'progress.exportingEditedPage': 'Export de la page modifiée {page} sur {count}',
+      'progress.rasterizingFineRotation': 'Pixellisation de la rotation fine à {dpi} dpi · page {page} sur {count}',
+      'progress.exportingPart': 'Export de la partie {part}…',
+      'progress.exportingPage': 'Export de la page {page} sur {count}',
+      'progress.compressingPage': 'Compression de la page {page} sur {count}',
+      'errors.rangeRequired': 'Saisissez une plage de pages avant d’exporter.',
+      'errors.rangeFormat': 'Utilisez des plages comme 1-3, 8, 12-15.',
+      'errors.rangeBounds': 'La plage doit rester entre 1 et {count}.',
+      'errors.rangeOrder': 'Les plages doivent aller du plus petit au plus grand numéro.',
+      'errors.rangeEmpty': 'Saisissez au moins une page à exporter.',
+      'errors.readPdfFailed': 'Impossible de lire ce PDF : {error}',
+      'errors.mergeFailed': 'Échec de la fusion : {error}',
+      'errors.splitExportFailed': 'Échec de l’export de la séparation : {error}',
+      'errors.exportFailed': 'Échec de l’export : {error}',
+      'errors.previewFailed': 'Échec de l’aperçu : {error}',
+      'errors.originalMissing': 'Les données du PDF original ne sont pas disponibles.',
+      'errors.noPagesExport': 'Aucune page à exporter.',
+      'errors.renderPageFailed': 'Impossible de rendre la page {page}.',
+      'errors.chooseMerge': 'Choisissez un ou plusieurs PDF à fusionner.',
+      'errors.password': 'Saisissez un mot de passe avant d’exporter un PDF protégé.',
+      'errors.notPdf': 'Ce fichier ne semble pas être un PDF.',
       'organize.summaryEmpty': 'Importez un PDF pour réordonner ou supprimer des pages.',
       'organize.summarySplit': '{parts} PDF sont prêts. Modifiez les noms et exportez chaque partie depuis le panneau de séparation.',
       'organize.summaryPages': '{count} pages originales sur {total} seront incluses dans l’export. Utilisez Scinder sur une page pour séparer le PDF.',
@@ -2468,7 +2774,7 @@
 
   function parsePageRangeSpec(value, count) {
     const spec = String(value || '').trim();
-    if (!spec) return { ok: false, error: 'Enter a page range before exporting.' };
+    if (!spec) return { ok: false, error: t('errors.rangeRequired') };
     const pages = [];
     const seen = new Set();
     const parts = spec.split(',');
@@ -2476,20 +2782,20 @@
       const part = rawPart.trim();
       if (!part) continue;
       const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(part);
-      if (!match) return { ok: false, error: 'Use page ranges like 1-3, 8, 12-15.' };
+      if (!match) return { ok: false, error: t('errors.rangeFormat') };
       const start = Number(match[1]);
       const end = match[2] ? Number(match[2]) : start;
       if (start < 1 || end < 1 || start > count || end > count) {
-        return { ok: false, error: 'Page range must stay between 1 and ' + count + '.' };
+        return { ok: false, error: t('errors.rangeBounds', { count }) };
       }
-      if (end < start) return { ok: false, error: 'Page ranges must go from low to high.' };
+      if (end < start) return { ok: false, error: t('errors.rangeOrder') };
       for (let page = start; page <= end; page++) {
         if (seen.has(page)) continue;
         seen.add(page);
         pages.push(page);
       }
     }
-    if (!pages.length) return { ok: false, error: 'Enter at least one page to export.' };
+    if (!pages.length) return { ok: false, error: t('errors.rangeEmpty') };
     return { ok: true, pages };
   }
 
@@ -2578,7 +2884,14 @@
   }
 
   function pageHasFullData(pd, renderKey = state.resolution) {
-    return !!(pd && pd.lum && pd.histo && pd.renderKey === renderKey);
+    const pixelCount = (pd?.w || 0) * (pd?.h || 0);
+    return !!(pd
+      && pd.lum
+      && pd.histo
+      && pd.renderKey === renderKey
+      && pixelCount > 0
+      && pd.lum.length === pixelCount
+      && pd.histo.length === 256);
   }
 
   function resetRenderCaches() {
@@ -2938,19 +3251,19 @@
       actions.className = 'merge-file-actions';
       const up = document.createElement('button');
       up.type = 'button';
-      up.textContent = '↑';
+      up.innerHTML = '<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">↑</span>';
       up.disabled = index === 0;
       up.setAttribute('aria-label', t('merge.moveUp', { name: file.name }));
       up.addEventListener('click', () => moveMergeFile(index, -1));
       const down = document.createElement('button');
       down.type = 'button';
-      down.textContent = '↓';
+      down.innerHTML = '<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">↓</span>';
       down.disabled = index === state.mergeFiles.length - 1;
       down.setAttribute('aria-label', t('merge.moveDown', { name: file.name }));
       down.addEventListener('click', () => moveMergeFile(index, 1));
       const remove = document.createElement('button');
       remove.type = 'button';
-      remove.textContent = '×';
+      remove.innerHTML = '<span class="merge-file-action-glyph" aria-hidden="true">×</span>';
       remove.setAttribute('aria-label', t('merge.remove', { name: file.name }));
       remove.addEventListener('click', () => removeMergeFile(index));
       actions.appendChild(up);
@@ -2981,6 +3294,32 @@
     renderMergeList();
   }
 
+  function currentPdfAsMergeFile() {
+    if (!state.pdfBytes || !state.fileName) return null;
+    const name = normalizePdfName(state.fileName);
+    const bytes = state.pdfBytes.slice(0);
+    const size = state.fileSize || bytes.byteLength || bytes.length || 0;
+    return {
+      name,
+      size,
+      type: 'application/pdf',
+      currentPdfSource: state.pdfBytes,
+      arrayBuffer: async () => bytes.slice(0),
+    };
+  }
+
+  function isCurrentPdfMergeFile(file) {
+    return file?.currentPdfSource === state.pdfBytes ||
+      (state.fileName && normalizePdfName(file.name) === normalizePdfName(state.fileName) && file.size === state.fileSize);
+  }
+
+  function seedCurrentPdfInMergeList() {
+    const currentFile = currentPdfAsMergeFile();
+    if (!currentFile) return;
+    state.mergeFiles = state.mergeFiles.filter(file => !isCurrentPdfMergeFile(file));
+    state.mergeFiles.unshift(currentFile);
+  }
+
   function addMergeFiles(fileList) {
     clearError();
     const files = Array.from(fileList).filter(file =>
@@ -2989,7 +3328,8 @@
       showError(t('errors.chooseMerge'));
       return;
     }
-    state.mergeFiles.push(...files);
+    seedCurrentPdfInMergeList();
+    state.mergeFiles.push(...files.filter(file => !isCurrentPdfMergeFile(file)));
     updateMergeState();
   }
 
@@ -3013,14 +3353,14 @@
       return;
     }
     mergeRunBtn.disabled = true;
-    setLoader(true, 'Merging PDFs…', 0);
+    setLoader(true, t('progress.mergingPdfs'), 0);
     try {
       const pdfLib = await ensurePdfLib();
       const out = await pdfLib.PDFDocument.create();
       let totalPages = 0;
       for (let i = 0; i < state.mergeFiles.length; i++) {
         const file = state.mergeFiles[i];
-        setLoader(true, 'Merging ' + file.name, (i / state.mergeFiles.length) * 70);
+        setLoader(true, t('progress.mergingFile', { name: file.name }), (i / state.mergeFiles.length) * 70);
         const src = await pdfLib.PDFDocument.load(await file.arrayBuffer());
         const pageIndices = src.getPageIndices();
         const pages = await out.copyPages(src, pageIndices);
@@ -3031,15 +3371,15 @@
       const mergedName = cleanDownloadBase(state.mergeFiles[0].name, 'merged') +
         (state.mergeFiles.length > 1 ? '_merged.pdf' : '_copy.pdf');
       const mergedBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      await loadPdfBytes(mergedBuffer, mergedName, bytes.byteLength, 'Rendering merged PDF…');
+      await loadPdfBytes(mergedBuffer, mergedName, bytes.byteLength, t('progress.renderingMergedPdf'));
       state.mergeFiles = [];
       updateMergeState();
       switchTool('organize');
       setLoader(false);
-      proofMeta.textContent = totalPages + ' merged pages';
+      proofMeta.textContent = t('proof.mergedPages', { count: totalPages });
     } catch (err) {
       console.error(err);
-      showError('Merge failed: ' + (err.message || err));
+      showError(t('errors.mergeFailed', { error: err.message || err }));
       setLoader(false);
       updateMergeState();
     }
@@ -3069,7 +3409,7 @@
     fileInput.value = '';
   });
 
-  async function loadPdfBytes(buf, fileName, fileSize, loadingLabel = 'Loading PDF…') {
+  async function loadPdfBytes(buf, fileName, fileSize, loadingLabel = t('progress.loadingPdf')) {
     resetRenderCaches();
     state.fileName = normalizePdfName(fileName);
     state.fileSize = fileSize;
@@ -3094,12 +3434,12 @@
     updatePageState();
     const lazyOpen = state.largePdfSafeMode || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit' || activeTool === 'compress';
     if (lazyOpen) {
-      setLoader(true, state.largePdfSafeMode ? 'Opening large PDF safely…' : 'Opening PDF…', 45);
+      setLoader(true, state.largePdfSafeMode ? t('progress.openingLargePdf') : t('progress.openingPdf'), 45);
       await ensurePageMeta(0);
       if (activeTool === 'edit') await ensureRasterPreviewData(0);
     } else {
       for (let i = 1; i <= pdf.numPages; i++) {
-        setLoader(true, 'Rendering page ' + i + ' of ' + pdf.numPages, ((i - 1) / pdf.numPages) * 100);
+        setLoader(true, t('progress.renderingPage', { page: i, count: pdf.numPages }), ((i - 1) / pdf.numPages) * 100);
         await renderPageToLuminance(i);
       }
     }
@@ -3124,7 +3464,7 @@
       await loadPdfBytes(await file.arrayBuffer(), file.name, file.size);
     } catch (err) {
       console.error(err);
-      showError('Could not read this PDF: ' + (err.message || err));
+      showError(t('errors.readPdfFailed', { error: err.message || err }));
       fileStatusEl.textContent = t('status.error');
       setLoader(false);
     }
@@ -3437,7 +3777,7 @@
       }
     } catch (err) {
       console.error(err);
-      showError('Preview failed: ' + (err.message || err));
+      showError(t('errors.previewFailed', { error: err.message || err }));
     }
   }
 
@@ -3465,17 +3805,21 @@
       tmp.width = 0;
       tmp.height = 0;
     }
+    const keepFullData = pageHasFullData(pd, pd.renderKey) && pd.w === nextW && pd.h === nextH;
     const updated = {
       ...pd,
       w: nextW,
       h: nextH,
       scale,
       previewQualityScale: highQuality ? scale : (pd.previewQualityScale || scale),
+      lum: keepFullData ? pd.lum : null,
+      histo: keepFullData ? pd.histo : null,
+      renderKey: keepFullData ? pd.renderKey : null,
       metaKey: PREVIEW_META_KEY,
     };
     state.pages[sourceIndex] = updated;
     if (sourceIndex === currentSourceIndex()) {
-      proofMeta.textContent = nextW + ' × ' + nextH + ' px · page ' + state.curPage + '/' + activePageCount();
+      proofMeta.textContent = t('proof.pagePixels', { w: nextW, h: nextH, page: state.curPage, count: activePageCount() });
     }
     return true;
   }
@@ -3518,7 +3862,7 @@
       const pd = await ensurePageMeta(sourceIndex);
       if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || (activeTool !== 'preview' && activeTool !== 'merge' && activeTool !== 'compress')) return;
       renderOriginalPreview(pd, sourceIndex);
-      proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · page ' + state.curPage + '/' + activePageCount();
+      proofMeta.textContent = t('proof.pagePixels', { w: pd.w, h: pd.h, page: state.curPage, count: activePageCount() });
       return;
     }
     const pd = isRasterTool(activeTool)
@@ -3527,7 +3871,7 @@
     if (!pd || token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool === 'organize' || activeTool === 'edit') return;
     if (processTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas);
     else applyGreyscaleToCanvas(pd, previewCanvas);
-    proofMeta.textContent = pd.w + ' × ' + pd.h + ' px · page ' + state.curPage + '/' + activePageCount();
+    proofMeta.textContent = t('proof.pagePixels', { w: pd.w, h: pd.h, page: state.curPage, count: activePageCount() });
     applyZoom();
   }
 
@@ -3805,7 +4149,7 @@
     edit.crop = cropFromPointer(cropDrag.handle, dxPct, dyPct);
     syncCropLabels(edit);
     resetEditBtn.disabled = !isPageEdited(edit);
-    proofMeta.textContent = 'page ' + state.curPage + '/' + activePageCount() + ' · ' + editedLabel(edit);
+    proofMeta.textContent = t('proof.editPage', { page: state.curPage, count: activePageCount(), edit: editedLabel(edit) });
     if (final) renderPageEditor();
   }
 
@@ -3914,7 +4258,7 @@
     tmp.width = 0;
     tmp.height = 0;
     pageEditorCanvasWrap.style.display = 'block';
-    proofMeta.textContent = 'page ' + state.curPage + '/' + activePageCount() + ' · ' + editedLabel(currentPageEdit());
+    proofMeta.textContent = t('proof.editPage', { page: state.curPage, count: activePageCount(), edit: editedLabel(currentPageEdit()) });
     applyZoom({ preserveCenter: false });
     updateCropOverlay();
   }
@@ -4389,8 +4733,8 @@
 
   async function createPageOrderPdfArtifact(pageOrder, fileBase, context) {
     const pdfLib = await ensurePdfLib();
-    if (!state.pdfBytes) throw new Error('Original PDF data is not available.');
-    if (!pageOrder.length) throw new Error('There are no pages to export.');
+    if (!state.pdfBytes) throw new Error(t('errors.originalMissing'));
+    if (!pageOrder.length) throw new Error(t('errors.noPagesExport'));
     const src = await pdfLib.PDFDocument.load(state.pdfBytes);
     const out = await pdfLib.PDFDocument.create();
     const copiedPages = await out.copyPages(src, pageOrder);
@@ -4433,19 +4777,19 @@
 
   async function createEditedPdfArtifact(pageOrder, fileBase, context) {
     const pdfLib = await ensurePdfLib();
-    if (!state.pdfBytes) throw new Error('Original PDF data is not available.');
-    if (!pageOrder.length) throw new Error('There are no pages to export.');
+    if (!state.pdfBytes) throw new Error(t('errors.originalMissing'));
+    if (!pageOrder.length) throw new Error(t('errors.noPagesExport'));
     const src = await pdfLib.PDFDocument.load(state.pdfBytes);
     const out = await pdfLib.PDFDocument.create();
     let rasterized = false;
     const count = pageOrder.length;
     for (let i = 0; i < count; i++) {
       const progress = currentPageProgress(i, count);
-      setLoader(true, 'Exporting edited page ' + (i + 1) + ' of ' + count, progress);
+      setLoader(true, t('progress.exportingEditedPage', { page: i + 1, count }), progress);
       const sourceIndex = pageOrder[i];
       const edit = clonePageEdit(state.pageEdits[sourceIndex]);
       if (hasFineRotation(edit)) {
-        setLoader(true, 'Rasterizing fine rotation at ' + fineRotationExportDpi() + ' dpi · page ' + (i + 1) + ' of ' + count, progress);
+        setLoader(true, t('progress.rasterizingFineRotation', { dpi: fineRotationExportDpi(), page: i + 1, count }), progress);
       }
       if (!isPageEdited(edit)) {
         const [copied] = await out.copyPages(src, [sourceIndex]);
@@ -4490,7 +4834,7 @@
       return;
     }
     splitPartsList.querySelectorAll('button').forEach(button => { button.disabled = true; });
-    setLoader(true, 'Exporting part ' + (partIndex + 1) + '…', 35);
+    setLoader(true, t('progress.exportingPart', { part: partIndex + 1 }), 35);
     try {
       await exportPageOrderAsPdf(part.pageOrder, part.name || defaultSplitName(partIndex), {
         toolId: 'split',
@@ -4499,7 +4843,7 @@
       setLoader(false);
     } catch (err) {
       console.error(err);
-      showError('Split export failed: ' + (err.message || err));
+      showError(t('errors.splitExportFailed', { error: err.message || err }));
       setLoader(false);
     } finally {
       updatePageState();
@@ -4511,11 +4855,11 @@
     const tmp = document.createElement('canvas');
     let pdf = null;
     const count = context.pageOrder.length;
-    if (!count) throw new Error('There are no pages to export.');
+    if (!count) throw new Error(t('errors.noPagesExport'));
     for (let i = 0; i < count; i++) {
-      setLoader(true, 'Exporting page ' + (i + 1) + ' of ' + count, currentPageProgress(i, count));
+      setLoader(true, t('progress.exportingPage', { page: i + 1, count }), currentPageProgress(i, count));
       const pd = await ensurePageData(context.pageOrder[i]);
-      if (!pd) throw new Error('Could not render page ' + (i + 1));
+      if (!pd) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
       if (processTool === 'threshold') applyThresholdToCanvas(pd, tmp);
       else applyGreyscaleToCanvas(pd, tmp);
       const wPt = pd.w / pd.scale;
@@ -4568,9 +4912,9 @@
     const tmp = document.createElement('canvas');
     let pdf = null;
     const count = context.pageOrder.length;
-    if (!count) throw new Error('There are no pages to export.');
+    if (!count) throw new Error(t('errors.noPagesExport'));
     for (let i = 0; i < count; i++) {
-      setLoader(true, 'Compressing page ' + (i + 1) + ' of ' + count, currentPageProgress(i, count));
+      setLoader(true, t('progress.compressingPage', { page: i + 1, count }), currentPageProgress(i, count));
       const size = await renderCompressedPageToCanvas(context.pageOrder[i], preset, tmp);
       const orient = size.wPt > size.hPt ? 'l' : 'p';
       const dataUrl = tmp.toDataURL('image/jpeg', preset.jpegQuality);
@@ -4613,15 +4957,19 @@
   }
 
   // ── Threshold controls ──
-  threshSlider.addEventListener('input', e => {
-    const v = +e.target.value;
+  function setThresholdValue(value, render = true) {
+    const v = Math.max(0, Math.min(255, Math.round(+value || 0)));
     state.threshold = v;
+    threshSlider.value = String(v);
     threshNum.textContent = v;
     threshPct.textContent = Math.round((v / 255) * 100) + '%';
     threshHint.textContent = threshHintText(v);
     threshNeedle.style.left = ((v / 255) * 100) + '%';
-    if (state.pdfDoc) requestPreviewRender(false);
-  });
+    if (render && state.pdfDoc) requestPreviewRender(false);
+  }
+
+  threshSlider.addEventListener('input', e => setThresholdValue(e.target.value));
+  thresholdResetBtn.addEventListener('click', () => setThresholdValue(128));
   invertToggle.addEventListener('click', () => {
     state.invert = !state.invert;
     setTogglePressed(invertToggle, state.invert);
@@ -4629,22 +4977,30 @@
   });
 
   // ── Greyscale controls ──
-  brightSlider.addEventListener('input', e => {
-    const v = +e.target.value;
+  function setBrightnessValue(value, render = true) {
+    const v = Math.max(-100, Math.min(100, Math.round(+value || 0)));
     state.brightness = v;
+    brightSlider.value = String(v);
     brightNum.textContent = v > 0 ? '+' + v : String(v);
     brightTag.textContent = brightnessHintText(v);
     $('greyHint').textContent = greyHintText();
-    if (state.pdfDoc) requestPreviewRender(false);
-  });
-  contrastSlider.addEventListener('input', e => {
-    const v = +e.target.value;
+    if (render && state.pdfDoc) requestPreviewRender(false);
+  }
+
+  function setContrastValue(value, render = true) {
+    const v = Math.max(50, Math.min(200, Math.round(+value || 0)));
     state.contrast = v;
+    contrastSlider.value = String(v);
     contrastNum.textContent = v;
     contrastTag.textContent = contrastHintText(v);
     $('greyHint').textContent = greyHintText();
-    if (state.pdfDoc) requestPreviewRender(false);
-  });
+    if (render && state.pdfDoc) requestPreviewRender(false);
+  }
+
+  brightSlider.addEventListener('input', e => setBrightnessValue(e.target.value));
+  brightnessResetBtn.addEventListener('click', () => setBrightnessValue(0));
+  contrastSlider.addEventListener('input', e => setContrastValue(e.target.value));
+  contrastResetBtn.addEventListener('click', () => setContrastValue(100));
   greyInvertToggle.addEventListener('click', () => {
     state.greyInvert = !state.greyInvert;
     setTogglePressed(greyInvertToggle, state.greyInvert);
@@ -4746,7 +5102,6 @@
 
   // ── Resolution toggles ──
   const resButtons = { fast: $('resFast'), '300': $('res300'), '600': $('res600') };
-  const resLabels  = { fast: 'Rendering page ', '300': 'Rendering at 300 dpi · page ', '600': 'Rendering at 600 dpi · page ' };
 
   function syncResolutionToggles() {
     Object.entries(resButtons).forEach(([key, btn]) => setTogglePressed(btn, state.resolution === key));
@@ -4760,7 +5115,7 @@
       if (!state.pdfDoc) return;
       if (state.largePdfSafeMode) {
         forgetFullPageData();
-        setLoader(true, 'Resolution set · rendering current page…', 35);
+        setLoader(true, t('progress.resolutionCurrentPage'), 35);
         if (isRasterTool(activeTool)) {
           await ensureRasterPreviewData(currentSourceIndex());
         } else if (activeTool === 'edit') {
@@ -4769,7 +5124,10 @@
       } else {
         state.pages = new Array(state.numPages).fill(null);
         for (let i = 1; i <= state.numPages; i++) {
-          setLoader(true, resLabels[key] + i + ' / ' + state.numPages, ((i - 1) / state.numPages) * 100);
+          const label = key === 'fast'
+            ? t('progress.renderingPage', { page: i, count: state.numPages })
+            : t('progress.renderingAtDpi', { dpi: key, page: i, count: state.numPages });
+          setLoader(true, label, ((i - 1) / state.numPages) * 100);
           await renderPageToLuminance(i);
         }
       }
@@ -4824,17 +5182,17 @@
     }
     if (!exportOrder.length) return;
     downloadBtn.disabled = true;
-    setLoader(true, 'Exporting pages…', 0);
+    setLoader(true, t('progress.exportingPages'), 0);
     try {
       const context = createExportContext(activeTool, exportOrder, exportBaseNameForTool(activeTool));
       if (activeTool === 'organize') {
-        setLoader(true, 'Exporting original pages…', 35);
+        setLoader(true, t('progress.exportingOriginalPages'), 35);
         await runExportPipeline(context, () => createPageOrderPdfArtifact(exportOrder, context.fileBase, context));
       } else if (activeTool === 'edit') {
-        setLoader(true, 'Exporting page edits…', 15);
+        setLoader(true, t('progress.exportingPageEdits'), 15);
         await runExportPipeline(context, () => createEditedPdfArtifact(exportOrder, context.fileBase, context));
       } else if (activeTool === 'compress') {
-        setLoader(true, 'Compressing PDF…', 10);
+        setLoader(true, t('progress.compressingPdf'), 10);
         await runExportPipeline(context, createCompressedPdfArtifact);
       } else {
         await runExportPipeline(context, createRasterProcessedPdfArtifact);
@@ -4842,7 +5200,7 @@
       setLoader(false);
     } catch (err) {
       console.error(err);
-      showError('Export failed: ' + (err.message || err));
+      showError(t('errors.exportFailed', { error: err.message || err }));
       setLoader(false);
     } finally {
       updatePageState();
@@ -4852,6 +5210,14 @@
   // ── Zoom ──
   const ZOOM_MIN = 0.25, ZOOM_MAX = 8, ZOOM_STEP = 1.25;
   let zoomLevel = 1; // 1 = largest fit without preview scrollbars
+
+  function syncZoomReadout() {
+    if (!zoomValEl || zoomValEl.querySelector('input')) return;
+    zoomValEl.title = t('zoom.fitTitle');
+    zoomValEl.textContent = (!state.pdfDoc || activeTool === 'organize')
+      ? t('zoom.fit')
+      : Math.round(zoomLevel * 100) + '%';
+  }
 
   function setZoom(z, opts) {
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
@@ -4956,7 +5322,7 @@
       previewStage.classList.remove('zoomed', 'pannable', 'panning');
       zoomOutBtn.disabled = true;
       zoomInBtn.disabled = true;
-      zoomValEl.textContent = 'fit';
+      syncZoomReadout();
       return;
     }
     const preserveCenter = opts.preserveCenter !== false;
@@ -4966,7 +5332,7 @@
 
     zoomOutBtn.disabled = !state.pdfDoc || z <= ZOOM_MIN + 0.001;
     zoomInBtn.disabled  = !state.pdfDoc || z >= ZOOM_MAX - 0.001;
-    zoomValEl.textContent = Math.round(z * 100) + '%';
+    syncZoomReadout();
 
     if (activeTool === 'edit') {
       const center = preserveCenter ? getEditorScrollCenter() : { x: 0.5, y: 0.5 };
@@ -5030,7 +5396,8 @@
     const finish = commit => {
       if (done) return; done = true;
       const raw = input.value.trim().toLowerCase().replace('%', '');
-      if (commit && raw === 'fit') setZoom(1, { preserveCenter: false });
+      const fitWords = ['fit', t('zoom.fit').toLowerCase()];
+      if (commit && fitWords.includes(raw)) setZoom(1, { preserveCenter: false });
       else if (commit && raw !== '' && !isNaN(+raw) && +raw > 0) setZoom(+raw / 100);
       else applyZoom(); // restore readout
     };
@@ -5111,6 +5478,7 @@
   downloadBtn.parentElement.style.display = activeTool === 'preview' ? 'none' : '';
   syncAdvancedOptions();
   updateMergeState();
+  updatePageState();
   setTogglePressed(invertToggle, state.invert);
   setTogglePressed(greyInvertToggle, state.greyInvert);
   setTogglePressed(sepiaToggle, state.sepia);
@@ -5123,7 +5491,6 @@
   updateToolIndicator();
 
   // init display
-  threshNum.textContent = '128';
-  threshPct.textContent = '50%';
-  threshNeedle.style.left = '50%';
-  brightNum.textContent = '0';
+  setThresholdValue(128, false);
+  setBrightnessValue(0, false);
+  setContrastValue(100, false);
