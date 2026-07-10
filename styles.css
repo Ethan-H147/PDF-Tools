@@ -2314,6 +2314,9 @@
 
   .page-thumb {
     background: #fff;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
     display: block;
     width: 100%;
     aspect-ratio: 0.72;
@@ -2853,6 +2856,38 @@
     .page-edit-card .page-thumb-placeholder {
       height: 188px;
       min-height: 188px;
+    }
+
+    body.mobile-performance-mode .tool-nav,
+    body.mobile-performance-mode .pagenav,
+    body.mobile-performance-mode .actions {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: rgba(245, 245, 247, 0.985);
+    }
+
+    body.dark-mode.mobile-performance-mode .tool-nav,
+    body.dark-mode.mobile-performance-mode .pagenav,
+    body.dark-mode.mobile-performance-mode .actions {
+      background: rgba(28, 28, 30, 0.985);
+    }
+
+    body.mobile-performance-mode .organizer-grid .page-card:not(.page-drag-clone),
+    body.mobile-performance-mode .page-edit-card {
+      content-visibility: auto;
+      contain: layout paint style;
+      contain-intrinsic-size: 110px 168px;
+      transform: none;
+      will-change: auto;
+    }
+
+    body.mobile-performance-mode .page-drag-clone {
+      will-change: transform;
+    }
+
+    body.mobile-performance-mode .preview-canvas-wrap,
+    body.mobile-performance-mode .page-editor-canvas-wrap {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 10px 24px rgba(0, 0, 0, 0.12);
     }
   }
 

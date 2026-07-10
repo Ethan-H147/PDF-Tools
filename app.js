@@ -4,16 +4,32 @@
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   // ── Tool registry: add a new entry here to add a new tool ──
+  const MOBILE_PERFORMANCE_MODE = (() => {
+    if (navigator.userAgentData?.mobile) return true;
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')) return true;
+    const shortestScreenSide = Math.min(screen.width || innerWidth, screen.height || innerHeight);
+    return navigator.maxTouchPoints > 1 && shortestScreenSide <= 700 && matchMedia('(pointer: coarse)').matches;
+  })();
   const FINE_ROTATION_EXPORT_DPI = { high: 600, ultra: 900 };
   const LARGE_PDF_SAFE_MODE_BYTES = 35 * 1024 * 1024;
   const LARGE_PDF_SAFE_MODE_PAGES = 80;
-  const SAFE_FULL_PAGE_CACHE_LIMIT = (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4 : 3;
-  const RASTER_PREVIEW_MAX_PIXELS = (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4200000 : 2200000;
-  const ORIGINAL_PREVIEW_MAX_PIXELS = (navigator.deviceMemory && navigator.deviceMemory >= 8)
+  const SAFE_FULL_PAGE_CACHE_LIMIT = MOBILE_PERFORMANCE_MODE
+    ? 1
+    : (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4 : 3;
+  const RASTER_PREVIEW_MAX_PIXELS = MOBILE_PERFORMANCE_MODE
+    ? 1200000
+    : (navigator.deviceMemory && navigator.deviceMemory >= 6) ? 4200000 : 2200000;
+  const ORIGINAL_PREVIEW_MAX_PIXELS = MOBILE_PERFORMANCE_MODE
+    ? 2000000
+    : (navigator.deviceMemory && navigator.deviceMemory >= 8)
     ? 36000000
     : (navigator.deviceMemory && navigator.deviceMemory >= 4)
       ? 22000000
       : 12000000;
+  const MOBILE_RASTER_EXPORT_MAX_PIXELS = 5000000;
+  const MOBILE_CANVAS_MAX_SIDE = 4096;
+  const MOBILE_THUMBNAIL_CACHE_LIMIT = 18;
+  document.body.classList.toggle('mobile-performance-mode', MOBILE_PERFORMANCE_MODE);
   const RASTER_PREVIEW_KEY = 'preview-raster';
   const PREVIEW_META_KEY = 'preview-meta';
   const PDF_LIB_SCRIPT_URLS = [
@@ -147,7 +163,7 @@
     // output
     resolution: '600',
     // cache
-    pages: [], pageOrder: [], splitPoints: [], splitNames: [], fileName: '', fileSize: 0, pdfBytes: null,
+    pages: [], pageOrder: [], splitPoints: [], splitNames: [], fileName: '', fileSize: 0, pdfBytes: null, sourceFile: null,
     mergeFiles: [], pageEdits: [],
     fineRotationQuality: 'high',
     compressMode: 'original',
@@ -158,11 +174,58 @@
 
   const pageRenderJobs = new Map();
   const thumbnailJobs = new Map();
+  const activePdfRenderTasks = new Set();
   const thumbnailQueue = [];
   const thumbnailQueued = new Set();
   let thumbnailQueueRunning = false;
   let thumbnailObserver = null;
+  let mobileThumbnailCacheOrder = [];
+  let operationInProgress = false;
+  let pdfLoadGeneration = 0;
+  let activePdfLoadingTask = null;
+  let pendingPdfDestroy = Promise.resolve();
   const lazyScriptLoads = new Map();
+
+  function isCancelledRenderError(err) {
+    return err?.name === 'RenderingCancelledException' || /rendering cancelled/i.test(err?.message || '');
+  }
+
+  async function runPdfPageRender(page, params) {
+    const task = page.render(params);
+    activePdfRenderTasks.add(task);
+    try {
+      await task.promise;
+      return true;
+    } catch (err) {
+      if (isCancelledRenderError(err)) return false;
+      throw err;
+    } finally {
+      activePdfRenderTasks.delete(task);
+    }
+  }
+
+  function cancelActivePdfRenders() {
+    activePdfRenderTasks.forEach(task => {
+      try { task.cancel(); } catch {}
+    });
+    activePdfRenderTasks.clear();
+  }
+
+  function beginPdfLoad() {
+    const token = ++pdfLoadGeneration;
+    const loadingTask = activePdfLoadingTask;
+    activePdfLoadingTask = null;
+    queuePdfDestroy(loadingTask);
+    return token;
+  }
+
+  function queuePdfDestroy(pdfDoc) {
+    if (!pdfDoc?.destroy) return pendingPdfDestroy;
+    pendingPdfDestroy = pendingPdfDestroy
+      .then(() => pdfDoc.destroy())
+      .catch(() => {});
+    return pendingPdfDestroy;
+  }
 
   const $ = id => document.getElementById(id);
 
@@ -600,11 +663,16 @@
     });
   }
 
-  function switchTool(id) {
+  function switchTool(id, { force = false } = {}) {
     if (!TOOLS[id]) return;
+    if (operationInProgress && !force) return;
     if (id === activeTool) {
       syncToolTabA11y();
       return;
+    }
+    if (MOBILE_PERFORMANCE_MODE) {
+      resetRenderCaches({ preserveThumbnailCache: true });
+      forgetFullPageData();
     }
     activeTool = id;
     if (id === 'threshold' || id === 'greyscale') processTool = id;
@@ -635,6 +703,23 @@
   function updatePreviewMode() {
     const organizing = activeTool === 'organize';
     const editing = activeTool === 'edit';
+    if (MOBILE_PERFORMANCE_MODE) {
+      if (organizing || editing) {
+        previewCanvas.width = 0;
+        previewCanvas.height = 0;
+        previewCanvas._mobileProcessedImage = null;
+      }
+      if (!editing) {
+        pageEditorCanvas.width = 0;
+        pageEditorCanvas.height = 0;
+      }
+      if (!isRasterTool(activeTool)) {
+        previewCanvas._mobileProcessedImage = null;
+        histoCanvas.width = 0;
+        histoCanvas.height = 0;
+        forgetFullPageData();
+      }
+    }
     previewStage.classList.toggle('organizing', organizing);
     previewStage.classList.toggle('editing', editing);
     previewTools.classList.toggle('preview-tools-hidden', organizing || editing);
@@ -675,7 +760,7 @@
 
   function updateSourceDropMode() {
     const merging = activeTool === 'merge';
-    const hasCurrentPdf = !!state.pdfBytes || !!state.pdfDoc;
+    const hasCurrentPdf = !!state.pdfBytes || !!state.sourceFile || !!state.pdfDoc;
     const collapseDrop = hasCurrentPdf && !merging;
     fileInput.multiple = merging;
     dropZone.classList.toggle('is-collapsed', collapseDrop);
@@ -737,6 +822,10 @@
     return clean || fallback;
   }
 
+  function yieldToMainThread() {
+    return new Promise(resolve => setTimeout(resolve, 0));
+  }
+
   function loadScriptOnce(id, urls) {
     if (lazyScriptLoads.has(id)) return lazyScriptLoads.get(id);
     let index = 0;
@@ -782,9 +871,35 @@
     throw new Error('Export did not produce PDF bytes.');
   }
 
+  async function readOriginalPdfBytes() {
+    if (state.pdfBytes) return normalizePdfBytes(state.pdfBytes);
+    if (state.sourceFile) return new Uint8Array(await state.sourceFile.arrayBuffer());
+    throw new Error(t('errors.originalMissing'));
+  }
+
+  function hasOriginalPdfSource() {
+    return !!(state.pdfBytes || state.sourceFile);
+  }
+
   function createPdfArtifact(bytes, fileBase, meta = {}) {
     return {
       bytes: normalizePdfBytes(bytes),
+      fileBase: cleanDownloadBase(fileBase, outputBaseName()),
+      mimeType: 'application/pdf',
+      meta: {
+        processors: [],
+        ...meta,
+      },
+    };
+  }
+
+  function createJsPdfOutputArtifact(pdf, fileBase, meta = {}) {
+    if (!MOBILE_PERFORMANCE_MODE) {
+      return createPdfArtifact(pdf.output('arraybuffer'), fileBase, meta);
+    }
+    return {
+      bytes: null,
+      blob: pdf.output('blob'),
       fileBase: cleanDownloadBase(fileBase, outputBaseName()),
       mimeType: 'application/pdf',
       meta: {
@@ -805,8 +920,23 @@
     };
   }
 
+  function createOriginalSourceArtifact(fileBase, meta = {}) {
+    if (state.sourceFile) {
+      return {
+        bytes: null,
+        blob: state.sourceFile,
+        fileBase: cleanDownloadBase(fileBase, outputBaseName()),
+        mimeType: 'application/pdf',
+        meta: { processors: [], ...meta },
+      };
+    }
+    return createPdfArtifact(state.pdfBytes, fileBase, meta);
+  }
+
   function downloadPdfArtifact(artifact) {
-    const blob = new Blob([normalizePdfBytes(artifact.bytes)], { type: artifact.mimeType || 'application/pdf' });
+    const blob = artifact.blob instanceof Blob
+      ? artifact.blob
+      : new Blob([normalizePdfBytes(artifact.bytes)], { type: artifact.mimeType || 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -828,6 +958,20 @@
       advanced: {
         currentOnly: useCurrentOnly && advancedCurrentOnly.checked,
         password,
+      },
+      settings: {
+        processTool,
+        threshold: state.threshold,
+        invert: state.invert,
+        brightness: state.brightness,
+        contrast: state.contrast,
+        greyInvert: state.greyInvert,
+        sepia: state.sepia,
+        resolution: state.resolution,
+        compressMode: state.compressMode,
+        fineRotationDpi: fineRotationExportDpi(),
+        pageEdits: state.pageEdits.map(edit => clonePageEdit(edit)),
+        signatureStamps: signatureState.stamps.map(stamp => ({ ...stamp })),
       },
     };
   }
@@ -3197,7 +3341,7 @@
   }
 
   function shouldUseLargePdfSafeMode(fileSize, pageCount) {
-    return fileSize >= LARGE_PDF_SAFE_MODE_BYTES || pageCount >= LARGE_PDF_SAFE_MODE_PAGES;
+    return MOBILE_PERFORMANCE_MODE || fileSize >= LARGE_PDF_SAFE_MODE_BYTES || pageCount >= LARGE_PDF_SAFE_MODE_PAGES;
   }
 
   function pageHasFullData(pd, renderKey = state.resolution) {
@@ -3211,13 +3355,41 @@
       && pd.histo.length === 256);
   }
 
-  function resetRenderCaches() {
+  function resetRenderCaches({ preserveThumbnailCache = false } = {}) {
     state.renderGeneration++;
+    cancelActivePdfRenders();
+    cancelOriginalPreviewRender();
+    if (previewRenderFrame) {
+      cancelAnimationFrame(previewRenderFrame);
+      previewRenderFrame = null;
+    }
+    previewNeedsHistogram = false;
+    mobilePreviewRenderQueued = false;
+    if (editPreviewFrame) {
+      cancelAnimationFrame(editPreviewFrame);
+      editPreviewFrame = null;
+    }
+    editPreviewQueued = false;
+    editedPreviewRenderToken++;
+    if (editThumbnailTimer) {
+      clearTimeout(editThumbnailTimer);
+      editThumbnailTimer = null;
+    }
+    editThumbnailToken++;
+    if (originalPreviewUpgradeTimer) {
+      clearTimeout(originalPreviewUpgradeTimer);
+      originalPreviewUpgradeTimer = null;
+    }
     state.fullPageCacheOrder = [];
     pageRenderJobs.clear();
     thumbnailJobs.clear();
     thumbnailQueue.length = 0;
     thumbnailQueued.clear();
+    if (!preserveThumbnailCache) mobileThumbnailCacheOrder = [];
+    if (thumbnailObserver) {
+      thumbnailObserver.disconnect();
+      thumbnailObserver = null;
+    }
   }
 
   function touchFullPageCache(sourceIndex) {
@@ -3314,6 +3486,7 @@
   }
 
   function setCompressMode(mode) {
+    if (operationInProgress) return;
     if (!COMPRESSION_PRESETS[mode] || state.compressMode === mode) return;
     state.compressMode = mode;
     syncCompressControls();
@@ -3436,15 +3609,15 @@
     pageCountEl.textContent = state.pdfDoc ? count : '—';
     totPageEl.textContent = state.pdfDoc ? padPage(count) : '—';
     curPageEl.textContent = state.pdfDoc && count ? padPage(state.curPage) : '—';
-    prevBtn.disabled = !state.pdfDoc || state.curPage <= 1;
-    nextBtn.disabled = !state.pdfDoc || state.curPage >= count;
-    downloadBtn.disabled = activeTool === 'preview'
+    prevBtn.disabled = operationInProgress || !state.pdfDoc || state.curPage <= 1;
+    nextBtn.disabled = operationInProgress || !state.pdfDoc || state.curPage >= count;
+    downloadBtn.disabled = operationInProgress || (activeTool === 'preview'
       ? true
       : activeTool === 'merge'
         ? state.mergeFiles.length === 0
         : activeTool === 'sign'
           ? !signatureCanExport()
-          : !state.pdfDoc || count === 0;
+          : !state.pdfDoc || count === 0);
     resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
     organizeHint.textContent = state.pdfDoc
       ? (state.splitPoints.length
@@ -3550,13 +3723,14 @@
   });
 
   function clearCurrentPdf() {
+    if (operationInProgress) return;
+    beginPdfLoad();
     clearError();
-    if (state.pdfDoc?.destroy) {
-      try { state.pdfDoc.destroy(); } catch {}
-    }
+    const previousPdf = state.pdfDoc;
+    state.pdfDoc = null;
     state.mergeFiles = state.mergeFiles.filter(file => !isCurrentPdfMergeFile(file));
     resetRenderCaches();
-    state.pdfDoc = null;
+    queuePdfDestroy(previousPdf);
     state.numPages = 0;
     state.curPage = 1;
     state.pages = [];
@@ -3567,6 +3741,7 @@
     state.fileName = '';
     state.fileSize = 0;
     state.pdfBytes = null;
+    state.sourceFile = null;
     signatureState.stamps = [];
     signatureState.selectedId = null;
     signatureState.drag = null;
@@ -3575,6 +3750,7 @@
     state.fullPageCacheOrder = [];
     previewCanvas.width = 0;
     previewCanvas.height = 0;
+    previewCanvas._mobileProcessedImage = null;
     pageEditorCanvas.width = 0;
     pageEditorCanvas.height = 0;
     canvasWrap.style.display = 'none';
@@ -3584,6 +3760,7 @@
     fileNameEl.removeAttribute('tabindex');
     fileSizeEl.textContent = '—';
     fileStatusEl.textContent = t('status.ready');
+    setLoader(false);
     fileCard.classList.remove('on');
     downloadBtn.disabled = activeTool !== 'merge';
     zoomLevel = 1;
@@ -3592,6 +3769,7 @@
     syncSignatureControls();
     updateSignatureOverlay();
     updatePageState();
+    updatePreviewMode();
     syncPreviewStageHeight();
     applyZoom({ preserveCenter: false });
   }
@@ -3623,19 +3801,20 @@
       const up = document.createElement('button');
       up.type = 'button';
       up.innerHTML = '<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">↑</span>';
-      up.disabled = index === 0;
+      up.disabled = operationInProgress || index === 0;
       up.setAttribute('aria-label', t('merge.moveUp', { name: file.name }));
       up.addEventListener('click', () => moveMergeFile(index, -1));
       const down = document.createElement('button');
       down.type = 'button';
       down.innerHTML = '<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">↓</span>';
-      down.disabled = index === state.mergeFiles.length - 1;
+      down.disabled = operationInProgress || index === state.mergeFiles.length - 1;
       down.setAttribute('aria-label', t('merge.moveDown', { name: file.name }));
       down.addEventListener('click', () => moveMergeFile(index, 1));
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.innerHTML = '<span class="merge-file-action-glyph" aria-hidden="true">×</span>';
       remove.setAttribute('aria-label', t('merge.remove', { name: file.name }));
+      remove.disabled = operationInProgress;
       remove.addEventListener('click', () => removeMergeFile(index));
       actions.appendChild(up);
       actions.appendChild(down);
@@ -3659,28 +3838,28 @@
         size: fmtBytes(totalSize),
       })
       : t('merge.summaryEmpty');
-    mergeClearBtn.disabled = count === 0;
-    mergeRunBtn.disabled = count === 0;
-    if (activeTool === 'merge') downloadBtn.disabled = count === 0;
+    mergeClearBtn.disabled = operationInProgress || count === 0;
+    mergeRunBtn.disabled = operationInProgress || count === 0;
+    if (activeTool === 'merge') downloadBtn.disabled = operationInProgress || count === 0;
     renderMergeList();
   }
 
   function currentPdfAsMergeFile() {
-    if (!state.pdfBytes || !state.fileName) return null;
+    const source = state.sourceFile || state.pdfBytes;
+    if (!source || !state.fileName) return null;
     const name = normalizePdfName(state.fileName);
-    const bytes = state.pdfBytes.slice(0);
-    const size = state.fileSize || bytes.byteLength || bytes.length || 0;
+    const size = state.fileSize || source.size || source.byteLength || source.length || 0;
     return {
       name,
       size,
       type: 'application/pdf',
-      currentPdfSource: state.pdfBytes,
-      arrayBuffer: async () => bytes.slice(0),
+      currentPdfSource: source,
+      arrayBuffer: async () => source instanceof Blob ? source.arrayBuffer() : source,
     };
   }
 
   function isCurrentPdfMergeFile(file) {
-    return file?.currentPdfSource === state.pdfBytes ||
+    return file?.currentPdfSource === (state.sourceFile || state.pdfBytes) ||
       (state.fileName && normalizePdfName(file.name) === normalizePdfName(state.fileName) && file.size === state.fileSize);
   }
 
@@ -3692,6 +3871,7 @@
   }
 
   function addMergeFiles(fileList) {
+    if (operationInProgress) return;
     clearError();
     const files = Array.from(fileList).filter(file =>
       file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
@@ -3705,6 +3885,7 @@
   }
 
   function moveMergeFile(index, delta) {
+    if (operationInProgress) return;
     const next = index + delta;
     if (next < 0 || next >= state.mergeFiles.length) return;
     const [file] = state.mergeFiles.splice(index, 1);
@@ -3713,39 +3894,56 @@
   }
 
   function removeMergeFile(index) {
+    if (operationInProgress) return;
     state.mergeFiles.splice(index, 1);
     updateMergeState();
   }
 
+  async function buildMergedPdfBytes(files) {
+    const pdfLib = await ensurePdfLib();
+    const out = await pdfLib.PDFDocument.create();
+    let totalPages = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setLoader(true, t('progress.mergingFile', { name: file.name }), (i / files.length) * 70);
+      const src = await pdfLib.PDFDocument.load(await file.arrayBuffer());
+      const pageIndices = src.getPageIndices();
+      const pages = await out.copyPages(src, pageIndices);
+      for (const page of pages) {
+        out.addPage(page);
+        if (MOBILE_PERFORMANCE_MODE) await yieldToMainThread();
+      }
+      totalPages += pageIndices.length;
+    }
+    return { bytes: await out.save(), totalPages };
+  }
+
   async function mergeSelectedPdfs() {
+    if (operationInProgress) return;
     clearError();
     if (!state.mergeFiles.length) {
       showError(t('errors.chooseMerge'));
       return;
     }
-    mergeRunBtn.disabled = true;
+    operationInProgress = true;
+    beginPdfLoad();
+    updateMergeState();
+    updatePageState();
     setLoader(true, t('progress.mergingPdfs'), 0);
     try {
-      const pdfLib = await ensurePdfLib();
-      const out = await pdfLib.PDFDocument.create();
-      let totalPages = 0;
-      for (let i = 0; i < state.mergeFiles.length; i++) {
-        const file = state.mergeFiles[i];
-        setLoader(true, t('progress.mergingFile', { name: file.name }), (i / state.mergeFiles.length) * 70);
-        const src = await pdfLib.PDFDocument.load(await file.arrayBuffer());
-        const pageIndices = src.getPageIndices();
-        const pages = await out.copyPages(src, pageIndices);
-        pages.forEach(page => out.addPage(page));
-        totalPages += pageIndices.length;
-      }
-      const bytes = await out.save();
-      const mergedName = cleanDownloadBase(state.mergeFiles[0].name, 'merged') +
-        (state.mergeFiles.length > 1 ? '_merged.pdf' : '_copy.pdf');
-      const mergedBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      await loadPdfBytes(mergedBuffer, mergedName, bytes.byteLength, t('progress.renderingMergedPdf'));
+      let files = state.mergeFiles.slice();
+      const mergedName = cleanDownloadBase(files[0].name, 'merged') +
+        (files.length > 1 ? '_merged.pdf' : '_copy.pdf');
+      const { bytes, totalPages } = await buildMergedPdfBytes(files);
       state.mergeFiles = [];
+      files = null;
       updateMergeState();
-      switchTool('organize');
+      if (MOBILE_PERFORMANCE_MODE) await yieldToMainThread();
+      const mergedSourceFile = MOBILE_PERFORMANCE_MODE
+        ? new File([bytes], normalizePdfName(mergedName), { type: 'application/pdf' })
+        : null;
+      await loadPdfBytes(bytes, mergedName, bytes.byteLength, t('progress.renderingMergedPdf'), mergedSourceFile);
+      switchTool('organize', { force: true });
       setLoader(false);
       proofMeta.textContent = t('proof.mergedPages', { count: totalPages });
     } catch (err) {
@@ -3753,10 +3951,15 @@
       showError(t('errors.mergeFailed', { error: err.message || err }));
       setLoader(false);
       updateMergeState();
+    } finally {
+      operationInProgress = false;
+      updateMergeState();
+      updatePageState();
     }
   }
 
   mergeClearBtn.addEventListener('click', () => {
+    if (operationInProgress) return;
     state.mergeFiles = [];
     updateMergeState();
   });
@@ -3780,8 +3983,35 @@
     fileInput.value = '';
   });
 
-  async function loadPdfBytes(buf, fileName, fileSize, loadingLabel = t('progress.loadingPdf')) {
+  async function loadPdfBytes(
+    buf,
+    fileName,
+    fileSize,
+    loadingLabel = t('progress.loadingPdf'),
+    sourceFile = null,
+    loadToken = beginPdfLoad(),
+  ) {
+    if (loadToken !== pdfLoadGeneration) return false;
+    const previousPdf = state.pdfDoc;
+    state.pdfDoc = null;
     resetRenderCaches();
+    queuePdfDestroy(previousPdf);
+    await pendingPdfDestroy;
+    if (loadToken !== pdfLoadGeneration) return false;
+    state.numPages = 0;
+    state.curPage = 1;
+    state.pages = [];
+    state.pageOrder = [];
+    state.splitPoints = [];
+    state.splitNames = [];
+    state.pageEdits = [];
+    state.largePdfSafeMode = false;
+    state.fullPageCacheOrder = [];
+    previewCanvas.width = 0;
+    previewCanvas.height = 0;
+    previewCanvas._mobileProcessedImage = null;
+    pageEditorCanvas.width = 0;
+    pageEditorCanvas.height = 0;
     signatureState.stamps = [];
     signatureState.selectedId = null;
     signatureState.drag = null;
@@ -3794,10 +4024,28 @@
     fileSizeEl.textContent = fmtBytes(fileSize);
     fileStatusEl.textContent = t('status.loading');
     fileCard.classList.add('on');
-    state.pdfBytes = buf.slice(0);
+    const inputBytes = normalizePdfBytes(buf);
+    state.sourceFile = sourceFile;
+    state.pdfBytes = sourceFile ? null : inputBytes;
+    updatePageState();
     updateSourceDropMode();
     setLoader(true, loadingLabel, 0);
-    const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+    const pdfData = sourceFile ? inputBytes : inputBytes.slice();
+    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+    activePdfLoadingTask = loadingTask;
+    let pdf;
+    try {
+      pdf = await loadingTask.promise;
+    } catch (err) {
+      if (loadToken !== pdfLoadGeneration) return false;
+      throw err;
+    } finally {
+      if (activePdfLoadingTask === loadingTask) activePdfLoadingTask = null;
+    }
+    if (loadToken !== pdfLoadGeneration) {
+      await queuePdfDestroy(pdf);
+      return false;
+    }
     state.pdfDoc = pdf;
     state.numPages = pdf.numPages;
     state.largePdfSafeMode = shouldUseLargePdfSafeMode(fileSize, pdf.numPages);
@@ -3813,10 +4061,12 @@
       setLoader(true, state.largePdfSafeMode ? t('progress.openingLargePdf') : t('progress.openingPdf'), 45);
       await ensurePageMeta(0);
       if (activeTool === 'edit') await ensureRasterPreviewData(0);
+      if (loadToken !== pdfLoadGeneration) return false;
     } else {
       for (let i = 1; i <= pdf.numPages; i++) {
         setLoader(true, t('progress.renderingPage', { page: i, count: pdf.numPages }), ((i - 1) / pdf.numPages) * 100);
         await renderPageToLuminance(i);
+        if (loadToken !== pdfLoadGeneration) return false;
       }
     }
     fileStatusEl.textContent = state.largePdfSafeMode ? t('status.readySafe') : t('status.ready');
@@ -3830,34 +4080,79 @@
     drawPreview();
     drawHistogram();
     setLoader(false);
+    return true;
   }
 
   async function handleFile(file) {
+    if (operationInProgress) return;
     clearError();
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
       showError(t('errors.notPdf')); return;
     }
+    const loadToken = beginPdfLoad();
     try {
-      await loadPdfBytes(await file.arrayBuffer(), file.name, file.size);
-      queuePhonePreviewScroll();
+      const buffer = await file.arrayBuffer();
+      if (loadToken !== pdfLoadGeneration || operationInProgress) return;
+      const loaded = await loadPdfBytes(
+        buffer,
+        file.name,
+        file.size,
+        t('progress.loadingPdf'),
+        MOBILE_PERFORMANCE_MODE ? file : null,
+        loadToken,
+      );
+      if (loaded) queuePhonePreviewScroll();
     } catch (err) {
+      if (loadToken !== pdfLoadGeneration) return;
       console.error(err);
       showError(t('errors.readPdfFailed', { error: err.message || err }));
       fileStatusEl.textContent = t('status.error');
+      updatePageState();
+      updatePreviewMode();
       setLoader(false);
     }
   }
 
   // ── Page luminance cache ──
-  function getRenderScale(baseVp) {
-    if (state.resolution === '900') return 900 / 72;
-    if (state.resolution === '600') return 600 / 72;
-    if (state.resolution === '300') return 300 / 72;
-    return Math.min(2.5, 1800 / Math.max(baseVp.width, baseVp.height));
+  function capScaleToPixelBudget(baseVp, requestedScale, maxPixels) {
+    const basePixels = Math.max(1, baseVp.width * baseVp.height);
+    const pixelScale = Math.sqrt(maxPixels / basePixels);
+    const sideScale = MOBILE_CANVAS_MAX_SIDE / Math.max(1, baseVp.width, baseVp.height);
+    return Math.min(requestedScale, pixelScale, sideScale);
+  }
+
+  function getMobileExportPagePixelBudget(pageCount) {
+    const memoryGb = Number(navigator.deviceMemory) || 4;
+    const documentPixelBudget = memoryGb <= 2 ? 24000000 : memoryGb <= 4 ? 40000000 : 60000000;
+    const minimumPageBudget = memoryGb <= 2 ? 300000 : 450000;
+    return Math.max(
+      minimumPageBudget,
+      Math.min(MOBILE_RASTER_EXPORT_MAX_PIXELS, Math.floor(documentPixelBudget / Math.max(1, pageCount))),
+    );
+  }
+
+  function getMobileGreyscaleJpegQuality(pageCount) {
+    if (pageCount > 40) return 0.70;
+    if (pageCount > 15) return 0.76;
+    return 0.84;
+  }
+
+  function getRenderScale(baseVp, resolution = state.resolution, pixelBudget = MOBILE_RASTER_EXPORT_MAX_PIXELS) {
+    let requestedScale;
+    if (resolution === '900') requestedScale = 900 / 72;
+    else if (resolution === '600') requestedScale = 600 / 72;
+    else if (resolution === '300') requestedScale = 300 / 72;
+    else requestedScale = Math.min(2.5, 1800 / Math.max(baseVp.width, baseVp.height));
+    return MOBILE_PERFORMANCE_MODE
+      ? capScaleToPixelBudget(baseVp, requestedScale, pixelBudget)
+      : requestedScale;
   }
 
   function getPreviewRenderScale(baseVp) {
-    return Math.min(2.5, 2200 / Math.max(baseVp.width, baseVp.height));
+    const requestedScale = Math.min(2.5, 2200 / Math.max(baseVp.width, baseVp.height));
+    return MOBILE_PERFORMANCE_MODE
+      ? capScaleToPixelBudget(baseVp, Math.min(1.65, requestedScale), RASTER_PREVIEW_MAX_PIXELS)
+      : requestedScale;
   }
 
   function isOriginalPreviewTool(id = activeTool) {
@@ -3868,26 +4163,38 @@
     const basePixels = Math.max(1, baseVp.width * baseVp.height);
     const fitScale = Math.max(0.1, (targetCssWidth || baseVp.width) * Math.max(1, devicePixelRatio || 1) / baseVp.width);
     const memoryScale = Math.sqrt(ORIGINAL_PREVIEW_MAX_PIXELS / basePixels);
-    return Math.max(getPreviewRenderScale(baseVp), Math.min(fitScale, memoryScale));
+    const targetScale = Math.max(getPreviewRenderScale(baseVp), Math.min(fitScale, memoryScale));
+    return MOBILE_PERFORMANCE_MODE
+      ? Math.min(targetScale, MOBILE_CANVAS_MAX_SIDE / Math.max(1, baseVp.width, baseVp.height))
+      : targetScale;
   }
 
   function getRasterPreviewScale(baseVp) {
     const pagePixels = Math.max(1, baseVp.width * baseVp.height);
-    return Math.max(0.35, Math.min(2.4, Math.sqrt(RASTER_PREVIEW_MAX_PIXELS / pagePixels)));
+    const budgetScale = Math.min(2.4, Math.sqrt(RASTER_PREVIEW_MAX_PIXELS / pagePixels));
+    return MOBILE_PERFORMANCE_MODE
+      ? Math.min(budgetScale, MOBILE_CANVAS_MAX_SIDE / Math.max(1, baseVp.width, baseVp.height))
+      : Math.max(0.35, budgetScale);
   }
 
   async function ensurePageMeta(sourceIndex) {
     if (!state.pdfDoc || sourceIndex == null) return null;
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
     const existing = state.pages[sourceIndex];
     if (existing && existing.w && existing.h && existing.scale && existing.metaKey === PREVIEW_META_KEY) return existing;
-    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const page = await pdfDoc.getPage(sourceIndex + 1);
+    if (generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
     const baseVp = page.getViewport({ scale: 1 });
     const scale = getPreviewRenderScale(baseVp);
     const vp = page.getViewport({ scale });
     const pd = {
       ...(existing || {}),
-      w: Math.floor(vp.width),
-      h: Math.floor(vp.height),
+      w: Math.max(1, Math.floor(vp.width)),
+      h: Math.max(1, Math.floor(vp.height)),
       scale,
       baseW: baseVp.width,
       baseH: baseVp.height,
@@ -3899,24 +4206,37 @@
       metaKey: PREVIEW_META_KEY,
     };
     state.pages[sourceIndex] = pd;
+    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
     return pd;
   }
 
   async function renderPageToLuminance(pageNum, opts = {}) {
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
     const sourceIndex = pageNum - 1;
     const existing = state.pages[sourceIndex];
-    const page = await state.pdfDoc.getPage(pageNum);
+    const page = await pdfDoc.getPage(pageNum);
+    if (generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
     const baseVp = page.getViewport({ scale: 1 });
     const renderKey = opts.renderKey || state.resolution;
     const scale = opts.scale || getRenderScale(baseVp);
     const vp = page.getViewport({ scale });
     const c = document.createElement('canvas');
-    c.width = Math.floor(vp.width);
-    c.height = Math.floor(vp.height);
+    c.width = Math.max(1, Math.floor(vp.width));
+    c.height = Math.max(1, Math.floor(vp.height));
     const ctx = c.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, c.width, c.height);
-    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const rendered = await runPdfPageRender(page, { canvasContext: ctx, viewport: vp });
+    if (!rendered || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      c.width = 0;
+      c.height = 0;
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
     const img = ctx.getImageData(0, 0, c.width, c.height);
     const thumbUrl = opts.skipThumb ? null : makeThumbnailUrl(c);
     const d = img.data;
@@ -3936,6 +4256,7 @@
     touchFullPageCache(sourceIndex);
     c.width = 0;
     c.height = 0;
+    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
     return state.pages[sourceIndex];
   }
 
@@ -3956,8 +4277,15 @@
 
   async function ensureRasterPreviewData(sourceIndex) {
     if (!state.pdfDoc || sourceIndex == null) return null;
-    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
+    const page = await pdfDoc.getPage(sourceIndex + 1);
+    if (generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
     const scale = getRasterPreviewScale(page.getViewport({ scale: 1 }));
+    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
     return ensurePageData(sourceIndex, { renderKey: RASTER_PREVIEW_KEY, scale, skipThumb: true });
   }
 
@@ -3977,18 +4305,24 @@
     tctx.imageSmoothingEnabled = true;
     tctx.imageSmoothingQuality = 'high';
     tctx.drawImage(sourceCanvas, 0, 0, w, h);
-    return thumb.toDataURL('image/png');
+    const url = thumb.toDataURL('image/png');
+    thumb.width = 0;
+    thumb.height = 0;
+    return url;
   }
 
   async function renderThumbnail(sourceIndex, quality = 'low') {
     if (!state.pdfDoc || sourceIndex == null) return null;
+    if (MOBILE_PERFORMANCE_MODE) quality = 'low';
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
     const existing = state.pages[sourceIndex];
     if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) return existing.thumbUrl;
     const page = await state.pdfDoc.getPage(sourceIndex + 1);
     const baseVp = page.getViewport({ scale: 1 });
     const scale = quality === 'high'
       ? Math.min(1.45, 900 / Math.max(baseVp.width, baseVp.height))
-      : Math.min(0.75, 260 / Math.max(baseVp.width, baseVp.height));
+      : Math.min(0.75, (MOBILE_PERFORMANCE_MODE ? 180 : 260) / Math.max(baseVp.width, baseVp.height));
     const vp = page.getViewport({ scale });
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.floor(vp.width));
@@ -3996,31 +4330,70 @@
     const ctx = c.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, c.width, c.height);
-    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const rendered = await runPdfPageRender(page, { canvasContext: ctx, viewport: vp });
+    if (!rendered || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      c.width = 0;
+      c.height = 0;
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
     const thumbUrl = quality === 'high'
       ? makeThumbnailUrl(c, 520, 720)
-      : makeThumbnailUrl(c, 220, 310);
+      : makeThumbnailUrl(c, MOBILE_PERFORMANCE_MODE ? 160 : 220, MOBILE_PERFORMANCE_MODE ? 220 : 310);
     const pd = await ensurePageMeta(sourceIndex);
+    if (generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      c.width = 0;
+      c.height = 0;
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
     state.pages[sourceIndex] = { ...(pd || {}), thumbUrl, thumbQuality: quality };
     c.width = 0;
     c.height = 0;
+    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
     return thumbUrl;
   }
 
   function applyThumbnailToElements(sourceIndex, thumbUrl) {
     document.querySelectorAll('[data-thumb-source="' + sourceIndex + '"]').forEach(el => {
-      if (el.dataset.editThumbSource != null && isPageEdited(getPageEdit(sourceIndex))) return;
+      if (el.dataset.editThumbSource != null &&
+          isPageEdited(getPageEdit(sourceIndex)) &&
+          state.pages[sourceIndex]?.editedThumbUrl) return;
       if (el.tagName === 'IMG') el.src = thumbUrl;
       else el.style.backgroundImage = 'url("' + thumbUrl + '")';
+      el.classList.remove('page-thumb-placeholder');
       el.textContent = '';
       el.setAttribute('aria-label', 'Page thumbnail ' + (sourceIndex + 1));
     });
+  }
+
+  function touchMobileThumbnailCache(sourceIndex) {
+    if (!MOBILE_PERFORMANCE_MODE || sourceIndex == null) return;
+    mobileThumbnailCacheOrder = mobileThumbnailCacheOrder.filter(index => index !== sourceIndex);
+    mobileThumbnailCacheOrder.push(sourceIndex);
+    while (mobileThumbnailCacheOrder.length > MOBILE_THUMBNAIL_CACHE_LIMIT) {
+      const evictIndex = mobileThumbnailCacheOrder.shift();
+      if (evictIndex === sourceIndex) continue;
+      const pd = state.pages[evictIndex];
+      if (!pd?.thumbUrl && !pd?.editedThumbUrl) continue;
+      pd.thumbUrl = null;
+      pd.thumbQuality = null;
+      pd.editedThumbUrl = null;
+      document.querySelectorAll('[data-thumb-source="' + evictIndex + '"]').forEach(el => {
+        el.removeAttribute('src');
+        el.style.backgroundImage = '';
+        el.classList.add('page-thumb-placeholder');
+        el.textContent = 'Page ' + (evictIndex + 1);
+        getThumbnailObserver()?.observe(el);
+      });
+    }
   }
 
   function applyEditedThumbnailToElements(sourceIndex, thumbUrl) {
     document.querySelectorAll('[data-edit-thumb-source="' + sourceIndex + '"]').forEach(el => {
       if (el.tagName === 'IMG') el.src = thumbUrl;
       else el.style.backgroundImage = 'url("' + thumbUrl + '")';
+      el.classList.remove('page-thumb-placeholder');
       el.textContent = '';
       el.setAttribute('aria-label', 'Edited page thumbnail ' + (sourceIndex + 1));
     });
@@ -4029,6 +4402,7 @@
   let editThumbnailTimer = null;
   let editThumbnailToken = 0;
   function requestEditedThumbnailRender(sourceIndex = currentSourceIndex(), delay = 500) {
+    if (operationInProgress) return;
     if (sourceIndex == null) return;
     if (editThumbnailTimer) clearTimeout(editThumbnailTimer);
     editThumbnailTimer = setTimeout(async () => {
@@ -4049,13 +4423,13 @@
 
   function resetSignaturePadCanvas() {
     if (!signaturePad) return;
-    signaturePad.width = 900;
-    signaturePad.height = 300;
+    signaturePad.width = MOBILE_PERFORMANCE_MODE ? 600 : 900;
+    signaturePad.height = MOBILE_PERFORMANCE_MODE ? 200 : 300;
     const ctx = signaturePad.getContext('2d');
     ctx.clearRect(0, 0, signaturePad.width, signaturePad.height);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 5;
+    ctx.lineWidth = MOBILE_PERFORMANCE_MODE ? 4 : 5;
     ctx.strokeStyle = '#0c0a08';
   }
 
@@ -4401,14 +4775,21 @@
   }
 
   async function ensureThumbnail(sourceIndex, quality = 'low') {
+    if (MOBILE_PERFORMANCE_MODE) quality = 'low';
     const existing = state.pages[sourceIndex];
-    if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) return existing.thumbUrl;
+    if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) {
+      touchMobileThumbnailCache(sourceIndex);
+      return existing.thumbUrl;
+    }
     const jobKey = state.renderGeneration + ':thumb:' + sourceIndex + ':' + quality;
     if (thumbnailJobs.has(jobKey)) return thumbnailJobs.get(jobKey);
     const job = renderThumbnail(sourceIndex, quality)
       .then(url => {
-        if (url) applyThumbnailToElements(sourceIndex, url);
-        if (quality === 'low') queueThumbnail(sourceIndex, 'high');
+        if (url) {
+          applyThumbnailToElements(sourceIndex, url);
+          touchMobileThumbnailCache(sourceIndex);
+        }
+        if (!MOBILE_PERFORMANCE_MODE && quality === 'low') queueThumbnail(sourceIndex, 'high');
         return url;
       })
       .finally(() => thumbnailJobs.delete(jobKey));
@@ -4437,6 +4818,7 @@
 
   function queueThumbnail(sourceIndex, quality = 'low') {
     if (sourceIndex == null) return;
+    if (MOBILE_PERFORMANCE_MODE) quality = 'low';
     const existing = state.pages[sourceIndex];
     if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) return;
     const queueKey = sourceIndex + ':' + quality;
@@ -4449,20 +4831,36 @@
   function getThumbnailObserver() {
     if (!('IntersectionObserver' in window)) return null;
     if (!thumbnailObserver) {
-      thumbnailObserver = new IntersectionObserver(entries => {
+      thumbnailObserver = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
           if (!entry.isIntersecting) return;
           const sourceIndex = Number(entry.target.dataset.thumbSource);
-          thumbnailObserver.unobserve(entry.target);
+          observer.unobserve(entry.target);
           queueThumbnail(sourceIndex);
         });
-      }, { root: previewStage, rootMargin: '420px' });
+      }, { root: previewStage, rootMargin: MOBILE_PERFORMANCE_MODE ? '100px' : '420px' });
     }
     return thumbnailObserver;
   }
 
   function createPageThumb(sourceIndex, label) {
     const pd = state.pages[sourceIndex];
+    if (MOBILE_PERFORMANCE_MODE) {
+      const thumb = document.createElement('div');
+      thumb.className = 'page-thumb' + (pd?.thumbUrl ? '' : ' page-thumb-placeholder');
+      thumb.dataset.thumbSource = sourceIndex;
+      thumb.setAttribute('aria-label', label);
+      if (pd?.thumbUrl) {
+        thumb.style.backgroundImage = 'url("' + pd.thumbUrl + '")';
+        touchMobileThumbnailCache(sourceIndex);
+      } else {
+        thumb.textContent = 'Page ' + (sourceIndex + 1);
+        const observer = getThumbnailObserver();
+        if (observer) observer.observe(thumb);
+        else queueThumbnail(sourceIndex);
+      }
+      return thumb;
+    }
     if (pd?.thumbUrl) {
       const thumb = document.createElement('img');
       thumb.className = 'page-thumb';
@@ -4484,29 +4882,66 @@
   }
 
   // ── Processing functions ──
-  function applyThresholdToCanvas(pd, canvas) {
-    canvas.width = pd.w; canvas.height = pd.h;
+  function applyThresholdToCanvas(pd, canvas, settings = state) {
+    if (!MOBILE_PERFORMANCE_MODE || canvas.width !== pd.w || canvas.height !== pd.h) {
+      canvas.width = pd.w;
+      canvas.height = pd.h;
+      canvas._mobileProcessedImage = null;
+    }
     const ctx = canvas.getContext('2d');
-    const img = ctx.createImageData(pd.w, pd.h);
+    const img = MOBILE_PERFORMANCE_MODE
+      ? (canvas._mobileProcessedImage ||= ctx.createImageData(pd.w, pd.h))
+      : ctx.createImageData(pd.w, pd.h);
     const d = img.data; const lum = pd.lum;
-    const thresh = state.threshold; const inv = state.invert;
+    const thresh = settings.threshold; const inv = settings.invert;
+    const lut = MOBILE_PERFORMANCE_MODE ? new Uint8ClampedArray(256) : null;
+    if (lut) {
+      for (let value = 0; value < 256; value++) {
+        lut[value] = (inv ? value >= thresh : value < thresh) ? 0 : 255;
+      }
+    }
     for (let j = 0, i = 0; j < lum.length; j++, i += 4) {
-      const v = (inv ? lum[j] >= thresh : lum[j] < thresh) ? 0 : 255;
+      const v = lut ? lut[lum[j]] : (inv ? lum[j] >= thresh : lum[j] < thresh) ? 0 : 255;
       d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
     }
     ctx.putImageData(img, 0, 0);
   }
 
-  function applyGreyscaleToCanvas(pd, canvas) {
-    canvas.width = pd.w; canvas.height = pd.h;
+  function applyGreyscaleToCanvas(pd, canvas, settings = state) {
+    if (!MOBILE_PERFORMANCE_MODE || canvas.width !== pd.w || canvas.height !== pd.h) {
+      canvas.width = pd.w;
+      canvas.height = pd.h;
+      canvas._mobileProcessedImage = null;
+    }
     const ctx = canvas.getContext('2d');
-    const img = ctx.createImageData(pd.w, pd.h);
+    const img = MOBILE_PERFORMANCE_MODE
+      ? (canvas._mobileProcessedImage ||= ctx.createImageData(pd.w, pd.h))
+      : ctx.createImageData(pd.w, pd.h);
     const d = img.data; const lum = pd.lum;
-    const bf = state.brightness * 1.28;
-    const cf = state.contrast / 100;
-    const inv = state.greyInvert;
-    const sep = state.sepia;
+    const bf = settings.brightness * 1.28;
+    const cf = settings.contrast / 100;
+    const inv = settings.greyInvert;
+    const sep = settings.sepia;
+    const lut = MOBILE_PERFORMANCE_MODE ? new Uint8ClampedArray(256 * 3) : null;
+    if (lut) {
+      for (let source = 0; source < 256; source++) {
+        let value = Math.max(0, Math.min(255, (source - 128) * cf + 128 + bf)) | 0;
+        if (inv) value = 255 - value;
+        const offset = source * 3;
+        lut[offset] = sep ? Math.min(255, (value * 1.12) | 0) : value;
+        lut[offset + 1] = value;
+        lut[offset + 2] = sep ? Math.max(0, (value * 0.72) | 0) : value;
+      }
+    }
     for (let j = 0, i = 0; j < lum.length; j++, i += 4) {
+      if (lut) {
+        const offset = lum[j] * 3;
+        d[i] = lut[offset];
+        d[i + 1] = lut[offset + 1];
+        d[i + 2] = lut[offset + 2];
+        d[i + 3] = 255;
+        continue;
+      }
       let v = (lum[j] - 128) * cf + 128 + bf;
       v = Math.max(0, Math.min(255, v)) | 0;
       if (inv) v = 255 - v;
@@ -4522,19 +4957,37 @@
     ctx.putImageData(img, 0, 0);
   }
 
+  async function canvasToImageInput(canvas, mimeType, quality) {
+    if (!MOBILE_PERFORMANCE_MODE || !canvas.toBlob) {
+      return canvas.toDataURL(mimeType, quality);
+    }
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, mimeType, quality));
+    if (!blob) throw new Error('Could not encode the rendered page.');
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
   let originalPreviewRenderToken = 0;
   let processedPreviewRenderToken = 0;
   let originalPreviewUpgradeTimer = null;
+  let originalPreviewRenderTask = null;
+
+  function cancelOriginalPreviewRender() {
+    if (!originalPreviewRenderTask) return;
+    try { originalPreviewRenderTask.cancel(); } catch {}
+    activePdfRenderTasks.delete(originalPreviewRenderTask);
+    originalPreviewRenderTask = null;
+  }
 
   async function renderOriginalPreview(pd, sourceIndex) {
     const token = ++originalPreviewRenderToken;
+    cancelOriginalPreviewRender();
     if (originalPreviewUpgradeTimer) {
       clearTimeout(originalPreviewUpgradeTimer);
       originalPreviewUpgradeTimer = null;
     }
     try {
-      await renderOriginalPreviewPass(pd, sourceIndex, pd.scale, token, false);
-      if (token === originalPreviewRenderToken && isOriginalPreviewTool()) {
+      const rendered = await renderOriginalPreviewPass(pd, sourceIndex, pd.scale, token, false);
+      if (rendered && token === originalPreviewRenderToken && isOriginalPreviewTool()) {
         applyZoom();
         queueOriginalPreviewUpgrade(sourceIndex, token);
       }
@@ -4545,8 +4998,27 @@
   }
 
   async function renderOriginalPreviewPass(pd, sourceIndex, scale, token, highQuality) {
-    const page = await state.pdfDoc.getPage(sourceIndex + 1);
-    if (token !== originalPreviewRenderToken || !isOriginalPreviewTool()) return false;
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
+    if (!pdfDoc) return false;
+    let page;
+    try {
+      page = await pdfDoc.getPage(sourceIndex + 1);
+    } catch (err) {
+      if (generation !== state.renderGeneration ||
+          pdfDoc !== state.pdfDoc ||
+          token !== originalPreviewRenderToken ||
+          !isOriginalPreviewTool()) return false;
+      throw err;
+    }
+    if (generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return false;
+    }
+    if (token !== originalPreviewRenderToken || !isOriginalPreviewTool()) {
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return false;
+    }
     const viewport = page.getViewport({ scale });
     const nextW = Math.max(1, Math.floor(viewport.width));
     const nextH = Math.max(1, Math.floor(viewport.height));
@@ -4556,8 +5028,23 @@
     const ctx = tmp.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, tmp.width, tmp.height);
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    if (token !== originalPreviewRenderToken || !isOriginalPreviewTool()) {
+    const task = page.render({ canvasContext: ctx, viewport });
+    originalPreviewRenderTask = task;
+    activePdfRenderTasks.add(task);
+    try {
+      await task.promise;
+    } catch (err) {
+      if (isCancelledRenderError(err)) {
+        if (highQuality) { tmp.width = 0; tmp.height = 0; }
+        return false;
+      }
+      throw err;
+    } finally {
+      activePdfRenderTasks.delete(task);
+      if (originalPreviewRenderTask === task) originalPreviewRenderTask = null;
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+    }
+    if (generation !== state.renderGeneration || pdfDoc !== state.pdfDoc || token !== originalPreviewRenderToken || !isOriginalPreviewTool()) {
       if (highQuality) { tmp.width = 0; tmp.height = 0; }
       return false;
     }
@@ -4589,6 +5076,11 @@
   }
 
   function queueOriginalPreviewUpgrade(sourceIndex, token) {
+    if (originalPreviewUpgradeTimer) {
+      clearTimeout(originalPreviewUpgradeTimer);
+      originalPreviewUpgradeTimer = null;
+    }
+    if (MOBILE_PERFORMANCE_MODE) return;
     originalPreviewUpgradeTimer = setTimeout(async () => {
       originalPreviewUpgradeTimer = null;
       if (token !== originalPreviewRenderToken || !isOriginalPreviewTool() || sourceIndex !== currentSourceIndex()) return;
@@ -4627,7 +5119,7 @@
     const token = ++processedPreviewRenderToken;
     if (isOriginalPreviewTool() && sourceIndex != null) {
       const pd = await ensurePageMeta(sourceIndex);
-      if (token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || !isOriginalPreviewTool()) return;
+      if (!pd || token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || !isOriginalPreviewTool()) return;
       renderOriginalPreview(pd, sourceIndex);
       proofMeta.textContent = t('proof.pagePixels', { w: pd.w, h: pd.h, page: state.curPage, count: activePageCount() });
       return;
@@ -4649,10 +5141,11 @@
     if (!pd || sourceIndex !== currentSourceIndex() || !isRasterTool(activeTool)) return;
     const cw = histoCanvas.clientWidth || 300;
     const ch = histoCanvas.clientHeight || 56;
-    histoCanvas.width = cw * devicePixelRatio;
-    histoCanvas.height = ch * devicePixelRatio;
+    const pixelRatio = MOBILE_PERFORMANCE_MODE ? Math.min(2, devicePixelRatio || 1) : devicePixelRatio;
+    histoCanvas.width = cw * pixelRatio;
+    histoCanvas.height = ch * pixelRatio;
     const ctx = histoCanvas.getContext('2d');
-    ctx.scale(devicePixelRatio, devicePixelRatio);
+    ctx.scale(pixelRatio, pixelRatio);
     ctx.clearRect(0, 0, cw, ch);
     let max = 0;
     for (let i = 1; i < 255; i++) if (pd.histo[i] > max) max = pd.histo[i];
@@ -4667,8 +5160,32 @@
 
   let previewRenderFrame = null;
   let previewNeedsHistogram = false;
+  let mobilePreviewRenderInFlight = false;
+  let mobilePreviewRenderQueued = false;
   function requestPreviewRender(withHistogram = false) {
+    if (operationInProgress) return;
     previewNeedsHistogram = previewNeedsHistogram || withHistogram;
+    if (MOBILE_PERFORMANCE_MODE) {
+      mobilePreviewRenderQueued = true;
+      if (previewRenderFrame || mobilePreviewRenderInFlight) return;
+      previewRenderFrame = requestAnimationFrame(async () => {
+        previewRenderFrame = null;
+        mobilePreviewRenderQueued = false;
+        mobilePreviewRenderInFlight = true;
+        const needsHistogram = previewNeedsHistogram;
+        previewNeedsHistogram = false;
+        try {
+          await drawPreview();
+          if (needsHistogram) await drawHistogram();
+        } catch (err) {
+          if (!isCancelledRenderError(err)) console.warn('Preview render failed', err);
+        } finally {
+          mobilePreviewRenderInFlight = false;
+          if (mobilePreviewRenderQueued) requestPreviewRender(false);
+        }
+      });
+      return;
+    }
     if (previewRenderFrame) return;
     previewRenderFrame = requestAnimationFrame(() => {
       previewRenderFrame = null;
@@ -4679,11 +5196,24 @@
   }
 
   let editPreviewFrame = null;
+  let editPreviewInFlight = false;
+  let editPreviewQueued = false;
   function requestEditedPreviewRender() {
-    if (editPreviewFrame) return;
-    editPreviewFrame = requestAnimationFrame(() => {
+    if (operationInProgress) return;
+    editPreviewQueued = true;
+    if (editPreviewFrame || editPreviewInFlight) return;
+    editPreviewFrame = requestAnimationFrame(async () => {
       editPreviewFrame = null;
-      drawEditedPagePreview();
+      editPreviewQueued = false;
+      editPreviewInFlight = true;
+      try {
+        await drawEditedPagePreview();
+      } catch (err) {
+        if (!isCancelledRenderError(err)) console.warn('Edit preview failed', err);
+      } finally {
+        editPreviewInFlight = false;
+        if (editPreviewQueued) requestEditedPreviewRender();
+      }
     });
   }
 
@@ -4725,6 +5255,10 @@
 
   function renderPageEditor() {
     if (!pageEditorStrip || activeTool !== 'edit') return;
+    if (thumbnailObserver) {
+      thumbnailObserver.disconnect();
+      thumbnailObserver = null;
+    }
     pageEditorStrip.innerHTML = '';
     const count = activePageCount();
     pageEditorEmpty.classList.toggle('on', !state.pdfDoc || count === 0);
@@ -4936,6 +5470,7 @@
   }
 
   function beginCropDrag(e) {
+    if (operationInProgress) return;
     if (!canShowCropOverlay() || (e.pointerType === 'mouse' && e.button !== 0)) return;
     const target = e.target.closest('[data-crop-handle]');
     if (!target || !cropOverlay.contains(target)) return;
@@ -4970,7 +5505,13 @@
   }
 
   async function renderEditedColorPreviewToCanvas(sourceIndex, edit, canvas, includeCrop = true) {
-    const page = await state.pdfDoc.getPage(sourceIndex + 1);
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
+    const page = await pdfDoc.getPage(sourceIndex + 1);
+    if (generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
     const baseVp = page.getViewport({ scale: 1 });
     const scale = getRasterPreviewScale(baseVp);
     const vp = page.getViewport({ scale });
@@ -4980,7 +5521,13 @@
     const bctx = base.getContext('2d');
     bctx.fillStyle = '#fff';
     bctx.fillRect(0, 0, base.width, base.height);
-    await page.render({ canvasContext: bctx, viewport: vp }).promise;
+    const rendered = await runPdfPageRender(page, { canvasContext: bctx, viewport: vp });
+    if (!rendered || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      base.width = 0;
+      base.height = 0;
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
 
     const e = clonePageEdit(edit);
     if (!includeCrop) e.crop = { left: 0, top: 0, right: 0, bottom: 0 };
@@ -4990,14 +5537,15 @@
     const cropBottom = Math.round(base.height * e.crop.bottom / 100);
     const cropW = Math.max(1, base.width - cropLeft - cropRight);
     const cropH = Math.max(1, base.height - cropTop - cropBottom);
-    const crop = document.createElement('canvas');
-    crop.width = cropW;
-    crop.height = cropH;
-    const cctx = crop.getContext('2d');
-    cctx.fillStyle = '#fff';
-    cctx.fillRect(0, 0, cropW, cropH);
-    cctx.drawImage(base, cropLeft, cropTop, cropW, cropH, 0, 0, cropW, cropH);
-
+    const crop = MOBILE_PERFORMANCE_MODE ? null : document.createElement('canvas');
+    if (crop) {
+      crop.width = cropW;
+      crop.height = cropH;
+      const cctx = crop.getContext('2d');
+      cctx.fillStyle = '#fff';
+      cctx.fillRect(0, 0, cropW, cropH);
+      cctx.drawImage(base, cropLeft, cropTop, cropW, cropH, 0, 0, cropW, cropH);
+    }
     const angle = editAngle(e) * Math.PI / 180;
     const cos = Math.abs(Math.cos(angle));
     const sin = Math.abs(Math.sin(angle));
@@ -5010,22 +5558,40 @@
     ctx.fillRect(0, 0, outW, outH);
     ctx.translate(outW / 2, outH / 2);
     ctx.rotate(angle);
-    ctx.drawImage(crop, -cropW / 2, -cropH / 2);
+    if (crop) ctx.drawImage(crop, -cropW / 2, -cropH / 2);
+    else ctx.drawImage(base, cropLeft, cropTop, cropW, cropH, -cropW / 2, -cropH / 2, cropW, cropH);
 
     base.width = 0;
     base.height = 0;
-    crop.width = 0;
-    crop.height = 0;
+    if (crop) { crop.width = 0; crop.height = 0; }
+    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
     return { w: outW, h: outH };
   }
 
   async function renderEditedThumbnail(sourceIndex, edit) {
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
+    if (!pdfDoc) return null;
     const tmp = document.createElement('canvas');
     const size = await renderEditedColorPreviewToCanvas(sourceIndex, edit, tmp);
-    if (!size) return null;
-    const thumbUrl = makeThumbnailUrl(tmp, 520, 720);
+    if (!size || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      tmp.width = 0;
+      tmp.height = 0;
+      return null;
+    }
+    const thumbUrl = makeThumbnailUrl(
+      tmp,
+      MOBILE_PERFORMANCE_MODE ? 160 : 520,
+      MOBILE_PERFORMANCE_MODE ? 220 : 720,
+    );
     const pd = await ensurePageMeta(sourceIndex);
+    if (!pd || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      tmp.width = 0;
+      tmp.height = 0;
+      return null;
+    }
     state.pages[sourceIndex] = { ...(pd || {}), editedThumbUrl: thumbUrl };
+    touchMobileThumbnailCache(sourceIndex);
     tmp.width = 0;
     tmp.height = 0;
     return thumbUrl;
@@ -5057,36 +5623,68 @@
     updateCropOverlay();
   }
 
-  async function renderEditedPageImageToCanvas(sourceIndex, edit, canvas) {
+  async function renderEditedPageImageToCanvas(
+    sourceIndex,
+    edit,
+    canvas,
+    exportDpi = fineRotationExportDpi(),
+    pixelBudget = MOBILE_RASTER_EXPORT_MAX_PIXELS,
+  ) {
     const page = await state.pdfDoc.getPage(sourceIndex + 1);
     const pd = state.pages[sourceIndex];
-    const baseScale = hasFineRotation(edit)
-      ? Math.max(pd?.scale || 0, fineRotationExportDpi() / 72)
-      : (pd?.scale || getRenderScale(page.getViewport({ scale: 1 })));
+    const baseVp = page.getViewport({ scale: 1 });
+    const e = clonePageEdit(edit);
+    const requestedScale = hasFineRotation(edit)
+      ? Math.max(pd?.scale || 0, exportDpi / 72)
+      : (pd?.scale || getRenderScale(baseVp));
+    let baseScale = requestedScale;
+    if (MOBILE_PERFORMANCE_MODE) {
+      const cropBaseW = baseVp.width * Math.max(0.01, (100 - e.crop.left - e.crop.right) / 100);
+      const cropBaseH = baseVp.height * Math.max(0.01, (100 - e.crop.top - e.crop.bottom) / 100);
+      const angle = editAngle(e) * Math.PI / 180;
+      const cos = Math.abs(Math.cos(angle));
+      const sin = Math.abs(Math.sin(angle));
+      const outputAreaAtScaleOne = (cropBaseW * cos + cropBaseH * sin) * (cropBaseW * sin + cropBaseH * cos);
+      const outputWidthAtScaleOne = cropBaseW * cos + cropBaseH * sin;
+      const outputHeightAtScaleOne = cropBaseW * sin + cropBaseH * cos;
+      const workingAreaAtScaleOne = (baseVp.width * baseVp.height) + outputAreaAtScaleOne;
+      const peakSideAtScaleOne = Math.max(baseVp.width, baseVp.height, outputWidthAtScaleOne, outputHeightAtScaleOne);
+      baseScale = Math.min(
+        requestedScale,
+        Math.sqrt(pixelBudget / Math.max(1, workingAreaAtScaleOne)),
+        MOBILE_CANVAS_MAX_SIDE / Math.max(1, peakSideAtScaleOne),
+      );
+    }
     const vp = page.getViewport({ scale: baseScale });
     const base = document.createElement('canvas');
-    base.width = Math.floor(vp.width);
-    base.height = Math.floor(vp.height);
+    base.width = Math.max(1, Math.floor(vp.width));
+    base.height = Math.max(1, Math.floor(vp.height));
     const bctx = base.getContext('2d');
     bctx.fillStyle = '#fff';
     bctx.fillRect(0, 0, base.width, base.height);
-    await page.render({ canvasContext: bctx, viewport: vp }).promise;
+    const rendered = await runPdfPageRender(page, { canvasContext: bctx, viewport: vp });
+    if (!rendered) {
+      base.width = 0;
+      base.height = 0;
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
 
-    const e = clonePageEdit(edit);
     const cropLeft = Math.round(base.width * e.crop.left / 100);
     const cropTop = Math.round(base.height * e.crop.top / 100);
     const cropRight = Math.round(base.width * e.crop.right / 100);
     const cropBottom = Math.round(base.height * e.crop.bottom / 100);
     const cropW = Math.max(1, base.width - cropLeft - cropRight);
     const cropH = Math.max(1, base.height - cropTop - cropBottom);
-    const crop = document.createElement('canvas');
-    crop.width = cropW;
-    crop.height = cropH;
-    const cctx = crop.getContext('2d');
-    cctx.fillStyle = '#fff';
-    cctx.fillRect(0, 0, cropW, cropH);
-    cctx.drawImage(base, cropLeft, cropTop, cropW, cropH, 0, 0, cropW, cropH);
-
+    const crop = MOBILE_PERFORMANCE_MODE ? null : document.createElement('canvas');
+    if (crop) {
+      crop.width = cropW;
+      crop.height = cropH;
+      const cctx = crop.getContext('2d');
+      cctx.fillStyle = '#fff';
+      cctx.fillRect(0, 0, cropW, cropH);
+      cctx.drawImage(base, cropLeft, cropTop, cropW, cropH, 0, 0, cropW, cropH);
+    }
     const angle = editAngle(e) * Math.PI / 180;
     const cos = Math.abs(Math.cos(angle));
     const sin = Math.abs(Math.sin(angle));
@@ -5099,7 +5697,12 @@
     ctx.fillRect(0, 0, outW, outH);
     ctx.translate(outW / 2, outH / 2);
     ctx.rotate(angle);
-    ctx.drawImage(crop, -cropW / 2, -cropH / 2);
+    if (crop) ctx.drawImage(crop, -cropW / 2, -cropH / 2);
+    else ctx.drawImage(base, cropLeft, cropTop, cropW, cropH, -cropW / 2, -cropH / 2, cropW, cropH);
+    base.width = 0;
+    base.height = 0;
+    if (crop) { crop.width = 0; crop.height = 0; }
+    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
     return { wPt: outW / baseScale, hPt: outH / baseScale };
   }
 
@@ -5116,6 +5719,7 @@
     pointerX: 0,
     pointerY: 0,
     autoScrollFrame: null,
+    pointerMoveFrame: null,
     dragAnimationTimer: null,
   };
   const organizerTapState = {
@@ -5217,7 +5821,11 @@
   }
 
   function rerenderOrganizerAnimated(opts) {
-    const firstRects = captureOrganizerRects();
+    if (MOBILE_PERFORMANCE_MODE) {
+      renderOrganizer();
+      return;
+    }
+    const firstRects = MOBILE_PERFORMANCE_MODE ? null : captureOrganizerRects();
     renderOrganizer();
     animateOrganizerFrom(firstRects, opts);
   }
@@ -5234,6 +5842,10 @@
 
   function renderOrganizer() {
     if (!organizerGrid || activeTool !== 'organize') return;
+    if (thumbnailObserver) {
+      thumbnailObserver.disconnect();
+      thumbnailObserver = null;
+    }
     organizerGrid.innerHTML = '';
     const count = activePageCount();
     organizerEmpty.classList.toggle('on', !state.pdfDoc || count === 0);
@@ -5616,13 +6228,23 @@
     organizerDrag.pointerX = e.clientX;
     organizerDrag.pointerY = e.clientY;
     moveOrganizerClone(e.clientX, e.clientY);
-    updateOrganizerInsertIndex(e.clientX, e.clientY);
+    if (MOBILE_PERFORMANCE_MODE) {
+      if (organizerDrag.pointerMoveFrame) return;
+      organizerDrag.pointerMoveFrame = requestAnimationFrame(() => {
+        organizerDrag.pointerMoveFrame = null;
+        updateOrganizerInsertIndex(organizerDrag.pointerX, organizerDrag.pointerY);
+      });
+    } else {
+      updateOrganizerInsertIndex(e.clientX, e.clientY);
+    }
   }
 
   function cleanupOrganizerDrag() {
     window.removeEventListener('pointermove', onOrganizerPointerMove);
     clearOrganizerDragAnimationTimer();
     stopOrganizerAutoScroll();
+    if (organizerDrag.pointerMoveFrame) cancelAnimationFrame(organizerDrag.pointerMoveFrame);
+    organizerDrag.pointerMoveFrame = null;
     if (organizerDrag.clone) organizerDrag.clone.remove();
     organizerDrag.active = false;
     organizerDrag.sourceOutputIndex = null;
@@ -5635,9 +6257,16 @@
     organizerDrag.pointerY = 0;
   }
 
-  function finishOrganizerDrag() {
+  function finishOrganizerDrag(e) {
     if (!organizerDrag.active) return;
-    const firstRects = captureOrganizerRects();
+    if (MOBILE_PERFORMANCE_MODE && e?.clientX != null && e?.clientY != null) {
+      if (organizerDrag.pointerMoveFrame) cancelAnimationFrame(organizerDrag.pointerMoveFrame);
+      organizerDrag.pointerMoveFrame = null;
+      organizerDrag.pointerX = e.clientX;
+      organizerDrag.pointerY = e.clientY;
+      updateOrganizerInsertIndex(e.clientX, e.clientY);
+    }
+    const firstRects = MOBILE_PERFORMANCE_MODE ? null : captureOrganizerRects();
     const sourceIndex = organizerDrag.sourcePageIndex;
     const targetInsertIndex = organizerDrag.targetInsertIndex ?? organizerDrag.insertIndex;
     const nextFlow = buildOrganizerFlow().filter(item =>
@@ -5656,7 +6285,7 @@
 
   function cancelOrganizerDrag() {
     if (!organizerDrag.active) return;
-    const firstRects = captureOrganizerRects();
+    const firstRects = MOBILE_PERFORMANCE_MODE ? null : captureOrganizerRects();
     cleanupOrganizerDrag();
     renderOrganizer();
     animateOrganizerFrom(firstRects);
@@ -5666,6 +6295,16 @@
     if (!state.pdfDoc || outputIndex < 0 || outputIndex >= activePageCount()) return;
     hidePageContextMenu();
     const sourceIndex = state.pageOrder[outputIndex];
+    if (MOBILE_PERFORMANCE_MODE && state.pages[sourceIndex]) {
+      state.pages[sourceIndex].lum = null;
+      state.pages[sourceIndex].histo = null;
+      state.pages[sourceIndex].renderKey = null;
+      state.pages[sourceIndex].thumbUrl = null;
+      state.pages[sourceIndex].thumbQuality = null;
+      state.pages[sourceIndex].editedThumbUrl = null;
+      state.fullPageCacheOrder = state.fullPageCacheOrder.filter(index => index !== sourceIndex);
+      mobileThumbnailCacheOrder = mobileThumbnailCacheOrder.filter(index => index !== sourceIndex);
+    }
     const nextFlow = buildOrganizerFlow().filter(item =>
       item.type !== 'page' || item.sourceIndex !== sourceIndex);
     applyOrganizerFlow(nextFlow);
@@ -5674,14 +6313,33 @@
     if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
   }
 
+  function canReuseOriginalPdf(pageOrder, context) {
+    return MOBILE_PERFORMANCE_MODE
+      && hasOriginalPdfSource()
+      && context?.toolId !== 'compress'
+      && !context?.advanced?.password
+      && pageOrder.length === state.numPages
+      && pageOrder.every((sourceIndex, index) => sourceIndex === index);
+  }
+
   async function createPageOrderPdfArtifact(pageOrder, fileBase, context) {
-    const pdfLib = await ensurePdfLib();
-    if (!state.pdfBytes) throw new Error(t('errors.originalMissing'));
     if (!pageOrder.length) throw new Error(t('errors.noPagesExport'));
-    const src = await pdfLib.PDFDocument.load(state.pdfBytes);
+    if (canReuseOriginalPdf(pageOrder, context)) {
+      const meta = {
+        source: 'original',
+        rasterized: false,
+        preservesOriginalQuality: true,
+      };
+      return createOriginalSourceArtifact(fileBase, meta);
+    }
+    const pdfLib = await ensurePdfLib();
+    const src = await pdfLib.PDFDocument.load(await readOriginalPdfBytes());
     const out = await pdfLib.PDFDocument.create();
     const copiedPages = await out.copyPages(src, pageOrder);
-    copiedPages.forEach(page => out.addPage(page));
+    for (const page of copiedPages) {
+      out.addPage(page);
+      if (MOBILE_PERFORMANCE_MODE) await yieldToMainThread();
+    }
     const bytes = await out.save({ useObjectStreams: !context?.advanced?.password });
     return createPdfArtifact(bytes, fileBase, {
       source: 'pdf-lib',
@@ -5719,20 +6377,32 @@
   }
 
   async function createEditedPdfArtifact(pageOrder, fileBase, context) {
-    const pdfLib = await ensurePdfLib();
-    if (!state.pdfBytes) throw new Error(t('errors.originalMissing'));
     if (!pageOrder.length) throw new Error(t('errors.noPagesExport'));
-    const src = await pdfLib.PDFDocument.load(state.pdfBytes);
+    if (canReuseOriginalPdf(pageOrder, context) && pageOrder.every(sourceIndex => !isPageEdited(context.settings.pageEdits[sourceIndex]))) {
+      const meta = {
+        source: 'original',
+        rasterized: false,
+        preservesOriginalQuality: true,
+      };
+      return createOriginalSourceArtifact(fileBase, meta);
+    }
+    const pdfLib = await ensurePdfLib();
+    const src = await pdfLib.PDFDocument.load(await readOriginalPdfBytes());
     const out = await pdfLib.PDFDocument.create();
     let rasterized = false;
     const count = pageOrder.length;
+    const mobileRasterCanvas = MOBILE_PERFORMANCE_MODE ? document.createElement('canvas') : null;
+    const mobileRasterPageCount = MOBILE_PERFORMANCE_MODE
+      ? pageOrder.reduce((total, sourceIndex) => total + (hasFineRotation(context.settings.pageEdits[sourceIndex]) ? 1 : 0), 0)
+      : 0;
+    const mobileRasterPixelBudget = getMobileExportPagePixelBudget(mobileRasterPageCount || 1);
     for (let i = 0; i < count; i++) {
       const progress = currentPageProgress(i, count);
       setLoader(true, t('progress.exportingEditedPage', { page: i + 1, count }), progress);
       const sourceIndex = pageOrder[i];
-      const edit = clonePageEdit(state.pageEdits[sourceIndex]);
+      const edit = clonePageEdit(context.settings.pageEdits[sourceIndex]);
       if (hasFineRotation(edit)) {
-        setLoader(true, t('progress.rasterizingFineRotation', { dpi: fineRotationExportDpi(), page: i + 1, count }), progress);
+        setLoader(true, t('progress.rasterizingFineRotation', { dpi: context.settings.fineRotationDpi, page: i + 1, count }), progress);
       }
       if (!isPageEdited(edit)) {
         const [copied] = await out.copyPages(src, [sourceIndex]);
@@ -5748,12 +6418,26 @@
       }
 
       rasterized = true;
-      const canvas = document.createElement('canvas');
-      const size = await renderEditedPageImageToCanvas(sourceIndex, edit, canvas);
-      const image = await out.embedPng(canvas.toDataURL('image/png'));
-      const page = out.addPage([size.wPt, size.hPt]);
-      page.drawImage(image, { x: 0, y: 0, width: size.wPt, height: size.hPt });
-      await new Promise(r => setTimeout(r, 0));
+      const canvas = mobileRasterCanvas || document.createElement('canvas');
+      try {
+        const size = await renderEditedPageImageToCanvas(
+          sourceIndex,
+          edit,
+          canvas,
+          context.settings.fineRotationDpi,
+          mobileRasterPixelBudget,
+        );
+        if (!size) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
+        const image = MOBILE_PERFORMANCE_MODE
+          ? await out.embedJpg(await canvasToImageInput(canvas, 'image/jpeg', getMobileGreyscaleJpegQuality(mobileRasterPageCount)))
+          : await out.embedPng(await canvasToImageInput(canvas, 'image/png'));
+        const page = out.addPage([size.wPt, size.hPt]);
+        page.drawImage(image, { x: 0, y: 0, width: size.wPt, height: size.hPt });
+      } finally {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+      await yieldToMainThread();
     }
     const bytes = await out.save({ useObjectStreams: !context?.advanced?.password });
     return createPdfArtifact(bytes, fileBase, {
@@ -5774,15 +6458,15 @@
 
   async function createSignedPdfArtifact(pageOrder, fileBase, context) {
     const pdfLib = await ensurePdfLib();
-    if (!state.pdfBytes) throw new Error(t('errors.originalMissing'));
     if (!pageOrder.length) throw new Error(t('errors.noPagesExport'));
-    if (!signatureState.stamps.length) throw new Error(t('errors.noSignature'));
-    const exportStamps = activeSignatureStamps(pageOrder);
+    if (!context.settings.signatureStamps.length) throw new Error(t('errors.noSignature'));
+    const includedPages = new Set(pageOrder);
+    const exportStamps = context.settings.signatureStamps.filter(stamp => includedPages.has(stamp.pageIndex));
     if (!exportStamps.length) {
       throw new Error(t('errors.signaturePageMissing'));
     }
 
-    const src = await pdfLib.PDFDocument.load(state.pdfBytes);
+    const src = await pdfLib.PDFDocument.load(await readOriginalPdfBytes());
     const out = await pdfLib.PDFDocument.create();
     const imageCache = new Map();
     async function signatureImageFor(dataUrl) {
@@ -5831,6 +6515,7 @@
   }
 
   async function exportSplitPart(partIndex) {
+    if (operationInProgress) return;
     const part = splitParts()[partIndex];
     if (!part || !part.pageOrder.length) return;
     if (advancedPasswordToggle.checked && canPasswordProtectExport('split') && !advancedPasswordValue()) {
@@ -5838,6 +6523,11 @@
       advancedPasswordInput.focus();
       return;
     }
+    operationInProgress = true;
+    beginPdfLoad();
+    downloadBtn.disabled = true;
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
     splitPartsList.querySelectorAll('button').forEach(button => { button.disabled = true; });
     setLoader(true, t('progress.exportingPart', { part: partIndex + 1 }), 35);
     try {
@@ -5851,8 +6541,70 @@
       showError(t('errors.splitExportFailed', { error: err.message || err }));
       setLoader(false);
     } finally {
+      operationInProgress = false;
       updatePageState();
     }
+  }
+
+  async function renderMobileProcessedPageToCanvas(sourceIndex, canvas, settings, pixelBudget) {
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
+    const page = await pdfDoc.getPage(sourceIndex + 1);
+    const baseVp = page.getViewport({ scale: 1 });
+    const scale = getRenderScale(baseVp, settings.resolution, pixelBudget);
+    const viewport = page.getViewport({ scale });
+    canvas.width = Math.max(1, Math.floor(viewport.width));
+    canvas.height = Math.max(1, Math.floor(viewport.height));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const rendered = await runPdfPageRender(page, { canvasContext: ctx, viewport });
+    if (!rendered || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      canvas.width = 0;
+      canvas.height = 0;
+      page.cleanup?.();
+      return null;
+    }
+
+    let image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = image.data;
+    const rowStride = canvas.width * 4;
+    const rowsPerChunk = 128;
+    const rasterTool = settings.processTool;
+    const threshold = settings.threshold;
+    const thresholdInverted = settings.invert;
+    const brightness = settings.brightness * 1.28;
+    const contrast = settings.contrast / 100;
+    const greyInverted = settings.greyInvert;
+    const sepia = settings.sepia;
+    for (let startY = 0; startY < canvas.height; startY += rowsPerChunk) {
+      const end = Math.min(data.length, (startY + rowsPerChunk) * rowStride);
+      if (rasterTool === 'threshold') {
+        for (let i = startY * rowStride; i < end; i += 4) {
+          const lum = (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) | 0;
+          const value = (thresholdInverted ? lum >= threshold : lum < threshold) ? 0 : 255;
+          data[i] = value;
+          data[i + 1] = value;
+          data[i + 2] = value;
+          data[i + 3] = 255;
+        }
+      } else {
+        for (let i = startY * rowStride; i < end; i += 4) {
+          let value = (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) | 0;
+          value = Math.max(0, Math.min(255, (value - 128) * contrast + 128 + brightness)) | 0;
+          if (greyInverted) value = 255 - value;
+          data[i] = sepia ? Math.min(255, (value * 1.12) | 0) : value;
+          data[i + 1] = value;
+          data[i + 2] = sepia ? Math.max(0, (value * 0.72) | 0) : value;
+          data[i + 3] = 255;
+        }
+      }
+      if (startY + rowsPerChunk < canvas.height) await yieldToMainThread();
+    }
+    ctx.putImageData(image, 0, 0);
+    image = null;
+    page.cleanup?.();
+    return { w: canvas.width, h: canvas.height, scale, wPt: baseVp.width, hPt: baseVp.height };
   }
 
   async function createRasterProcessedPdfArtifact(context) {
@@ -5861,16 +6613,37 @@
     let pdf = null;
     const count = context.pageOrder.length;
     if (!count) throw new Error(t('errors.noPagesExport'));
+    const mobilePixelBudget = getMobileExportPagePixelBudget(count);
+    const mobileGreyscaleJpeg = MOBILE_PERFORMANCE_MODE && context.settings.processTool === 'greyscale';
+    const mobileGreyscaleQuality = getMobileGreyscaleJpegQuality(count);
     for (let i = 0; i < count; i++) {
       setLoader(true, t('progress.exportingPage', { page: i + 1, count }), currentPageProgress(i, count));
-      const pd = await ensurePageData(context.pageOrder[i]);
-      if (!pd) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
-      if (processTool === 'threshold') applyThresholdToCanvas(pd, tmp);
-      else applyGreyscaleToCanvas(pd, tmp);
-      const wPt = pd.w / pd.scale;
-      const hPt = pd.h / pd.scale;
+      let wPt;
+      let hPt;
+      if (MOBILE_PERFORMANCE_MODE) {
+        const size = await renderMobileProcessedPageToCanvas(
+          context.pageOrder[i],
+          tmp,
+          context.settings,
+          mobilePixelBudget,
+        );
+        if (!size) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
+        wPt = size.wPt;
+        hPt = size.hPt;
+      } else {
+        const pd = await ensurePageData(context.pageOrder[i]);
+        if (!pd) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
+        if (context.settings.processTool === 'threshold') applyThresholdToCanvas(pd, tmp, context.settings);
+        else applyGreyscaleToCanvas(pd, tmp, context.settings);
+        wPt = pd.w / pd.scale;
+        hPt = pd.h / pd.scale;
+      }
       const orient = wPt > hPt ? 'l' : 'p';
-      const dataUrl = tmp.toDataURL('image/png');
+      let imageInput = await canvasToImageInput(
+        tmp,
+        mobileGreyscaleJpeg ? 'image/jpeg' : 'image/png',
+        mobileGreyscaleJpeg ? mobileGreyscaleQuality : undefined,
+      );
       if (i === 0) {
         pdf = new jsPDF(jsPdfExportOptions({
           orientation: orient,
@@ -5880,12 +6653,13 @@
       } else {
         pdf.addPage([wPt, hPt], orient);
       }
-      pdf.addImage(dataUrl, 'PNG', 0, 0, wPt, hPt, undefined, 'FAST');
+      pdf.addImage(imageInput, mobileGreyscaleJpeg ? 'JPEG' : 'PNG', 0, 0, wPt, hPt, undefined, 'FAST');
+      imageInput = null;
       tmp.width = 0;
       tmp.height = 0;
-      await new Promise(r => setTimeout(r, 0));
+      await yieldToMainThread();
     }
-    return createPdfArtifact(pdf.output('arraybuffer'), context.fileBase, {
+    return createJsPdfOutputArtifact(pdf, context.fileBase, {
       source: 'jsPDF',
       rasterized: true,
       passwordProtected: !!(context.advanced.password && canPasswordProtectExport(context.toolId)),
@@ -5893,19 +6667,31 @@
     });
   }
 
-  async function renderCompressedPageToCanvas(sourceIndex, preset, canvas) {
+  async function renderCompressedPageToCanvas(sourceIndex, preset, canvas, pixelBudget) {
+    const generation = state.renderGeneration;
+    const pdfDoc = state.pdfDoc;
     const page = await state.pdfDoc.getPage(sourceIndex + 1);
     const baseVp = page.getViewport({ scale: 1 });
     const requestedScale = (preset.dpi || 144) / 72;
-    const cappedScale = Math.min(requestedScale, (preset.maxDimension || 2400) / Math.max(baseVp.width, baseVp.height));
-    const scale = Math.max(0.5, cappedScale);
+    let cappedScale = Math.min(requestedScale, (preset.maxDimension || 2400) / Math.max(baseVp.width, baseVp.height));
+    if (MOBILE_PERFORMANCE_MODE) {
+      cappedScale = capScaleToPixelBudget(baseVp, cappedScale, pixelBudget);
+    }
+    const scale = MOBILE_PERFORMANCE_MODE ? cappedScale : Math.max(0.5, cappedScale);
     const vp = page.getViewport({ scale });
     canvas.width = Math.max(1, Math.floor(vp.width));
     canvas.height = Math.max(1, Math.floor(vp.height));
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const rendered = await runPdfPageRender(page, { canvasContext: ctx, viewport: vp });
+    if (!rendered || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
+      canvas.width = 0;
+      canvas.height = 0;
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      return null;
+    }
+    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
     return {
       wPt: baseVp.width,
       hPt: baseVp.height,
@@ -5918,11 +6704,13 @@
     let pdf = null;
     const count = context.pageOrder.length;
     if (!count) throw new Error(t('errors.noPagesExport'));
+    const mobilePixelBudget = getMobileExportPagePixelBudget(count);
     for (let i = 0; i < count; i++) {
       setLoader(true, t('progress.compressingPage', { page: i + 1, count }), currentPageProgress(i, count));
-      const size = await renderCompressedPageToCanvas(context.pageOrder[i], preset, tmp);
+      const size = await renderCompressedPageToCanvas(context.pageOrder[i], preset, tmp, mobilePixelBudget);
+      if (!size) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
       const orient = size.wPt > size.hPt ? 'l' : 'p';
-      const dataUrl = tmp.toDataURL('image/jpeg', preset.jpegQuality);
+      let imageInput = await canvasToImageInput(tmp, 'image/jpeg', preset.jpegQuality);
       if (i === 0) {
         pdf = new jsPDF(jsPdfExportOptions({
           orientation: orient,
@@ -5933,14 +6721,15 @@
       } else {
         pdf.addPage([size.wPt, size.hPt], orient);
       }
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, size.wPt, size.hPt, undefined, 'FAST');
+      pdf.addImage(imageInput, 'JPEG', 0, 0, size.wPt, size.hPt, undefined, 'FAST');
+      imageInput = null;
       tmp.width = 0;
       tmp.height = 0;
-      await new Promise(r => setTimeout(r, 0));
+      await yieldToMainThread();
     }
-    return createPdfArtifact(pdf.output('arraybuffer'), context.fileBase, {
+    return createJsPdfOutputArtifact(pdf, context.fileBase, {
       source: 'jsPDF',
-      compressionMode: state.compressMode,
+      compressionMode: context.settings.compressMode,
       rasterized: true,
       passwordProtected: !!(context.advanced.password && canPasswordProtectExport(context.toolId)),
       preservesOriginalQuality: false,
@@ -5948,13 +6737,13 @@
   }
 
   async function createCompressedPdfArtifact(context) {
-    const preset = COMPRESSION_PRESETS[state.compressMode] || COMPRESSION_PRESETS.original;
+    const preset = COMPRESSION_PRESETS[context.settings.compressMode] || COMPRESSION_PRESETS.original;
     if (!preset.rasterize) {
       const artifact = await createPageOrderPdfArtifact(context.pageOrder, context.fileBase, context);
       return clonePdfArtifact(artifact, {
         meta: {
           ...artifact.meta,
-          compressionMode: state.compressMode,
+          compressionMode: context.settings.compressMode,
         },
       });
     }
@@ -5963,6 +6752,7 @@
 
   // ── Threshold controls ──
   function setThresholdValue(value, render = true) {
+    if (operationInProgress && render) return;
     const v = Math.max(0, Math.min(255, Math.round(+value || 0)));
     state.threshold = v;
     threshSlider.value = String(v);
@@ -5976,6 +6766,7 @@
   threshSlider.addEventListener('input', e => setThresholdValue(e.target.value));
   thresholdResetBtn.addEventListener('click', () => setThresholdValue(128));
   invertToggle.addEventListener('click', () => {
+    if (operationInProgress) return;
     state.invert = !state.invert;
     setTogglePressed(invertToggle, state.invert);
     if (state.pdfDoc) requestPreviewRender(false);
@@ -5983,6 +6774,7 @@
 
   // ── Greyscale controls ──
   function setBrightnessValue(value, render = true) {
+    if (operationInProgress && render) return;
     const v = Math.max(-100, Math.min(100, Math.round(+value || 0)));
     state.brightness = v;
     brightSlider.value = String(v);
@@ -5993,6 +6785,7 @@
   }
 
   function setContrastValue(value, render = true) {
+    if (operationInProgress && render) return;
     const v = Math.max(50, Math.min(200, Math.round(+value || 0)));
     state.contrast = v;
     contrastSlider.value = String(v);
@@ -6007,12 +6800,14 @@
   contrastSlider.addEventListener('input', e => setContrastValue(e.target.value));
   contrastResetBtn.addEventListener('click', () => setContrastValue(100));
   greyInvertToggle.addEventListener('click', () => {
+    if (operationInProgress) return;
     state.greyInvert = !state.greyInvert;
     setTogglePressed(greyInvertToggle, state.greyInvert);
     $('greyHint').textContent = greyHintText();
     if (state.pdfDoc) requestPreviewRender(false);
   });
   sepiaToggle.addEventListener('click', () => {
+    if (operationInProgress) return;
     state.sepia = !state.sepia;
     setTogglePressed(sepiaToggle, state.sepia);
     $('greyHint').textContent = greyHintText();
@@ -6024,6 +6819,7 @@
   compressSmall.addEventListener('click', () => setCompressMode('small'));
 
   function setFineRotation(value) {
+    if (operationInProgress) return;
     if (!state.pdfDoc) return;
     const edit = currentPageEdit();
     edit.fineRotation = Math.round((+value || 0) * 10) / 10;
@@ -6033,12 +6829,13 @@
   }
 
   function rotateSelectedPage90(delta) {
+    if (operationInProgress) return;
     if (!state.pdfDoc) return;
     const edit = currentPageEdit();
     edit.quarterTurns = (edit.quarterTurns + delta + 4) % 4;
     syncEditControls();
     renderPageEditor();
-    drawEditedPagePreview();
+    requestEditedPreviewRender();
     requestEditedThumbnailRender();
   }
 
@@ -6062,6 +6859,7 @@
   cropOverlay.addEventListener('pointercancel', finishCropDrag);
 
   signaturePad.addEventListener('pointerdown', e => {
+    if (operationInProgress) return;
     signatureState.padDrawing = true;
     signatureState.padPointerId = e.pointerId;
     signatureState.lastPadPoint = signaturePadPoint(e);
@@ -6099,17 +6897,22 @@
   signatureOverlay.addEventListener('pointerdown', beginSignatureOverlayDrag);
 
   fineQualityToggle.addEventListener('click', () => {
+    if (operationInProgress) return;
     state.fineRotationQuality = state.fineRotationQuality === 'ultra' ? 'high' : 'ultra';
     syncFineQualityToggle();
   });
 
   resetEditBtn.addEventListener('click', () => {
+    if (operationInProgress) return;
     const sourceIndex = currentSourceIndex();
     if (sourceIndex == null) return;
     state.pageEdits[sourceIndex] = defaultPageEdit();
+    if (MOBILE_PERFORMANCE_MODE && state.pages[sourceIndex]) {
+      state.pages[sourceIndex].editedThumbUrl = null;
+    }
     syncEditControls();
     renderPageEditor();
-    drawEditedPagePreview();
+    requestEditedPreviewRender();
     requestEditedThumbnailRender(sourceIndex);
   });
 
@@ -6161,6 +6964,7 @@
 
   Object.entries(resButtons).forEach(([key, btn]) => {
     btn.addEventListener('click', async () => {
+      if (operationInProgress) return;
       if (state.resolution === key) return;
       if (key === '900' && !window.confirm(t('resolution.900Warning'))) {
         syncResolutionToggles();
@@ -6199,7 +7003,12 @@
     updatePageState();
   }
   prevBtn.addEventListener('click', () => {
+    if (operationInProgress) return;
     if (state.curPage > 1) {
+      if (MOBILE_PERFORMANCE_MODE && isRasterTool(activeTool)) {
+        resetRenderCaches({ preserveThumbnailCache: true });
+        forgetFullPageData();
+      }
       state.curPage--;
       updatePageButtons();
       if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
@@ -6207,7 +7016,12 @@
     }
   });
   nextBtn.addEventListener('click', () => {
+    if (operationInProgress) return;
     if (state.curPage < activePageCount()) {
+      if (MOBILE_PERFORMANCE_MODE && isRasterTool(activeTool)) {
+        resetRenderCaches({ preserveThumbnailCache: true });
+        forgetFullPageData();
+      }
       state.curPage++;
       updatePageButtons();
       if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
@@ -6217,6 +7031,7 @@
 
   // ── Download ──
   downloadBtn.addEventListener('click', async () => {
+    if (operationInProgress) return;
     if (activeTool === 'preview') return;
     if (activeTool === 'merge') {
       await mergeSelectedPdfs();
@@ -6237,7 +7052,11 @@
       return;
     }
     if (!exportOrder.length) return;
+    operationInProgress = true;
+    beginPdfLoad();
     downloadBtn.disabled = true;
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
     setLoader(true, t('progress.exportingPages'), 0);
     try {
       const context = createExportContext(activeTool, exportOrder, exportBaseNameForTool(activeTool));
@@ -6262,6 +7081,7 @@
       showError(t('errors.exportFailed', { error: err.message || err }));
       setLoader(false);
     } finally {
+      operationInProgress = false;
       updatePageState();
     }
   });
@@ -6553,11 +7373,21 @@
     previewStage.classList.remove('panning');
   });
   previewStage.addEventListener('scroll', updatePanCursor);
+  let mobileResizeFrame = null;
   window.addEventListener('resize', () => {
-    syncMobileDockLayout();
-    syncPreviewStageHeight();
-    updateToolIndicator();
-    updateSignatureOverlay();
+    const updateLayout = () => {
+      mobileResizeFrame = null;
+      syncMobileDockLayout();
+      syncPreviewStageHeight();
+      updateToolIndicator();
+      updateSignatureOverlay();
+    };
+    if (!MOBILE_PERFORMANCE_MODE) {
+      updateLayout();
+      return;
+    }
+    if (mobileResizeFrame) return;
+    mobileResizeFrame = requestAnimationFrame(updateLayout);
   });
   document.querySelector('.tool-nav').addEventListener('scroll', updateToolIndicator);
 
