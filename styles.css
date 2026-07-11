@@ -2923,3 +2923,175 @@
       transition: none;
     }
   }
+
+  /* ── APPLE-STYLE CONTROL REFINEMENT (local checkpoint: 54ef1a7) ── */
+
+  /* The broader glass treatment was intentionally removed; these controls remain. */
+  /*
+  Quieter segmented tool navigation and layered panel materials were tested here.
+  .tool-nav {
+    background: rgba(255, 255, 255, 0.58);
+    border-color: rgba(0, 0, 0, 0.065);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.86),
+      0 6px 22px rgba(0, 0, 0, 0.035);
+  }
+
+  .tool-indicator {
+    background: rgba(0, 0, 0, 0.075);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(0, 0, 0, 0.055),
+      0 1px 3px rgba(0, 0, 0, 0.055);
+  }
+
+  .tool-tab,
+  .tool-tab.active {
+    color: var(--ink);
+    transition: color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+  }
+
+  .tool-tab:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgba(10, 132, 255, 0.62);
+  }
+
+  body.dark-mode .tool-nav {
+    background: rgba(44, 44, 46, 0.74);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.075),
+      0 8px 28px rgba(0, 0, 0, 0.16);
+  }
+
+  body.dark-mode .tool-indicator {
+    background: rgba(255, 255, 255, 0.115);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.09),
+      0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  body.dark-mode .tool-tab.active {
+    color: #fff;
+  }
+
+  */
+
+  /* Keep the softer, borderless layered materials in the left panel. */
+  .panel-left .filecard,
+  .panel-left .organize-summary,
+  .panel-left .edit-controls,
+  .panel-left .quality-toggle,
+  .panel-left .split-panel,
+  .panel-left .sign-pad-wrap,
+  .panel-left .signature-drag-source,
+  .panel-left .merge-file-row,
+  .panel-left .split-part-row,
+  .panel-left .crop-readout,
+  .panel-left .advanced-toggle,
+  .panel-left .advanced-panel,
+  .panel-left .histo,
+  .panel-left .pagenav {
+    border-color: transparent;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 1px 2px rgba(0, 0, 0, 0.045),
+      0 8px 22px rgba(0, 0, 0, 0.035);
+  }
+
+  .panel-left .pagenav button {
+    border-left: 0;
+    border-right: 0;
+  }
+
+  body.dark-mode .panel-left .filecard,
+  body.dark-mode .panel-left .organize-summary,
+  body.dark-mode .panel-left .edit-controls,
+  body.dark-mode .panel-left .quality-toggle,
+  body.dark-mode .panel-left .split-panel,
+  body.dark-mode .panel-left .sign-pad-wrap,
+  body.dark-mode .panel-left .signature-drag-source,
+  body.dark-mode .panel-left .merge-file-row,
+  body.dark-mode .panel-left .split-part-row,
+  body.dark-mode .panel-left .crop-readout,
+  body.dark-mode .panel-left .advanced-toggle,
+  body.dark-mode .panel-left .advanced-panel,
+  body.dark-mode .panel-left .histo,
+  body.dark-mode .panel-left .pagenav {
+    background: rgba(255, 255, 255, 0.055);
+    border-color: transparent;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.075),
+      0 1px 2px rgba(0, 0, 0, 0.18),
+      0 10px 26px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Let the threshold value lead without overpowering the controls. */
+  .big-display .num {
+    font-size: 56px;
+    font-weight: 650;
+    line-height: 1;
+  }
+
+  .big-display .denom {
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  /* Present export DPI as one native-feeling segmented control. */
+  .resolution-options {
+    background: rgba(118, 118, 128, 0.12);
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.055);
+    display: grid;
+    gap: 2px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 3px;
+    width: 100%;
+  }
+
+  .resolution-options.hidden {
+    display: none;
+  }
+
+  .resolution-options .toggle {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 9px;
+    color: var(--ink-mute);
+    display: flex;
+    font-size: 12px;
+    justify-content: center;
+    min-width: 0;
+    padding: 8px 6px;
+    text-align: center;
+  }
+
+  .resolution-options .toggle:hover {
+    background: rgba(255, 255, 255, 0.46);
+  }
+
+  .resolution-options .toggle.on {
+    background: #fff;
+    color: var(--ink);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.12),
+      0 0 0 0.5px rgba(0, 0, 0, 0.055);
+  }
+
+  body.dark-mode .resolution-options {
+    background: rgba(118, 118, 128, 0.24);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.055);
+  }
+
+  body.dark-mode .resolution-options .toggle:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  body.dark-mode .resolution-options .toggle.on {
+    background: #636366;
+    color: #fff;
+    box-shadow:
+      0 1px 4px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }

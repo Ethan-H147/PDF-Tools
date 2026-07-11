@@ -663,6 +663,24 @@
     });
   }
 
+  const RASTER_TOOL_ENTRY_DELAY_MS = 300;
+  let rasterToolEntryTimer = null;
+
+  function cancelRasterToolEntryRender() {
+    if (!rasterToolEntryTimer) return;
+    clearTimeout(rasterToolEntryTimer);
+    rasterToolEntryTimer = null;
+  }
+
+  function scheduleRasterToolEntryRender(id) {
+    cancelRasterToolEntryRender();
+    rasterToolEntryTimer = setTimeout(() => {
+      rasterToolEntryTimer = null;
+      if (!state.pdfDoc || activeTool !== id || operationInProgress) return;
+      requestPreviewRender(true);
+    }, RASTER_TOOL_ENTRY_DELAY_MS);
+  }
+
   function switchTool(id, { force = false } = {}) {
     if (!TOOLS[id]) return;
     if (operationInProgress && !force) return;
@@ -670,6 +688,8 @@
       syncToolTabA11y();
       return;
     }
+    const previousTool = activeTool;
+    cancelRasterToolEntryRender();
     if (MOBILE_PERFORMANCE_MODE) {
       resetRenderCaches({ preserveThumbnailCache: true });
       forgetFullPageData();
@@ -692,7 +712,11 @@
     updateToolIndicator();
     syncPreviewStageHeight();
     if (id === 'sign') syncSignatureControls();
-    if (state.pdfDoc && id !== 'organize' && id !== 'edit') requestPreviewRender(isRasterTool(id));
+    if (state.pdfDoc && id !== 'organize' && id !== 'edit') {
+      const enteringRasterTool = isRasterTool(id) && !isRasterTool(previousTool);
+      if (!MOBILE_PERFORMANCE_MODE && enteringRasterTool) scheduleRasterToolEntryRender(id);
+      else requestPreviewRender(isRasterTool(id));
+    }
     if (state.pdfDoc && id === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
   }
 
