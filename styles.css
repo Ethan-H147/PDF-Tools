@@ -1506,6 +1506,26 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  .edit-button-row .rotate-page-btn {
+    align-items: center;
+    display: inline-flex;
+    gap: 6px;
+    justify-content: center;
+    min-height: 0;
+    padding: 11px 14px;
+  }
+
+  .rotate-page-icon {
+    display: block;
+    fill: none;
+    height: 18px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.25;
+    width: 18px;
+  }
+
   .sign-panel {
     display: grid;
     gap: 14px;
@@ -2125,6 +2145,12 @@
   .page-editor-bottom button:disabled {
     cursor: not-allowed;
     opacity: .45;
+  }
+
+  .page-editor-bottom .rotate-page-icon {
+    height: 24px;
+    stroke-width: 2.4;
+    width: 24px;
   }
 
   .page-editor-bottom b {

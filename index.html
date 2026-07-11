@@ -129,8 +129,22 @@ Ethan Hu -->
             <input type="range" min="-5" max="5" value="0" step="0.1" class="slider edit-slider" id="editRotateSlider">
             <div class="slider-tags"><span>-5°</span><span>+5°</span></div>
             <div class="edit-button-row">
-              <button class="btn-secondary" id="rotateLeftBtn" disabled>↺ 90°</button>
-              <button class="btn-secondary" id="rotateRightBtn" disabled>↻ 90°</button>
+              <button class="btn-secondary rotate-page-btn" id="rotateLeftBtn" aria-label="Rotate page 90 degrees counterclockwise" disabled>
+                <svg class="rotate-page-icon" viewBox="0 0 32 32" aria-hidden="true">
+                  <rect x="8.25" y="13.25" width="14.5" height="14.5" rx="2.2"></rect>
+                  <path d="M25 14v-2.2a7 7 0 0 0-7-7h-4.5"></path>
+                  <path d="m16.5 1.8-3 3 3 3"></path>
+                </svg>
+                <span>90°</span>
+              </button>
+              <button class="btn-secondary rotate-page-btn" id="rotateRightBtn" aria-label="Rotate page 90 degrees clockwise" disabled>
+                <svg class="rotate-page-icon" viewBox="0 0 32 32" aria-hidden="true">
+                  <rect x="9.25" y="13.25" width="14.5" height="14.5" rx="2.2"></rect>
+                  <path d="M7 14v-2.2a7 7 0 0 1 7-7h4.5"></path>
+                  <path d="m15.5 1.8 3 3-3 3"></path>
+                </svg>
+                <span>90°</span>
+              </button>
             </div>
           </div>
           <div class="edit-controls">
@@ -368,10 +382,22 @@ Ethan Hu -->
               </div>
             </div>
             <div class="page-editor-bottom" id="pageEditorBottom">
-              <button type="button" id="bottomRotateLeftBtn" disabled>↺</button>
+              <button type="button" class="rotate-page-btn" id="bottomRotateLeftBtn" aria-label="Rotate page 90 degrees counterclockwise" disabled>
+                <svg class="rotate-page-icon" viewBox="0 0 32 32" aria-hidden="true">
+                  <rect x="8.25" y="13.25" width="14.5" height="14.5" rx="2.2"></rect>
+                  <path d="M25 14v-2.2a7 7 0 0 0-7-7h-4.5"></path>
+                  <path d="m16.5 1.8-3 3 3 3"></path>
+                </svg>
+              </button>
               <input type="range" min="-5" max="5" value="0" step="0.1" class="slider" id="bottomRotateSlider">
               <b id="bottomRotateNum">0.0°</b>
-              <button type="button" id="bottomRotateRightBtn" disabled>↻</button>
+              <button type="button" class="rotate-page-btn" id="bottomRotateRightBtn" aria-label="Rotate page 90 degrees clockwise" disabled>
+                <svg class="rotate-page-icon" viewBox="0 0 32 32" aria-hidden="true">
+                  <rect x="9.25" y="13.25" width="14.5" height="14.5" rx="2.2"></rect>
+                  <path d="M7 14v-2.2a7 7 0 0 1 7-7h4.5"></path>
+                  <path d="m15.5 1.8 3 3-3 3"></path>
+                </svg>
+              </button>
             </div>
           </div>
         </div>

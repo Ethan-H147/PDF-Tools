@@ -3393,10 +3393,18 @@
   }
 
   function touchFullPageCache(sourceIndex) {
-    if (!state.largePdfSafeMode || sourceIndex == null) return;
+    const rasterPreviewCache = isRasterTool(activeTool);
+    if ((!state.largePdfSafeMode && !rasterPreviewCache) || sourceIndex == null) return;
+    const cacheLimit = MOBILE_PERFORMANCE_MODE
+      ? 1
+      : rasterPreviewCache && state.resolution === '900'
+        ? 1
+        : rasterPreviewCache && state.resolution === '600'
+          ? 2
+          : SAFE_FULL_PAGE_CACHE_LIMIT;
     state.fullPageCacheOrder = state.fullPageCacheOrder.filter(index => index !== sourceIndex);
     state.fullPageCacheOrder.push(sourceIndex);
-    while (state.fullPageCacheOrder.length > SAFE_FULL_PAGE_CACHE_LIMIT) {
+    while (state.fullPageCacheOrder.length > cacheLimit) {
       const evictIndex = state.fullPageCacheOrder.shift();
       if (evictIndex === sourceIndex) continue;
       const pd = state.pages[evictIndex];
@@ -4056,7 +4064,7 @@
     state.splitPoints = [];
     state.splitNames = [];
     updatePageState();
-    const lazyOpen = state.largePdfSafeMode || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit' || activeTool === 'sign' || activeTool === 'compress';
+    const lazyOpen = state.largePdfSafeMode || isRasterTool(activeTool) || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit' || activeTool === 'sign' || activeTool === 'compress';
     if (lazyOpen) {
       setLoader(true, state.largePdfSafeMode ? t('progress.openingLargePdf') : t('progress.openingPdf'), 45);
       await ensurePageMeta(0);
@@ -4277,6 +4285,9 @@
 
   async function ensureRasterPreviewData(sourceIndex) {
     if (!state.pdfDoc || sourceIndex == null) return null;
+    if (!MOBILE_PERFORMANCE_MODE) {
+      return ensurePageData(sourceIndex, { renderKey: state.resolution, skipThumb: true });
+    }
     const generation = state.renderGeneration;
     const pdfDoc = state.pdfDoc;
     const page = await pdfDoc.getPage(sourceIndex + 1);
@@ -6973,23 +6984,17 @@
       state.resolution = key;
       syncResolutionToggles();
       if (!state.pdfDoc) return;
-      if (state.largePdfSafeMode) {
-        forgetFullPageData();
-        setLoader(true, t('progress.resolutionCurrentPage'), 35);
-        if (isRasterTool(activeTool)) {
-          await ensureRasterPreviewData(currentSourceIndex());
-        } else if (activeTool === 'edit') {
-          await ensurePageData(currentSourceIndex());
-        }
-      } else {
-        state.pages = new Array(state.numPages).fill(null);
-        for (let i = 1; i <= state.numPages; i++) {
-          const label = key === 'fast'
-            ? t('progress.renderingPage', { page: i, count: state.numPages })
-            : t('progress.renderingAtDpi', { dpi: key, page: i, count: state.numPages });
-          setLoader(true, label, ((i - 1) / state.numPages) * 100);
-          await renderPageToLuminance(i);
-        }
+      resetRenderCaches({ preserveThumbnailCache: true });
+      forgetFullPageData();
+      const sourceIndex = currentSourceIndex();
+      const label = key === 'fast'
+        ? t('progress.renderingPage', { page: state.curPage, count: activePageCount() })
+        : t('progress.renderingAtDpi', { dpi: key, page: state.curPage, count: activePageCount() });
+      setLoader(true, label, 35);
+      if (isRasterTool(activeTool)) {
+        await ensureRasterPreviewData(sourceIndex);
+      } else if (activeTool === 'edit') {
+        await ensurePageData(sourceIndex);
       }
       updatePageState();
       if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
@@ -7316,6 +7321,7 @@
       if (done) return; done = true;
       const raw = input.value.trim().toLowerCase().replace('%', '');
       const fitWords = ['fit', t('zoom.fit').toLowerCase()];
+      input.remove();
       if (commit && fitWords.includes(raw)) setZoom(1, { preserveCenter: false });
       else if (commit && raw !== '' && !isNaN(+raw) && +raw > 0) setZoom(+raw / 100);
       else applyZoom(); // restore readout
