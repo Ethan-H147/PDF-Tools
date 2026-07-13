@@ -93,57 +93,57 @@
 
   const TOOLS = {
     preview: {
-      lede: 'View a PDF cleanly with fast page navigation and zoom.',
-      meta: 'Open a PDF for viewing<br/>Use page navigation<br/>Zoom without changing the file',
+      lede: 'Read and inspect a PDF without changing it.',
+      meta: 'Move quickly between pages<br/>Zoom in on fine details<br/>Return to fit view in one click',
       downloadLabel: 'Preview Only',
       downloadSub: 'view and zoom without exporting',
       suffix: '',
     },
     organize: {
-      lede: 'Reorder or remove pages before export.',
-      meta: 'Drag pages to reorder<br/>Click × to remove a page<br/>Use Split to divide after a page<br/>Drag pages across split lines freely<br/>Click a split × to remove it<br/>Name and export each part separately<br/>Original PDF pages are preserved',
+      lede: 'Rearrange pages or split a PDF into separate files.',
+      meta: 'Drag pages into a new order<br/>Remove pages you do not need<br/>Add split points and name each part',
       downloadLabel: 'Export Organized PDF',
       downloadSub: 'preserve original page content',
       suffix: '_organized',
     },
     edit: {
-      lede: 'Crop and rotate individual pages before export.',
-      meta: 'Select one page at a time<br/>Drag the crop frame on the page<br/>Fine rotate with a low-sensitivity slider<br/>Use 90° rotate buttons for page turns',
+      lede: 'Crop, straighten, or rotate individual pages.',
+      meta: 'Adjust one page at a time<br/>Drag the crop frame into place<br/>Rotate by 90° or fine-tune the angle',
       downloadLabel: 'Export Edited PDF',
       downloadSub: 'apply page crops and rotations',
       suffix: '_edited',
     },
     sign: {
-      lede: 'Draw a signature and place it directly on a PDF page.',
-      meta: 'Draw your signature locally<br/>Drag it onto the page preview<br/>Export without rasterizing the PDF',
+      lede: 'Add a hand-drawn signature to any PDF page.',
+      meta: 'Draw and refine your signature<br/>Position and resize it on the page<br/>Keep the original PDF content sharp',
       downloadLabel: 'Export Signed PDF',
       downloadSub: 'stamp the signature onto the PDF',
       suffix: '_signed',
     },
     merge: {
-      lede: 'Merge multiple PDFs into one organized document.',
-      meta: 'Select any number of PDFs<br/>Reorder files before merging<br/>Merged output opens in Organize',
+      lede: 'Combine multiple PDFs into one document.',
+      meta: 'Add as many PDFs as you need<br/>Arrange them in the right order<br/>Review the combined pages before export',
       downloadLabel: 'Merge PDFs',
       downloadSub: 'combine selected files into organize',
       suffix: '_merged',
     },
     compress: {
-      lede: 'Reduce PDF file size with simple quality choices.',
-      meta: 'Original mode preserves page content<br/>Balanced and Small create lighter page images<br/>Password lock still works',
+      lede: 'Make a PDF smaller with a choice of quality levels.',
+      meta: 'Preserve original pages when possible<br/>Use Balanced for everyday sharing<br/>Use Small when file size matters most',
       downloadLabel: 'Export Compressed PDF',
       downloadSub: 'reduce file size',
       suffix: '_compressed',
     },
     threshold: {
-      lede: 'Convert PDFs to black and white with threshold control.',
-      meta: 'Black and white output<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
+      lede: 'Turn pages into crisp black and white.',
+      meta: 'Control what becomes black or white<br/>Adjust one page or the whole document<br/>Invert the result when needed',
       downloadLabel: 'Export PDF',
       downloadSub: 'render and download all pages',
       suffix: '_bw',
     },
     greyscale: {
-      lede: 'Convert PDFs to grayscale with brightness and contrast.',
-      meta: 'Grayscale output<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
+      lede: 'Remove color and tune the look of each page.',
+      meta: 'Adjust brightness and contrast<br/>Apply settings per page or to all pages<br/>Add an inverted or warm sepia finish',
       downloadLabel: 'Export Grayscale PDF',
       downloadSub: 'render and download all pages',
       suffix: '_grey',
@@ -255,6 +255,7 @@
   const thresholdScopeAll = $('thresholdScopeAll');
   const thresholdScopePage = $('thresholdScopePage');
   const thresholdScopeStatus = $('thresholdScopeStatus');
+  const thresholdCopyToAll = $('thresholdCopyToAll');
   const brightSlider  = $('brightSlider');
   const brightnessResetBtn = $('brightnessResetBtn');
   const brightNum     = $('brightNum');
@@ -268,10 +269,12 @@
   const greyscaleScopeAll = $('greyscaleScopeAll');
   const greyscaleScopePage = $('greyscaleScopePage');
   const greyscaleScopeStatus = $('greyscaleScopeStatus');
+  const greyscaleCopyToAll = $('greyscaleCopyToAll');
   const prevBtn       = $('prevPage');
   const nextBtn       = $('nextPage');
   const curPageEl     = $('curPage');
   const totPageEl     = $('totPage');
+  const pageCustomBadge = $('pageCustomBadge');
   const pageNav       = prevBtn.closest('.pagenav');
   const downloadBtn   = $('downloadBtn');
   const actionsDock   = downloadBtn.parentElement;
@@ -296,6 +299,7 @@
   const mergeRunBtn   = $('mergeRunBtn');
   const compressHint  = $('compressHint');
   const compressSummary = $('compressSummary');
+  const compressEstimate = $('compressEstimate');
   const compressOriginal = $('compressOriginal');
   const compressBalanced = $('compressBalanced');
   const compressSmall = $('compressSmall');
@@ -512,18 +516,23 @@
   function syncRasterScopeUI() {
     const count = activePageCount();
     const hasPage = !!state.pdfDoc && count > 0;
+    const sourceIndex = currentSourceIndex();
     [
-      ['threshold', thresholdScopeAll, thresholdScopePage, thresholdScopeStatus],
-      ['greyscale', greyscaleScopeAll, greyscaleScopePage, greyscaleScopeStatus],
-    ].forEach(([tool, allButton, pageButton, status]) => {
+      ['threshold', thresholdScopeAll, thresholdScopePage, thresholdScopeStatus, thresholdCopyToAll],
+      ['greyscale', greyscaleScopeAll, greyscaleScopePage, greyscaleScopeStatus, greyscaleCopyToAll],
+    ].forEach(([tool, allButton, pageButton, status, copyButton]) => {
       const perPage = state.rasterScopes[tool] === 'page';
+      const custom = !!state.rasterPageSettings[sourceIndex]?.[tool];
       setTogglePressed(allButton, !perPage);
       setTogglePressed(pageButton, perPage);
       pageButton.disabled = !hasPage;
+      copyButton.hidden = !perPage || !custom;
       status.textContent = perPage && hasPage
-        ? 'Page ' + state.curPage + ' of ' + count
+        ? 'Page ' + state.curPage + ' of ' + count + (custom ? ' · Custom' : '')
         : 'Every page';
     });
+    const activeRasterCustom = isRasterTool(activeTool) && !!state.rasterPageSettings[sourceIndex]?.[activeTool];
+    pageCustomBadge.hidden = !activeRasterCustom;
   }
 
   function syncRasterControls() {
@@ -677,6 +686,18 @@
     toolIndicator.style.transform = 'translateX(' + (tabRect.left - navRect.left + activeTab.parentElement.scrollLeft) + 'px)';
   }
 
+  function centerActiveToolTab() {
+    if (!isPhoneViewport()) return;
+    const activeTab = document.querySelector('.tool-tab.active');
+    const nav = activeTab?.parentElement;
+    if (!activeTab || !nav) return;
+    const left = activeTab.offsetLeft - (nav.clientWidth - activeTab.offsetWidth) / 2;
+    nav.scrollTo({
+      left: Math.max(0, left),
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }
+
   function toolTipText(meta) {
     const div = document.createElement('div');
     div.innerHTML = meta.replace(/<br\s*\/?>/gi, '\n');
@@ -782,6 +803,7 @@
     else updatePageState();
     updatePreviewMode();
     updateToolIndicator();
+    requestAnimationFrame(centerActiveToolTab);
     syncPreviewStageHeight();
     if (id === 'sign') syncSignatureControls();
     if (state.pdfDoc && id !== 'organize' && id !== 'edit') {
@@ -1257,8 +1279,8 @@
       'hint.inverted': 'inverted',
       'hint.lowContrast': 'low contrast',
       'hint.highContrast': 'high contrast',
-      'empty.noPreview': 'No preview yet',
-      'empty.uploadToBegin': 'Upload a PDF to begin',
+      'empty.noPreview': 'Your preview will appear here',
+      'empty.uploadToBegin': 'Choose a PDF to start',
       'empty.organize': 'Upload a PDF to organize pages.',
       'empty.organizeRemoved': 'All pages have been removed. Restore the original order to continue.',
       'empty.edit': 'Upload a PDF to crop or rotate pages.',
@@ -1317,44 +1339,44 @@
       'theme.onAria': 'Turn on dark mode',
       'theme.offAria': 'Turn off dark mode',
       'footer.type': 'Set in SF Pro / Inter',
-      'footer.clientSide': 'Client-side PDF processing',
+      'footer.clientSide': 'No account required',
       'footer.local': 'Runs entirely in your browser',
       'errors.chooseMerge': 'Choose one or more PDF files to merge.',
       'errors.password': 'Enter a password before exporting a locked PDF.',
       'errors.notPdf': 'That doesn’t look like a PDF.',
       'tool.preview.label': 'Preview',
-      'tool.preview.lede': 'View a PDF cleanly with fast page navigation and zoom.',
-      'tool.preview.meta': 'Open a PDF for viewing<br/>Use page navigation<br/>Zoom without changing the file',
+      'tool.preview.lede': 'Read and inspect a PDF without changing it.',
+      'tool.preview.meta': 'Move quickly between pages<br/>Zoom in on fine details<br/>Return to fit view in one click',
       'tool.preview.downloadLabel': 'Preview Only',
       'tool.preview.downloadSub': 'view and zoom without exporting',
       'tool.organize.label': 'Organize',
-      'tool.organize.lede': 'Reorder or remove pages before export.',
-      'tool.organize.meta': 'Drag pages to reorder<br/>Click × to remove a page<br/>Use Split to divide after a page<br/>Drag pages across split lines freely<br/>Click a split × to remove it<br/>Name and export each part separately<br/>Original PDF pages are preserved',
+      'tool.organize.lede': 'Rearrange pages or split a PDF into separate files.',
+      'tool.organize.meta': 'Drag pages into a new order<br/>Remove pages you do not need<br/>Add split points and name each part',
       'tool.organize.downloadLabel': 'Export Organized PDF',
       'tool.organize.downloadSub': 'preserve original page content',
       'tool.edit.label': 'Crop/Rotate',
-      'tool.edit.lede': 'Crop and rotate individual pages before export.',
-      'tool.edit.meta': 'Select one page at a time<br/>Drag the crop frame on the page<br/>Fine rotate with a low-sensitivity slider<br/>Use 90° rotate buttons for page turns',
+      'tool.edit.lede': 'Crop, straighten, or rotate individual pages.',
+      'tool.edit.meta': 'Adjust one page at a time<br/>Drag the crop frame into place<br/>Rotate by 90° or fine-tune the angle',
       'tool.edit.downloadLabel': 'Export Edited PDF',
       'tool.edit.downloadSub': 'apply page crops and rotations',
       'tool.merge.label': 'Merge',
-      'tool.merge.lede': 'Merge multiple PDFs into one organized document.',
-      'tool.merge.meta': 'Select any number of PDFs<br/>Reorder files before merging<br/>Merged output opens in Organize',
+      'tool.merge.lede': 'Combine multiple PDFs into one document.',
+      'tool.merge.meta': 'Add as many PDFs as you need<br/>Arrange them in the right order<br/>Review the combined pages before export',
       'tool.merge.downloadLabel': 'Merge PDFs',
       'tool.merge.downloadSub': 'combine selected files into organize',
       'tool.compress.label': 'Compress',
-      'tool.compress.lede': 'Reduce PDF file size with simple quality choices.',
-      'tool.compress.meta': 'Original mode preserves page content<br/>Balanced and Small create lighter page images<br/>Password lock still works',
+      'tool.compress.lede': 'Make a PDF smaller with a choice of quality levels.',
+      'tool.compress.meta': 'Preserve original pages when possible<br/>Use Balanced for everyday sharing<br/>Use Small when file size matters most',
       'tool.compress.downloadLabel': 'Export Compressed PDF',
       'tool.compress.downloadSub': 'reduce file size',
       'tool.threshold.label': 'Threshold',
-      'tool.threshold.lede': 'Convert PDFs to black and white with threshold control.',
-      'tool.threshold.meta': 'Black and white output<br/>Client-side only · no upload<br/>Threshold · 0 → 255',
+      'tool.threshold.lede': 'Turn pages into crisp black and white.',
+      'tool.threshold.meta': 'Control what becomes black or white<br/>Adjust one page or the whole document<br/>Invert the result when needed',
       'tool.threshold.downloadLabel': 'Export PDF',
       'tool.threshold.downloadSub': 'render and download all pages',
       'tool.greyscale.label': 'Grayscale',
-      'tool.greyscale.lede': 'Convert PDFs to grayscale with brightness and contrast.',
-      'tool.greyscale.meta': 'Grayscale output<br/>Client-side only · no upload<br/>Brightness &amp; contrast',
+      'tool.greyscale.lede': 'Remove color and tune the look of each page.',
+      'tool.greyscale.meta': 'Adjust brightness and contrast<br/>Apply settings per page or to all pages<br/>Add an inverted or warm sepia finish',
       'tool.greyscale.downloadLabel': 'Export Grayscale PDF',
       'tool.greyscale.downloadSub': 'render and download all pages',
     },
@@ -1533,7 +1555,7 @@
       'theme.onAria': '开启深色模式',
       'theme.offAria': '关闭深色模式',
       'footer.type': '字体 SF Pro / Inter',
-      'footer.clientSide': '本地处理 PDF',
+      'footer.clientSide': '无需注册账号',
       'footer.local': '全程在浏览器内完成',
       'tool.preview.label': '预览',
       'tool.preview.lede': '查看 PDF，支持快速翻页和缩放。',
@@ -1746,7 +1768,7 @@
       'theme.onAria': '開啟深色模式',
       'theme.offAria': '關閉深色模式',
       'footer.type': '字體 SF Pro / Inter',
-      'footer.clientSide': '本機處理 PDF',
+      'footer.clientSide': '無需註冊帳號',
       'footer.local': '全程在瀏覽器內完成',
       'tool.preview.label': '預覽',
       'tool.preview.lede': '查看 PDF，支援快速翻頁與縮放。',
@@ -1775,12 +1797,12 @@
       'tool.compress.downloadSub': '縮小檔案體積',
       'tool.threshold.label': '黑白',
       'tool.threshold.lede': '用閾值把 PDF 轉成黑白。',
-      'tool.threshold.meta': '黑白輸出<br/>全程在本機處理<br/>閾值 · 0 → 255',
+      'tool.threshold.meta': '控制哪些內容變成黑或白<br/>可調整單頁或全部頁面<br/>需要時可反相結果',
       'tool.threshold.downloadLabel': '匯出 PDF',
       'tool.threshold.downloadSub': '轉換並下載所有頁面',
       'tool.greyscale.label': '灰階',
       'tool.greyscale.lede': '用亮度和對比把 PDF 轉成灰階。',
-      'tool.greyscale.meta': '灰階輸出<br/>全程在本機處理<br/>亮度與對比',
+      'tool.greyscale.meta': '調整亮度與對比<br/>可套用到單頁或全部頁面<br/>可選反相或暖色調效果',
       'tool.greyscale.downloadLabel': '匯出灰階 PDF',
       'tool.greyscale.downloadSub': '轉換並下載所有頁面',
     },
@@ -1962,7 +1984,7 @@
       'theme.onAria': '다크 모드 켜기',
       'theme.offAria': '다크 모드 끄기',
       'footer.type': 'SF Pro / Inter 사용',
-      'footer.clientSide': '로컬 PDF 처리',
+      'footer.clientSide': '계정 없이 사용',
       'footer.local': '브라우저 안에서만 실행',
       'errors.chooseMerge': '병합할 PDF 파일을 하나 이상 선택하세요.',
       'errors.password': '잠긴 PDF로 내보내려면 비밀번호를 입력하세요.',
@@ -1994,12 +2016,12 @@
       'tool.compress.downloadSub': '파일 용량 줄이기',
       'tool.threshold.label': '흑백',
       'tool.threshold.lede': '임계값으로 PDF를 흑백으로 변환합니다.',
-      'tool.threshold.meta': '흑백 출력<br/>브라우저 안에서만 처리 · 업로드 없음<br/>임계값 · 0 → 255',
+      'tool.threshold.meta': '검정과 흰색의 기준 조절<br/>페이지별 또는 전체 문서에 적용<br/>필요할 때 결과 반전',
       'tool.threshold.downloadLabel': 'PDF 내보내기',
       'tool.threshold.downloadSub': '모든 페이지 변환 후 다운로드',
       'tool.greyscale.label': '그레이스케일',
       'tool.greyscale.lede': '밝기와 대비로 PDF를 그레이스케일로 변환합니다.',
-      'tool.greyscale.meta': '그레이스케일 출력<br/>브라우저 안에서만 처리 · 업로드 없음<br/>밝기와 대비',
+      'tool.greyscale.meta': '밝기와 대비 조절<br/>페이지별 또는 전체 문서에 적용<br/>반전 또는 따뜻한 세피아 효과',
       'tool.greyscale.downloadLabel': '그레이스케일 PDF 내보내기',
       'tool.greyscale.downloadSub': '모든 페이지 변환 후 다운로드',
     },
@@ -2181,7 +2203,7 @@
       'theme.onAria': 'ダークモードをオン',
       'theme.offAria': 'ダークモードをオフ',
       'footer.type': 'SF Pro / Inter',
-      'footer.clientSide': 'ローカルPDF処理',
+      'footer.clientSide': 'アカウント登録不要',
       'footer.local': 'すべてブラウザ内で実行',
       'errors.chooseMerge': '結合するPDFファイルを1つ以上選択してください。',
       'errors.password': '保護されたPDFとして書き出すにはパスワードを入力してください。',
@@ -2213,12 +2235,12 @@
       'tool.compress.downloadSub': 'ファイルサイズを削減',
       'tool.threshold.label': '白黒',
       'tool.threshold.lede': 'しきい値でPDFを白黒に変換します。',
-      'tool.threshold.meta': '白黒出力<br/>ブラウザ内のみで処理 · アップロードなし<br/>しきい値 · 0 → 255',
+      'tool.threshold.meta': '黒と白の境界を調整<br/>ページごと、または全ページに適用<br/>必要に応じて結果を反転',
       'tool.threshold.downloadLabel': 'PDFを書き出し',
       'tool.threshold.downloadSub': '全ページを変換してダウンロード',
       'tool.greyscale.label': 'グレースケール',
       'tool.greyscale.lede': '明るさとコントラストでPDFをグレースケールに変換します。',
-      'tool.greyscale.meta': 'グレースケール出力<br/>ブラウザ内のみで処理 · アップロードなし<br/>明るさとコントラスト',
+      'tool.greyscale.meta': '明るさとコントラストを調整<br/>ページごと、または全ページに適用<br/>反転または暖かいセピア調を追加',
       'tool.greyscale.downloadLabel': 'グレースケールPDFを書き出し',
       'tool.greyscale.downloadSub': '全ページを変換してダウンロード',
     },
@@ -2402,7 +2424,7 @@
       'theme.onAria': 'Activar modo oscuro',
       'theme.offAria': 'Desactivar modo oscuro',
       'footer.type': 'Con SF Pro / Inter',
-      'footer.clientSide': 'Procesamiento PDF en el navegador',
+      'footer.clientSide': 'Sin necesidad de cuenta',
       'footer.local': 'Funciona íntegramente en tu navegador',
       'tool.preview.label': 'Vista previa',
       'tool.preview.lede': 'Visualiza un PDF con navegación rápida y zoom.',
@@ -2431,12 +2453,12 @@
       'tool.compress.downloadSub': 'reducir tamaño del archivo',
       'tool.threshold.label': 'Umbral',
       'tool.threshold.lede': 'Convierte PDF a blanco y negro con control de umbral.',
-      'tool.threshold.meta': 'Salida en blanco y negro<br/>Solo en tu navegador · sin subida<br/>Umbral · 0 → 255',
+      'tool.threshold.meta': 'Controla qué se vuelve negro o blanco<br/>Ajusta una página o todo el documento<br/>Invierte el resultado cuando lo necesites',
       'tool.threshold.downloadLabel': 'Exportar PDF',
       'tool.threshold.downloadSub': 'renderizar y descargar todas las páginas',
       'tool.greyscale.label': 'Grises',
       'tool.greyscale.lede': 'Convierte PDF a escala de grises con brillo y contraste.',
-      'tool.greyscale.meta': 'Salida en escala de grises<br/>Solo en tu navegador · sin subida<br/>Brillo y contraste',
+      'tool.greyscale.meta': 'Ajusta brillo y contraste<br/>Aplica ajustes por página o a todas<br/>Añade inversión o un acabado sepia cálido',
       'tool.greyscale.downloadLabel': 'Exportar PDF en grises',
       'tool.greyscale.downloadSub': 'renderizar y descargar todas las páginas',
     },
@@ -2620,7 +2642,7 @@
       'theme.onAria': 'Activer le mode sombre',
       'theme.offAria': 'Désactiver le mode sombre',
       'footer.type': 'En SF Pro / Inter',
-      'footer.clientSide': 'Traitement PDF côté navigateur',
+      'footer.clientSide': 'Aucun compte requis',
       'footer.local': 'Fonctionne entièrement dans votre navigateur',
       'tool.preview.label': 'Aperçu',
       'tool.preview.lede': 'Consultez un PDF avec navigation rapide et zoom.',
@@ -2649,12 +2671,12 @@
       'tool.compress.downloadSub': 'réduire la taille du fichier',
       'tool.threshold.label': 'Seuil',
       'tool.threshold.lede': 'Convertissez les PDF en noir et blanc avec un seuil réglable.',
-      'tool.threshold.meta': 'Sortie noir et blanc<br/>Dans le navigateur uniquement · aucun envoi<br/>Seuil · 0 → 255',
+      'tool.threshold.meta': 'Choisissez ce qui devient noir ou blanc<br/>Réglez une page ou tout le document<br/>Inversez le résultat si nécessaire',
       'tool.threshold.downloadLabel': 'Exporter le PDF',
       'tool.threshold.downloadSub': 'rendre et télécharger toutes les pages',
       'tool.greyscale.label': 'Gris',
       'tool.greyscale.lede': 'Convertissez les PDF en niveaux de gris avec luminosité et contraste.',
-      'tool.greyscale.meta': 'Sortie en niveaux de gris<br/>Dans le navigateur uniquement · aucun envoi<br/>Luminosité et contraste',
+      'tool.greyscale.meta': 'Réglez la luminosité et le contraste<br/>Appliquez les réglages par page ou partout<br/>Ajoutez une inversion ou un sépia chaleureux',
       'tool.greyscale.downloadLabel': 'Exporter le PDF en gris',
       'tool.greyscale.downloadSub': 'rendre et télécharger toutes les pages',
     },
@@ -2681,8 +2703,8 @@
       'sign.summaryPlaced': 'Signature placed on page {page}. Drag it again to adjust.',
       'sign.summaryPlacedCount': '{count} signatures placed. Drag to move; drag corners to resize.',
       'tool.sign.label': 'Sign',
-      'tool.sign.lede': 'Draw a signature and place it directly on a PDF page.',
-      'tool.sign.meta': 'Draw your signature locally<br/>Drag it onto the page preview<br/>Export without rasterizing the PDF',
+      'tool.sign.lede': 'Add a hand-drawn signature to any PDF page.',
+      'tool.sign.meta': 'Draw and refine your signature<br/>Position and resize it on the page<br/>Keep the original PDF content sharp',
       'tool.sign.downloadLabel': 'Export Signed PDF',
       'tool.sign.downloadSub': 'stamp the signature onto the PDF',
     },
@@ -3587,6 +3609,36 @@
     fineQualityLabel.textContent = ultra ? t('edit.qualityUltra') : t('edit.qualityHigh');
   }
 
+  function estimateCompressedOutput(preset) {
+    if (!state.pdfDoc || !activePageCount()) return null;
+    let totalPixels = 0;
+    state.pageOrder.forEach(sourceIndex => {
+      const pd = state.pages[sourceIndex];
+      const baseW = pd?.baseW || (pd?.w && pd?.scale ? pd.w / pd.scale : 612);
+      const baseH = pd?.baseH || (pd?.h && pd?.scale ? pd.h / pd.scale : 792);
+      const requestedScale = (preset.dpi || 144) / 72;
+      const cappedScale = Math.min(requestedScale, (preset.maxDimension || 2400) / Math.max(baseW, baseH));
+      totalPixels += Math.max(1, Math.floor(baseW * cappedScale)) * Math.max(1, Math.floor(baseH * cappedScale));
+    });
+    const bytesPerPixel = state.compressMode === 'small' ? 0.075 : 0.12;
+    const midpoint = totalPixels * bytesPerPixel + activePageCount() * 2600;
+    return {
+      low: Math.max(1024, midpoint * 0.62),
+      high: Math.max(2048, midpoint * 1.42),
+    };
+  }
+
+  function compressionEstimateText(preset) {
+    if (!state.pdfDoc) return 'Choose a PDF to see an estimated output size.';
+    if (!preset.rasterize) {
+      return 'Expected output: close to the source size' + (state.fileSize ? ' (' + fmtBytes(state.fileSize) + ')' : '') + '.';
+    }
+    const estimate = estimateCompressedOutput(preset);
+    return estimate
+      ? 'Rough estimate: ' + fmtBytes(estimate.low) + '–' + fmtBytes(estimate.high) + ' · actual size depends on page detail.'
+      : 'Output size will be estimated after the PDF is ready.';
+  }
+
   function syncCompressControls() {
     const preset = COMPRESSION_PRESETS[state.compressMode] || COMPRESSION_PRESETS.original;
     setTogglePressed(compressOriginal, state.compressMode === 'original');
@@ -3595,6 +3647,7 @@
     const modeKey = state.compressMode === 'balanced' ? 'Balanced' : state.compressMode === 'small' ? 'Small' : 'Original';
     compressHint.textContent = t('compress.hint' + modeKey);
     compressSummary.textContent = t('compress.summary' + modeKey);
+    compressEstimate.textContent = compressionEstimateText(preset);
   }
 
   function setCompressMode(mode) {
@@ -3747,6 +3800,7 @@
       : t('proof.awaiting');
     syncAdvancedOptions();
     syncRasterControls();
+    syncCompressControls();
     syncSignatureControls();
     updateSignatureOverlay();
     updatePreviewMode();
@@ -6934,15 +6988,32 @@
   function setRasterScope(tool, scope) {
     if (operationInProgress || (scope === 'page' && !state.pdfDoc)) return;
     state.rasterScopes[tool] = scope;
-    if (scope === 'page') editableRasterSettings(tool);
     syncRasterControls();
     if (state.pdfDoc && activeTool === tool) requestPreviewRender(false);
+  }
+
+  function copyCurrentRasterSettingsToAll(tool) {
+    if (operationInProgress || !state.pdfDoc) return;
+    const sourceIndex = currentSourceIndex();
+    const settings = effectiveRasterSettings(tool, sourceIndex);
+    Object.assign(state, settings);
+    Object.keys(state.rasterPageSettings).forEach(key => {
+      delete state.rasterPageSettings[key][tool];
+      if (!state.rasterPageSettings[key].threshold && !state.rasterPageSettings[key].greyscale) {
+        delete state.rasterPageSettings[key];
+      }
+    });
+    state.rasterScopes[tool] = 'all';
+    syncRasterControls();
+    if (activeTool === tool) requestPreviewRender(false);
   }
 
   thresholdScopeAll.addEventListener('click', () => setRasterScope('threshold', 'all'));
   thresholdScopePage.addEventListener('click', () => setRasterScope('threshold', 'page'));
   greyscaleScopeAll.addEventListener('click', () => setRasterScope('greyscale', 'all'));
   greyscaleScopePage.addEventListener('click', () => setRasterScope('greyscale', 'page'));
+  thresholdCopyToAll.addEventListener('click', () => copyCurrentRasterSettingsToAll('threshold'));
+  greyscaleCopyToAll.addEventListener('click', () => copyCurrentRasterSettingsToAll('greyscale'));
 
   function setThresholdValue(value, render = true) {
     if (operationInProgress && render) return;
@@ -6953,6 +7024,7 @@
     threshPct.textContent = Math.round((v / 255) * 100) + '%';
     threshHint.textContent = threshHintText(v);
     threshNeedle.style.left = ((v / 255) * 100) + '%';
+    syncRasterScopeUI();
     if (render && state.pdfDoc) requestPreviewRender(false);
   }
 
@@ -6963,6 +7035,7 @@
     const settings = editableRasterSettings('threshold');
     settings.invert = !settings.invert;
     setTogglePressed(invertToggle, settings.invert);
+    syncRasterScopeUI();
     if (state.pdfDoc) requestPreviewRender(false);
   });
 
@@ -6976,6 +7049,7 @@
     brightNum.textContent = v > 0 ? '+' + v : String(v);
     brightTag.textContent = brightnessHintText(v);
     $('greyHint').textContent = greyHintText(settings);
+    syncRasterScopeUI();
     if (render && state.pdfDoc) requestPreviewRender(false);
   }
 
@@ -6988,6 +7062,7 @@
     contrastNum.textContent = v;
     contrastTag.textContent = contrastHintText(v);
     $('greyHint').textContent = greyHintText(settings);
+    syncRasterScopeUI();
     if (render && state.pdfDoc) requestPreviewRender(false);
   }
 
@@ -7001,6 +7076,7 @@
     settings.greyInvert = !settings.greyInvert;
     setTogglePressed(greyInvertToggle, settings.greyInvert);
     $('greyHint').textContent = greyHintText(settings);
+    syncRasterScopeUI();
     if (state.pdfDoc) requestPreviewRender(false);
   });
   sepiaToggle.addEventListener('click', () => {
@@ -7009,6 +7085,7 @@
     settings.sepia = !settings.sepia;
     setTogglePressed(sepiaToggle, settings.sepia);
     $('greyHint').textContent = greyHintText(settings);
+    syncRasterScopeUI();
     if (state.pdfDoc) requestPreviewRender(false);
   });
 

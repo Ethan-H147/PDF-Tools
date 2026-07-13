@@ -26,7 +26,7 @@ Ethan Hu -->
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=12b1bbc">
+<link rel="stylesheet" href="styles.css?v=91bd6e4">
 </head>
 <body>
 <div class="frame">
@@ -205,6 +205,7 @@ Ethan Hu -->
         <div style="margin-top:26px">
           <div class="section-label"><span data-i18n="sections.compress">II. Compress PDF</span><span id="compressHint">original</span></div>
           <div class="organize-summary" id="compressSummary">Compact the PDF while keeping original page content.</div>
+          <div class="compress-estimate" id="compressEstimate" aria-live="polite">Choose a PDF to see an estimated output size.</div>
           <div class="toggles compress-options">
             <div class="toggle on" id="compressOriginal" role="button" tabindex="0" aria-pressed="true" data-i18n="compress.original">Original</div>
             <div class="toggle" id="compressBalanced" role="button" tabindex="0" aria-pressed="false" data-i18n="compress.balanced">Balanced</div>
@@ -226,6 +227,7 @@ Ethan Hu -->
               <button type="button" class="page-processing-segment on" id="thresholdScopeAll" aria-pressed="true">All pages</button>
               <button type="button" class="page-processing-segment" id="thresholdScopePage" aria-pressed="false">This page</button>
             </div>
+            <button type="button" class="copy-page-settings" id="thresholdCopyToAll" hidden>Use this for all pages</button>
           </div>
           <div class="big-display">
             <span class="num" id="threshNum">128</span>
@@ -263,6 +265,7 @@ Ethan Hu -->
               <button type="button" class="page-processing-segment on" id="greyscaleScopeAll" aria-pressed="true">All pages</button>
               <button type="button" class="page-processing-segment" id="greyscaleScopePage" aria-pressed="false">This page</button>
             </div>
+            <button type="button" class="copy-page-settings" id="greyscaleCopyToAll" hidden>Use this for all pages</button>
           </div>
 
           <div class="grey-row">
@@ -300,7 +303,7 @@ Ethan Hu -->
       <div class="section-label" style="margin-top:26px"><span data-i18n="sections.pages">III. Pages</span><span>—</span></div>
       <div class="pagenav">
         <button id="prevPage" disabled>‹</button>
-        <div class="num"><span data-i18n="file.pagePrefix">Page </span><b id="curPage">—</b> / <b id="totPage">—</b><span data-i18n="file.pageSuffix"></span></div>
+        <div class="num"><span data-i18n="file.pagePrefix">Page </span><b id="curPage">—</b> / <b id="totPage">—</b><span data-i18n="file.pageSuffix"></span><span class="page-custom-badge" id="pageCustomBadge" hidden>Custom</span></div>
         <button id="nextPage" disabled>›</button>
       </div>
 
@@ -364,8 +367,9 @@ Ethan Hu -->
       </div>
       <div class="preview-stage" id="previewStage">
         <div class="empty" id="emptyState">
-          <div class="big" data-i18n="empty.noPreview">No preview yet</div>
-          <div class="small" data-i18n="empty.uploadToBegin">Upload a PDF to begin</div>
+          <div class="empty-document" aria-hidden="true"><span></span></div>
+          <div class="big" data-i18n="empty.noPreview">Your preview will appear here</div>
+          <div class="small" data-i18n="empty.uploadToBegin">Choose a PDF to start</div>
         </div>
         <div class="preview-canvas-wrap" id="canvasWrap" style="display:none">
           <canvas id="previewCanvas"></canvas>
@@ -432,8 +436,11 @@ Ethan Hu -->
   </main>
 
   <footer>
-    <span data-i18n="footer.type">Set in SF Pro / Inter</span>
-    <em data-i18n="footer.clientSide">Client-side PDF processing</em>
+    <div class="footer-brand">
+      <span data-i18n="footer.type">Set in SF Pro / Inter</span>
+      <em data-i18n="footer.clientSide">No account required</em>
+      <span class="footer-local" data-i18n="footer.local">Runs entirely in your browser</span>
+    </div>
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="Turn on dark mode" aria-pressed="false">
       <span id="themeToggleText">Dark mode</span>
       <span class="theme-toggle-track" aria-hidden="true"><span class="theme-toggle-thumb"></span></span>
@@ -447,7 +454,10 @@ Ethan Hu -->
       <button type="button" data-lang="es" aria-pressed="false">Español</button>
       <button type="button" data-lang="fr" aria-pressed="false">Français</button>
     </div>
-    <span data-i18n="footer.local">Runs entirely in your browser</span>
+    <div class="footer-support">
+      <a class="footer-link" href="https://github.com/Ethan-H147/PDF-Tools/issues" target="_blank" rel="noopener noreferrer">Feedback</a>
+      <a class="footer-link" href="https://buymeacoffee.com/EthanHu147" target="_blank" rel="noopener noreferrer">Leave a tip</a>
+    </div>
   </footer>
 
 </div>
@@ -456,6 +466,6 @@ Ethan Hu -->
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.js?v=12b1bbc"></script>
+<script src="app.js?v=91bd6e4"></script>
 </body>
 </html>
