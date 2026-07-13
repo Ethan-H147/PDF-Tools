@@ -160,6 +160,8 @@
     threshold: 128, invert: false,
     // greyscale
     brightness: 0, contrast: 100, greyInvert: false, sepia: false,
+    rasterScopes: { threshold: 'all', greyscale: 'all' },
+    rasterPageSettings: {},
     // output
     resolution: '600',
     // cache
@@ -250,6 +252,9 @@
   const threshNeedle  = $('threshNeedle');
   const histoCanvas   = $('histoCanvas');
   const invertToggle  = $('invertToggle');
+  const thresholdScopeAll = $('thresholdScopeAll');
+  const thresholdScopePage = $('thresholdScopePage');
+  const thresholdScopeStatus = $('thresholdScopeStatus');
   const brightSlider  = $('brightSlider');
   const brightnessResetBtn = $('brightnessResetBtn');
   const brightNum     = $('brightNum');
@@ -260,6 +265,9 @@
   const contrastTag   = $('contrastTag');
   const greyInvertToggle = $('greyInvertToggle');
   const sepiaToggle   = $('sepiaToggle');
+  const greyscaleScopeAll = $('greyscaleScopeAll');
+  const greyscaleScopePage = $('greyscaleScopePage');
+  const greyscaleScopeStatus = $('greyscaleScopeStatus');
   const prevBtn       = $('prevPage');
   const nextBtn       = $('nextPage');
   const curPageEl     = $('curPage');
@@ -474,11 +482,75 @@
     return v < -50 ? t('hint.dark') : v < -10 ? t('hint.reduced') : v <= 10 ? t('hint.neutral') : v <= 50 ? t('hint.bright') : t('hint.maximum');
   }
 
+  function baseRasterSettings(tool, settings = state) {
+    return tool === 'threshold'
+      ? { threshold: settings.threshold, invert: settings.invert }
+      : {
+          brightness: settings.brightness,
+          contrast: settings.contrast,
+          greyInvert: settings.greyInvert,
+          sepia: settings.sepia,
+        };
+  }
+
+  function effectiveRasterSettings(tool, sourceIndex, settings = state) {
+    const base = baseRasterSettings(tool, settings);
+    if (settings.rasterScopes?.[tool] !== 'page' || sourceIndex == null) return base;
+    const pageSettings = settings.rasterPageSettings?.[sourceIndex]?.[tool];
+    return pageSettings ? { ...base, ...pageSettings } : base;
+  }
+
+  function editableRasterSettings(tool) {
+    if (state.rasterScopes[tool] !== 'page') return state;
+    const sourceIndex = currentSourceIndex();
+    if (sourceIndex == null) return state;
+    const pageSettings = state.rasterPageSettings[sourceIndex] ||= {};
+    pageSettings[tool] ||= baseRasterSettings(tool);
+    return pageSettings[tool];
+  }
+
+  function syncRasterScopeUI() {
+    const count = activePageCount();
+    const hasPage = !!state.pdfDoc && count > 0;
+    [
+      ['threshold', thresholdScopeAll, thresholdScopePage, thresholdScopeStatus],
+      ['greyscale', greyscaleScopeAll, greyscaleScopePage, greyscaleScopeStatus],
+    ].forEach(([tool, allButton, pageButton, status]) => {
+      const perPage = state.rasterScopes[tool] === 'page';
+      setTogglePressed(allButton, !perPage);
+      setTogglePressed(pageButton, perPage);
+      pageButton.disabled = !hasPage;
+      status.textContent = perPage && hasPage
+        ? 'Page ' + state.curPage + ' of ' + count
+        : 'Every page';
+    });
+  }
+
+  function syncRasterControls() {
+    const sourceIndex = currentSourceIndex();
+    const thresholdSettings = effectiveRasterSettings('threshold', sourceIndex);
+    const greyscaleSettings = effectiveRasterSettings('greyscale', sourceIndex);
+    const thresholdValue = thresholdSettings.threshold;
+    threshSlider.value = String(thresholdValue);
+    threshNum.textContent = thresholdValue;
+    threshPct.textContent = Math.round((thresholdValue / 255) * 100) + '%';
+    threshHint.textContent = threshHintText(thresholdValue);
+    threshNeedle.style.left = ((thresholdValue / 255) * 100) + '%';
+    setTogglePressed(invertToggle, thresholdSettings.invert);
+    brightSlider.value = String(greyscaleSettings.brightness);
+    brightNum.textContent = greyscaleSettings.brightness > 0 ? '+' + greyscaleSettings.brightness : String(greyscaleSettings.brightness);
+    brightTag.textContent = brightnessHintText(greyscaleSettings.brightness);
+    contrastSlider.value = String(greyscaleSettings.contrast);
+    contrastNum.textContent = greyscaleSettings.contrast;
+    contrastTag.textContent = contrastHintText(greyscaleSettings.contrast);
+    setTogglePressed(greyInvertToggle, greyscaleSettings.greyInvert);
+    setTogglePressed(sepiaToggle, greyscaleSettings.sepia);
+    $('greyHint').textContent = greyHintText(greyscaleSettings);
+    syncRasterScopeUI();
+  }
+
   function syncToneLabels() {
-    threshHint.textContent = threshHintText(state.threshold);
-    brightTag.textContent = brightnessHintText();
-    contrastTag.textContent = contrastHintText(state.contrast);
-    $('greyHint').textContent = greyHintText();
+    syncRasterControls();
     if (!state.pdfDoc) fileStatusEl.textContent = t('status.ready');
   }
 
@@ -991,6 +1063,14 @@
         contrast: state.contrast,
         greyInvert: state.greyInvert,
         sepia: state.sepia,
+        rasterScopes: { ...state.rasterScopes },
+        rasterPageSettings: Object.fromEntries(Object.entries(state.rasterPageSettings).map(([sourceIndex, settings]) => [
+          sourceIndex,
+          {
+            threshold: settings.threshold ? { ...settings.threshold } : null,
+            greyscale: settings.greyscale ? { ...settings.greyscale } : null,
+          },
+        ])),
         resolution: state.resolution,
         compressMode: state.compressMode,
         fineRotationDpi: fineRotationExportDpi(),
@@ -3666,6 +3746,7 @@
       ? (count ? t('proof.outputPages', { count }) : t('proof.noPages'))
       : t('proof.awaiting');
     syncAdvancedOptions();
+    syncRasterControls();
     syncSignatureControls();
     updateSignatureOverlay();
     updatePreviewMode();
@@ -3706,12 +3787,12 @@
     return t('hint.maximum');
   }
 
-  function greyHintText() {
-    if (state.sepia) return t('hint.sepia');
-    if (state.greyInvert) return t('hint.inverted');
-    if (state.brightness > 40) return t('hint.bright');
-    if (state.brightness < -40) return t('hint.dark');
-    if (state.contrast > 140) return t('hint.highContrast');
+  function greyHintText(settings = state) {
+    if (settings.sepia) return t('hint.sepia');
+    if (settings.greyInvert) return t('hint.inverted');
+    if (settings.brightness > 40) return t('hint.bright');
+    if (settings.brightness < -40) return t('hint.dark');
+    if (settings.contrast > 140) return t('hint.highContrast');
     return t('hint.neutral');
   }
 
@@ -3770,6 +3851,7 @@
     state.splitPoints = [];
     state.splitNames = [];
     state.pageEdits = [];
+    state.rasterPageSettings = {};
     state.fileName = '';
     state.fileSize = 0;
     state.pdfBytes = null;
@@ -4037,6 +4119,7 @@
     state.splitPoints = [];
     state.splitNames = [];
     state.pageEdits = [];
+    state.rasterPageSettings = {};
     state.largePdfSafeMode = false;
     state.fullPageCacheOrder = [];
     previewCanvas.width = 0;
@@ -4188,7 +4271,7 @@
   }
 
   function isOriginalPreviewTool(id = activeTool) {
-    return id === 'preview' || id === 'merge' || id === 'compress' || id === 'sign';
+    return id === 'preview' || id === 'merge' || id === 'sign' || (id === 'compress' && state.compressMode === 'original');
   }
 
   function getOriginalPreviewScale(baseVp, targetCssWidth) {
@@ -5152,6 +5235,10 @@
       return;
     }
     const token = ++processedPreviewRenderToken;
+    if (activeTool === 'compress' && state.compressMode !== 'original') {
+      await drawCompressedPreview(sourceIndex, token);
+      return;
+    }
     if (isOriginalPreviewTool() && sourceIndex != null) {
       const pd = await ensurePageMeta(sourceIndex);
       if (!pd || token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || !isOriginalPreviewTool()) return;
@@ -5163,9 +5250,62 @@
       ? await ensureRasterPreviewData(sourceIndex)
       : await ensurePageData(sourceIndex);
     if (!pd || token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool === 'organize' || activeTool === 'edit') return;
-    if (processTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas);
-    else applyGreyscaleToCanvas(pd, previewCanvas);
+    const previewSettings = effectiveRasterSettings(processTool, sourceIndex);
+    if (processTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas, previewSettings);
+    else applyGreyscaleToCanvas(pd, previewCanvas, previewSettings);
     proofMeta.textContent = t('proof.pagePixels', { w: pd.w, h: pd.h, page: state.curPage, count: activePageCount() });
+    applyZoom();
+  }
+
+  async function decodeCompressedPreview(blob) {
+    if (typeof createImageBitmap === 'function') return createImageBitmap(blob);
+    const url = URL.createObjectURL(blob);
+    try {
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = url;
+      await image.decode();
+      return image;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function drawCompressedPreview(sourceIndex, token) {
+    const mode = state.compressMode;
+    const preset = COMPRESSION_PRESETS[mode];
+    if (!preset?.rasterize) return;
+    const tmp = document.createElement('canvas');
+    const pixelBudget = MOBILE_PERFORMANCE_MODE
+      ? getMobileExportPagePixelBudget(activePageCount())
+      : undefined;
+    const size = await renderCompressedPageToCanvas(sourceIndex, preset, tmp, pixelBudget);
+    if (!size || token !== processedPreviewRenderToken || activeTool !== 'compress' || state.compressMode !== mode || sourceIndex !== currentSourceIndex()) {
+      tmp.width = 0;
+      tmp.height = 0;
+      return;
+    }
+    const width = tmp.width;
+    const height = tmp.height;
+    const blob = await new Promise(resolve => tmp.toBlob(resolve, 'image/jpeg', preset.jpegQuality));
+    if (!blob) throw new Error('Could not encode the compressed preview.');
+    const image = await decodeCompressedPreview(blob);
+    if (token !== processedPreviewRenderToken || activeTool !== 'compress' || state.compressMode !== mode || sourceIndex !== currentSourceIndex()) {
+      image.close?.();
+      tmp.width = 0;
+      tmp.height = 0;
+      return;
+    }
+    previewCanvas.width = width;
+    previewCanvas.height = height;
+    const ctx = previewCanvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+    image.close?.();
+    tmp.width = 0;
+    tmp.height = 0;
+    proofMeta.textContent = t('proof.pagePixels', { w: width, h: height, page: state.curPage, count: activePageCount() });
     applyZoom();
   }
 
@@ -6653,23 +6793,28 @@
     const mobileGreyscaleQuality = getMobileGreyscaleJpegQuality(count);
     for (let i = 0; i < count; i++) {
       setLoader(true, t('progress.exportingPage', { page: i + 1, count }), currentPageProgress(i, count));
+      const sourceIndex = context.pageOrder[i];
+      const pageSettings = {
+        ...context.settings,
+        ...effectiveRasterSettings(context.settings.processTool, sourceIndex, context.settings),
+      };
       let wPt;
       let hPt;
       if (MOBILE_PERFORMANCE_MODE) {
         const size = await renderMobileProcessedPageToCanvas(
-          context.pageOrder[i],
+          sourceIndex,
           tmp,
-          context.settings,
+          pageSettings,
           mobilePixelBudget,
         );
         if (!size) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
         wPt = size.wPt;
         hPt = size.hPt;
       } else {
-        const pd = await ensurePageData(context.pageOrder[i]);
+        const pd = await ensurePageData(sourceIndex);
         if (!pd) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
-        if (context.settings.processTool === 'threshold') applyThresholdToCanvas(pd, tmp, context.settings);
-        else applyGreyscaleToCanvas(pd, tmp, context.settings);
+        if (context.settings.processTool === 'threshold') applyThresholdToCanvas(pd, tmp, pageSettings);
+        else applyGreyscaleToCanvas(pd, tmp, pageSettings);
         wPt = pd.w / pd.scale;
         hPt = pd.h / pd.scale;
       }
@@ -6786,10 +6931,23 @@
   }
 
   // ── Threshold controls ──
+  function setRasterScope(tool, scope) {
+    if (operationInProgress || (scope === 'page' && !state.pdfDoc)) return;
+    state.rasterScopes[tool] = scope;
+    if (scope === 'page') editableRasterSettings(tool);
+    syncRasterControls();
+    if (state.pdfDoc && activeTool === tool) requestPreviewRender(false);
+  }
+
+  thresholdScopeAll.addEventListener('click', () => setRasterScope('threshold', 'all'));
+  thresholdScopePage.addEventListener('click', () => setRasterScope('threshold', 'page'));
+  greyscaleScopeAll.addEventListener('click', () => setRasterScope('greyscale', 'all'));
+  greyscaleScopePage.addEventListener('click', () => setRasterScope('greyscale', 'page'));
+
   function setThresholdValue(value, render = true) {
     if (operationInProgress && render) return;
     const v = Math.max(0, Math.min(255, Math.round(+value || 0)));
-    state.threshold = v;
+    editableRasterSettings('threshold').threshold = v;
     threshSlider.value = String(v);
     threshNum.textContent = v;
     threshPct.textContent = Math.round((v / 255) * 100) + '%';
@@ -6802,8 +6960,9 @@
   thresholdResetBtn.addEventListener('click', () => setThresholdValue(128));
   invertToggle.addEventListener('click', () => {
     if (operationInProgress) return;
-    state.invert = !state.invert;
-    setTogglePressed(invertToggle, state.invert);
+    const settings = editableRasterSettings('threshold');
+    settings.invert = !settings.invert;
+    setTogglePressed(invertToggle, settings.invert);
     if (state.pdfDoc) requestPreviewRender(false);
   });
 
@@ -6811,22 +6970,24 @@
   function setBrightnessValue(value, render = true) {
     if (operationInProgress && render) return;
     const v = Math.max(-100, Math.min(100, Math.round(+value || 0)));
-    state.brightness = v;
+    const settings = editableRasterSettings('greyscale');
+    settings.brightness = v;
     brightSlider.value = String(v);
     brightNum.textContent = v > 0 ? '+' + v : String(v);
     brightTag.textContent = brightnessHintText(v);
-    $('greyHint').textContent = greyHintText();
+    $('greyHint').textContent = greyHintText(settings);
     if (render && state.pdfDoc) requestPreviewRender(false);
   }
 
   function setContrastValue(value, render = true) {
     if (operationInProgress && render) return;
     const v = Math.max(50, Math.min(200, Math.round(+value || 0)));
-    state.contrast = v;
+    const settings = editableRasterSettings('greyscale');
+    settings.contrast = v;
     contrastSlider.value = String(v);
     contrastNum.textContent = v;
     contrastTag.textContent = contrastHintText(v);
-    $('greyHint').textContent = greyHintText();
+    $('greyHint').textContent = greyHintText(settings);
     if (render && state.pdfDoc) requestPreviewRender(false);
   }
 
@@ -6836,16 +6997,18 @@
   contrastResetBtn.addEventListener('click', () => setContrastValue(100));
   greyInvertToggle.addEventListener('click', () => {
     if (operationInProgress) return;
-    state.greyInvert = !state.greyInvert;
-    setTogglePressed(greyInvertToggle, state.greyInvert);
-    $('greyHint').textContent = greyHintText();
+    const settings = editableRasterSettings('greyscale');
+    settings.greyInvert = !settings.greyInvert;
+    setTogglePressed(greyInvertToggle, settings.greyInvert);
+    $('greyHint').textContent = greyHintText(settings);
     if (state.pdfDoc) requestPreviewRender(false);
   });
   sepiaToggle.addEventListener('click', () => {
     if (operationInProgress) return;
-    state.sepia = !state.sepia;
-    setTogglePressed(sepiaToggle, state.sepia);
-    $('greyHint').textContent = greyHintText();
+    const settings = editableRasterSettings('greyscale');
+    settings.sepia = !settings.sepia;
+    setTogglePressed(sepiaToggle, settings.sepia);
+    $('greyHint').textContent = greyHintText(settings);
     if (state.pdfDoc) requestPreviewRender(false);
   });
 

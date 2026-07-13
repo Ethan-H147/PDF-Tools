@@ -309,6 +309,70 @@
   /* greyscale slider rows */
   .grey-row { margin-bottom: 22px; }
 
+  .page-processing-scope {
+    align-items: center;
+    background: color-mix(in srgb, var(--paper-2) 72%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+    margin: 12px 0 20px;
+    padding: 10px 10px 10px 13px;
+  }
+  .page-processing-scope-copy { display: grid; gap: 2px; min-width: 0; }
+  .page-processing-kicker {
+    color: var(--ink-mute);
+    font-family: var(--font-ui);
+    font-size: 8px;
+    font-weight: 650;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .page-processing-scope-copy strong {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .page-processing-segments {
+    background: rgba(118, 118, 128, .12);
+    border-radius: 9px;
+    display: grid;
+    flex: 0 0 auto;
+    gap: 2px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 3px;
+  }
+  .page-processing-segment {
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+    color: var(--ink-mute);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 7px 9px;
+    white-space: nowrap;
+  }
+  .page-processing-segment:hover { color: var(--ink); }
+  .page-processing-segment.on {
+    background: var(--paper);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .06);
+    color: var(--ink);
+  }
+  body.dark-mode .page-processing-scope { background: rgba(255, 255, 255, .045); border-color: transparent; }
+  body.dark-mode .page-processing-segments { background: rgba(118, 118, 128, .24); }
+  body.dark-mode .page-processing-segment.on { background: #636366; color: #fff; }
+  @media (max-width: 430px) {
+    .page-processing-scope { align-items: stretch; flex-direction: column; }
+    .page-processing-segments { width: 100%; }
+  }
+
   /* ── RESOLUTION CHECKBOX ── */
   .res-label {
     display: flex;
@@ -493,7 +557,7 @@
 
   .signature-stamp {
     border: 1px dashed rgba(0, 113, 227, 0.62);
-    border-radius: 6px;
+    border-radius: 0;
     box-sizing: border-box;
     cursor: grab;
     min-height: 18px;
@@ -539,29 +603,29 @@
   .signature-resize-handle[data-signature-handle="nw"] {
     border-width: 3px 0 0 3px;
     cursor: nwse-resize;
-    left: -4px;
-    top: -4px;
+    left: -2px;
+    top: -2px;
   }
 
   .signature-resize-handle[data-signature-handle="ne"] {
     border-width: 3px 3px 0 0;
     cursor: nesw-resize;
-    right: -4px;
-    top: -4px;
+    right: -2px;
+    top: -2px;
   }
 
   .signature-resize-handle[data-signature-handle="se"] {
     border-width: 0 3px 3px 0;
-    bottom: -4px;
+    bottom: -2px;
     cursor: nwse-resize;
-    right: -4px;
+    right: -2px;
   }
 
   .signature-resize-handle[data-signature-handle="sw"] {
     border-width: 0 0 3px 3px;
-    bottom: -4px;
+    bottom: -2px;
     cursor: nesw-resize;
-    left: -4px;
+    left: -2px;
   }
 
   /* ── ZOOM BAR ── */
@@ -2926,9 +2990,7 @@
 
   /* ── APPLE-STYLE CONTROL REFINEMENT (local checkpoint: 54ef1a7) ── */
 
-  /* The broader glass treatment was intentionally removed; these controls remain. */
-  /*
-  Quieter segmented tool navigation and layered panel materials were tested here.
+  /* Softer segmented tool navigation for light mode. */
   .tool-nav {
     background: rgba(255, 255, 255, 0.58);
     border-color: rgba(0, 0, 0, 0.065);
@@ -2955,11 +3017,12 @@
     box-shadow: inset 0 0 0 2px rgba(10, 132, 255, 0.62);
   }
 
+  /* Dark mode uses a quiet glass edge instead of the light-mode highlight. */
   body.dark-mode .tool-nav {
     background: rgba(44, 44, 46, 0.74);
-    border-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.025);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.075),
+      inset 0 1px 0 rgba(255, 255, 255, 0.035),
       0 8px 28px rgba(0, 0, 0, 0.16);
   }
 
@@ -2973,8 +3036,6 @@
   body.dark-mode .tool-tab.active {
     color: #fff;
   }
-
-  */
 
   /* Keep the softer, borderless layered materials in the left panel. */
   .panel-left .filecard,

@@ -21,6 +21,7 @@ Ethan Hu -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PDF Atelier</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -216,6 +217,16 @@ Ethan Hu -->
       <div class="tool-panel" id="tool-threshold" role="tabpanel" aria-labelledby="tab-threshold" aria-hidden="true">
         <div style="margin-top:26px">
           <div class="section-label"><span data-i18n="sections.threshold">II. Threshold</span><span id="threshHint">mid range</span></div>
+          <div class="page-processing-scope" aria-label="Threshold settings scope">
+            <div class="page-processing-scope-copy">
+              <span class="page-processing-kicker">Apply settings to</span>
+              <strong id="thresholdScopeStatus">Every page</strong>
+            </div>
+            <div class="page-processing-segments" role="group" aria-label="Threshold settings scope">
+              <button type="button" class="page-processing-segment on" id="thresholdScopeAll" aria-pressed="true">All pages</button>
+              <button type="button" class="page-processing-segment" id="thresholdScopePage" aria-pressed="false">This page</button>
+            </div>
+          </div>
           <div class="big-display">
             <span class="num" id="threshNum">128</span>
             <span class="denom">/255</span>
@@ -243,6 +254,16 @@ Ethan Hu -->
       <div class="tool-panel" id="tool-greyscale" role="tabpanel" aria-labelledby="tab-greyscale" aria-hidden="true">
         <div style="margin-top:26px">
           <div class="section-label"><span data-i18n="sections.greyscale">II. Grayscale</span><span id="greyHint">neutral</span></div>
+          <div class="page-processing-scope" aria-label="Grayscale settings scope">
+            <div class="page-processing-scope-copy">
+              <span class="page-processing-kicker">Apply settings to</span>
+              <strong id="greyscaleScopeStatus">Every page</strong>
+            </div>
+            <div class="page-processing-segments" role="group" aria-label="Grayscale settings scope">
+              <button type="button" class="page-processing-segment on" id="greyscaleScopeAll" aria-pressed="true">All pages</button>
+              <button type="button" class="page-processing-segment" id="greyscaleScopePage" aria-pressed="false">This page</button>
+            </div>
+          </div>
 
           <div class="grey-row">
             <div class="big-display">
