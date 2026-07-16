@@ -183,6 +183,8 @@
   let thumbnailObserver = null;
   let mobileThumbnailCacheOrder = [];
   let operationInProgress = false;
+  let mobileEditFocused = false;
+  let mobileEditOverviewScrollTop = 0;
   let pdfLoadGeneration = 0;
   let activePdfLoadingTask = null;
   let pendingPdfDestroy = Promise.resolve();
@@ -324,6 +326,12 @@
   const pageEditorCanvasWrap = $('pageEditorCanvasWrap');
   const pageEditorCanvas = $('pageEditorCanvas');
   const pageEditorBottom = $('pageEditorBottom');
+  const mobileEditCloseBtn = $('mobileEditCloseBtn');
+  const mobileEditResetBtn = $('mobileEditResetBtn');
+  const mobileEditPageLabel = $('mobileEditPageLabel');
+  const mobileEditCropLabel = $('mobileEditCropLabel');
+  const mobileEditQualityBtn = $('mobileEditQualityBtn');
+  const mobileEditQualityLabel = $('mobileEditQualityLabel');
   const editHint      = $('editHint');
   const editSummary   = $('editSummary');
   const editRotateSlider = $('editRotateSlider');
@@ -706,11 +714,55 @@
 
   function syncBottomDockState() {
     document.body.classList.toggle('preview-only-mode', activeTool === 'preview');
+    syncMobileEditMode();
     syncMobileDockLayout();
   }
 
   function isPhoneViewport() {
     return window.matchMedia('(max-width: 700px)').matches;
+  }
+
+  function isMobileEditLayout() {
+    return isPhoneViewport() && activeTool === 'edit';
+  }
+
+  function syncMobileEditMode() {
+    const mobileEditor = isMobileEditLayout();
+    if (!mobileEditor || !state.pdfDoc) mobileEditFocused = false;
+    const focused = mobileEditor && mobileEditFocused;
+    document.documentElement.classList.toggle('mobile-edit-focused', focused);
+    document.body.classList.toggle('mobile-edit-tool', mobileEditor);
+    document.body.classList.toggle('mobile-edit-focused', focused);
+    pageEditor?.classList.toggle('mobile-overview', mobileEditor && !focused);
+    pageEditor?.classList.toggle('mobile-focused', focused);
+  }
+
+  function openMobilePageEditor(outputIndex) {
+    if (!isMobileEditLayout() || !state.pdfDoc || operationInProgress) return;
+    mobileEditOverviewScrollTop = pageEditorStrip.scrollTop;
+    mobileEditFocused = true;
+    state.curPage = Math.max(1, Math.min(activePageCount(), outputIndex + 1));
+    syncMobileEditMode();
+    updatePageState();
+    syncEditControls();
+    requestEditedPreviewRender();
+    requestAnimationFrame(() => mobileEditCloseBtn?.focus({ preventScroll: true }));
+  }
+
+  function closeMobilePageEditor({ restoreFocus = true } = {}) {
+    if (!mobileEditFocused) return;
+    mobileEditFocused = false;
+    syncMobileEditMode();
+    renderPageEditor();
+    syncEditControls();
+    cropOverlay.hidden = true;
+    requestAnimationFrame(() => {
+      pageEditorStrip.scrollTop = mobileEditOverviewScrollTop;
+      if (!restoreFocus) return;
+      const selected = pageEditorStrip.querySelector('[data-output-index="' + (state.curPage - 1) + '"]');
+      selected?.focus({ preventScroll: true });
+    });
+    syncMobileDockMetrics();
   }
 
   function syncMobileDockLayout() {
@@ -821,6 +873,7 @@
   function updatePreviewMode() {
     const organizing = activeTool === 'organize';
     const editing = activeTool === 'edit';
+    syncMobileEditMode();
     if (MOBILE_PERFORMANCE_MODE) {
       if (organizing || editing) {
         previewCanvas.width = 0;
@@ -1234,6 +1287,9 @@
       'edit.pageHint': 'page {page}',
       'edit.summaryEmpty': 'Upload a PDF, then choose a page from the editor to crop or rotate it.',
       'edit.summaryActive': 'Editing page {page} of {count}. Changes apply only to this page.',
+      'edit.mobileHold': 'Press and hold a page to crop or rotate it.',
+      'edit.mobileCloseAria': 'Back to all pages',
+      'edit.mobilePage': 'Page {page} of {count}',
       'edit.fullPage': 'Full page',
       'edit.cropKept': '{w}% × {h}% kept',
       'edit.cropTotal': '{total}% total',
@@ -1451,6 +1507,9 @@
       'edit.pageHint': '第 {page} 页',
       'edit.summaryEmpty': '上传 PDF 后，选择要裁剪或旋转的页面。',
       'edit.summaryActive': '正在编辑第 {page}/{count} 页。改动只会应用到这一页。',
+      'edit.mobileHold': '长按页面即可裁剪或旋转。',
+      'edit.mobileCloseAria': '返回所有页面',
+      'edit.mobilePage': '第 {page} 页，共 {count} 页',
       'edit.fullPage': '完整页面',
       'edit.cropKept': '保留 {w}% × {h}%',
       'edit.cropTotal': '共 {total}%',
@@ -1661,6 +1720,9 @@
       'edit.pageHint': '第 {page} 頁',
       'edit.summaryEmpty': '上傳 PDF 後，選擇要裁切或旋轉的頁面。',
       'edit.summaryActive': '正在編輯第 {page}/{count} 頁。變更只會套用到這一頁。',
+      'edit.mobileHold': '長按頁面即可裁切或旋轉。',
+      'edit.mobileCloseAria': '返回所有頁面',
+      'edit.mobilePage': '第 {page} 頁，共 {count} 頁',
       'edit.fullPage': '完整頁面',
       'edit.cropKept': '保留 {w}% × {h}%',
       'edit.cropTotal': '共 {total}%',
@@ -1880,6 +1942,9 @@
       'edit.pageHint': '{page}페이지',
       'edit.summaryEmpty': 'PDF를 올린 뒤 자르거나 회전할 페이지를 선택하세요.',
       'edit.summaryActive': '{count}페이지 중 {page}페이지를 편집 중입니다. 변경 사항은 이 페이지에만 적용됩니다.',
+      'edit.mobileHold': '페이지를 길게 눌러 자르거나 회전하세요.',
+      'edit.mobileCloseAria': '모든 페이지로 돌아가기',
+      'edit.mobilePage': '{count}페이지 중 {page}페이지',
       'edit.fullPage': '전체 페이지',
       'edit.cropKept': '{w}% × {h}% 유지',
       'edit.cropTotal': '총 {total}%',
@@ -2099,6 +2164,9 @@
       'edit.pageHint': '{page}ページ',
       'edit.summaryEmpty': 'PDFを追加して、トリミングまたは回転するページを選択してください。',
       'edit.summaryActive': '{count}ページ中{page}ページを編集中です。変更はこのページにのみ適用されます。',
+      'edit.mobileHold': 'ページを長押しして切り抜きまたは回転します。',
+      'edit.mobileCloseAria': 'すべてのページに戻る',
+      'edit.mobilePage': '{count}ページ中{page}ページ',
       'edit.fullPage': 'ページ全体',
       'edit.cropKept': '{w}% × {h}% を保持',
       'edit.cropTotal': '合計 {total}%',
@@ -2317,6 +2385,9 @@
       'edit.pageHint': 'página {page}',
       'edit.summaryEmpty': 'Sube un PDF y elige una página en el editor para recortarla o girarla.',
       'edit.summaryActive': 'Editando página {page} de {count}. Los cambios solo afectan esta página.',
+      'edit.mobileHold': 'Mantén pulsada una página para recortarla o girarla.',
+      'edit.mobileCloseAria': 'Volver a todas las páginas',
+      'edit.mobilePage': 'Página {page} de {count}',
       'edit.fullPage': 'Página completa',
       'edit.cropKept': '{w}% × {h}% conservado',
       'edit.cropTotal': '{total}% total',
@@ -2535,6 +2606,9 @@
       'edit.pageHint': 'page {page}',
       'edit.summaryEmpty': 'Importez un PDF, puis choisissez une page à recadrer ou faire pivoter.',
       'edit.summaryActive': 'Modification de la page {page} sur {count}. Les changements ne touchent que cette page.',
+      'edit.mobileHold': 'Appuyez longuement sur une page pour la recadrer ou la pivoter.',
+      'edit.mobileCloseAria': 'Revenir à toutes les pages',
+      'edit.mobilePage': 'Page {page} sur {count}',
       'edit.fullPage': 'Page complète',
       'edit.cropKept': '{w}% × {h}% conservé',
       'edit.cropTotal': '{total}% au total',
@@ -3607,6 +3681,13 @@
     fineQualityToggle.classList.toggle('on', ultra);
     fineQualityToggle.setAttribute('aria-pressed', ultra ? 'true' : 'false');
     fineQualityLabel.textContent = ultra ? t('edit.qualityUltra') : t('edit.qualityHigh');
+    if (mobileEditQualityBtn) {
+      mobileEditQualityBtn.classList.toggle('on', ultra);
+      mobileEditQualityBtn.setAttribute('aria-pressed', ultra ? 'true' : 'false');
+    }
+    if (mobileEditQualityLabel) {
+      mobileEditQualityLabel.textContent = ultra ? t('edit.qualityUltra') : t('edit.qualityHigh');
+    }
   }
 
   function estimateCompressedOutput(preset) {
@@ -5429,6 +5510,7 @@
   let editPreviewQueued = false;
   function requestEditedPreviewRender() {
     if (operationInProgress) return;
+    if (isMobileEditLayout() && !mobileEditFocused) return;
     editPreviewQueued = true;
     if (editPreviewFrame || editPreviewInFlight) return;
     editPreviewFrame = requestAnimationFrame(async () => {
@@ -5482,6 +5564,68 @@
     return parts.join(' · ');
   }
 
+  const MOBILE_EDIT_HOLD_MS = 520;
+
+  function selectPageForEditing(outputIndex) {
+    state.curPage = outputIndex + 1;
+    updatePageState();
+    syncEditControls();
+    requestEditedPreviewRender();
+  }
+
+  function bindPageEditCard(card, outputIndex) {
+    let holdTimer = null;
+    let holdStartX = 0;
+    let holdStartY = 0;
+    let longPressed = false;
+
+    const cancelHold = () => {
+      if (holdTimer) clearTimeout(holdTimer);
+      holdTimer = null;
+      card.classList.remove('is-pressing');
+    };
+
+    card.addEventListener('pointerdown', e => {
+      if (!isMobileEditLayout() || mobileEditFocused || operationInProgress) return;
+      if (e.button != null && e.button !== 0) return;
+      cancelHold();
+      longPressed = false;
+      holdStartX = e.clientX;
+      holdStartY = e.clientY;
+      card.classList.add('is-pressing');
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        longPressed = true;
+        card.classList.remove('is-pressing');
+        openMobilePageEditor(outputIndex);
+      }, MOBILE_EDIT_HOLD_MS);
+    });
+    card.addEventListener('pointermove', e => {
+      if (!holdTimer) return;
+      if (Math.hypot(e.clientX - holdStartX, e.clientY - holdStartY) > 10) cancelHold();
+    });
+    card.addEventListener('pointerup', cancelHold);
+    card.addEventListener('pointercancel', cancelHold);
+    card.addEventListener('pointerleave', cancelHold);
+    card.addEventListener('contextmenu', e => {
+      if (isMobileEditLayout()) e.preventDefault();
+    });
+    card.addEventListener('keydown', e => {
+      if (!isMobileEditLayout() || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      openMobilePageEditor(outputIndex);
+    });
+    card.addEventListener('click', e => {
+      if (isMobileEditLayout()) {
+        e.preventDefault();
+        if (e.detail === 0 && !longPressed) openMobilePageEditor(outputIndex);
+        longPressed = false;
+        return;
+      }
+      selectPageForEditing(outputIndex);
+    });
+  }
+
   function renderPageEditor() {
     if (!pageEditorStrip || activeTool !== 'edit') return;
     if (thumbnailObserver) {
@@ -5490,10 +5634,13 @@
     }
     pageEditorStrip.innerHTML = '';
     const count = activePageCount();
-    pageEditorEmpty.classList.toggle('on', !state.pdfDoc || count === 0);
-    pageEditorCanvasWrap.style.display = state.pdfDoc && count ? 'block' : 'none';
-    pageEditorBottom.style.display = state.pdfDoc && count ? 'flex' : 'none';
-    if (!state.pdfDoc || count === 0) {
+    const hasPages = !!state.pdfDoc && count > 0;
+    const mobileOverview = isMobileEditLayout() && !mobileEditFocused;
+    pageEditor.classList.toggle('is-empty', !hasPages);
+    pageEditorEmpty.classList.toggle('on', !hasPages);
+    pageEditorCanvasWrap.style.display = hasPages && !mobileOverview ? 'block' : 'none';
+    pageEditorBottom.style.display = hasPages && !mobileOverview ? 'flex' : 'none';
+    if (!hasPages) {
       pageEditorEmpty.textContent = t('empty.edit');
       cropOverlay.hidden = true;
       return;
@@ -5502,15 +5649,19 @@
       const sourceIndex = state.pageOrder[outputIndex];
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = 'page-edit-card' + (state.curPage === outputIndex + 1 ? ' active' : '');
+      const selected = !mobileOverview && state.curPage === outputIndex + 1;
+      card.className = 'page-edit-card' + (selected ? ' active' : '');
       card.dataset.outputIndex = outputIndex;
       card.dataset.sourceIndex = sourceIndex;
+      if (mobileOverview) card.setAttribute('aria-describedby', 'mobileEditOverviewHint');
 
       const thumb = createPageThumb(sourceIndex, 'Page ' + (outputIndex + 1));
       thumb.dataset.editThumbSource = sourceIndex;
       const edit = getPageEdit(sourceIndex);
+      const edited = isPageEdited(edit);
+      card.classList.toggle('edited', edited);
       const editedThumbUrl = state.pages[sourceIndex]?.editedThumbUrl;
-      if (isPageEdited(edit) && editedThumbUrl) {
+      if (edited && editedThumbUrl) {
         if (thumb.tagName === 'IMG') thumb.src = editedThumbUrl;
         else {
           thumb.style.backgroundImage = 'url("' + editedThumbUrl + '")';
@@ -5523,7 +5674,7 @@
       actions.className = 'page-card-actions';
       const badge = document.createElement('span');
       badge.className = 'page-edit-badge';
-      badge.textContent = editedLabel(edit);
+      badge.textContent = mobileOverview && !edited ? '' : editedLabel(edit);
       const num = document.createElement('div');
       num.className = 'page-number';
       num.textContent = outputIndex + 1;
@@ -5531,12 +5682,7 @@
       actions.appendChild(num);
       card.appendChild(actions);
 
-      card.addEventListener('click', () => {
-        state.curPage = outputIndex + 1;
-        updatePageState();
-        syncEditControls();
-        requestEditedPreviewRender();
-      });
+      bindPageEditCard(card, outputIndex);
       pageEditorStrip.appendChild(card);
     }
   }
@@ -5559,26 +5705,35 @@
     cropReadout.textContent = total
       ? t('edit.cropKept', { w: roundCropValue(retainedW), h: roundCropValue(retainedH) })
       : t('edit.fullPage');
+    if (mobileEditCropLabel) mobileEditCropLabel.textContent = cropReadout.textContent;
     updateCropOverlay();
   }
 
   function syncEditControls() {
     const hasPages = !!state.pdfDoc && activePageCount() > 0;
+    const mobileOverview = isMobileEditLayout() && !mobileEditFocused;
     rotateLeftBtn.disabled = !hasPages;
     rotateRightBtn.disabled = !hasPages;
     bottomRotateLeftBtn.disabled = !hasPages;
     bottomRotateRightBtn.disabled = !hasPages;
     resetEditBtn.disabled = !hasPages || !isPageEdited(currentPageEdit());
-    editHint.textContent = hasPages ? t('edit.pageHint', { page: state.curPage }) : t('edit.selectPage');
+    mobileEditResetBtn.disabled = resetEditBtn.disabled;
+    editHint.textContent = hasPages
+      ? (mobileOverview ? t('organize.pages', { count: activePageCount() }) : t('edit.pageHint', { page: state.curPage }))
+      : t('edit.selectPage');
     editSummary.textContent = hasPages
-      ? t('edit.summaryActive', { page: state.curPage, count: activePageCount() })
+      ? (mobileOverview ? t('edit.mobileHold') : t('edit.summaryActive', { page: state.curPage, count: activePageCount() }))
       : t('edit.summaryEmpty');
     editRotateSlider.disabled = !hasPages;
     bottomRotateSlider.disabled = !hasPages;
-    cropOverlay.hidden = !hasPages;
+    cropOverlay.hidden = !hasPages || mobileOverview;
+    if (mobileEditPageLabel) {
+      mobileEditPageLabel.textContent = t('edit.mobilePage', { page: state.curPage, count: activePageCount() });
+    }
     if (!hasPages) {
       cropHint.textContent = '0%';
       cropReadout.textContent = t('edit.fullPage');
+      if (mobileEditCropLabel) mobileEditCropLabel.textContent = cropReadout.textContent;
       return;
     }
     const edit = currentPageEdit();
@@ -5623,7 +5778,9 @@
   }
 
   function canShowCropOverlay() {
-    return activeTool === 'edit' && !!state.pdfDoc && activePageCount() > 0 && !!pageEditorCanvas.width;
+    return activeTool === 'edit' &&
+      (!isMobileEditLayout() || mobileEditFocused) &&
+      !!state.pdfDoc && activePageCount() > 0 && !!pageEditorCanvas.width;
   }
 
   function updateCropOverlay() {
@@ -5690,7 +5847,9 @@
     const edit = currentPageEdit();
     edit.crop = cropFromPointer(cropDrag.handle, dxPct, dyPct);
     syncCropLabels(edit);
-    resetEditBtn.disabled = !isPageEdited(edit);
+    const resetDisabled = !isPageEdited(edit);
+    resetEditBtn.disabled = resetDisabled;
+    mobileEditResetBtn.disabled = resetDisabled;
     proofMeta.textContent = t('proof.editPage', { page: state.curPage, count: activePageCount(), edit: editedLabel(edit) });
     if (final) {
       renderPageEditor();
@@ -5834,7 +5993,8 @@
     if (sourceIndex == null || !state.pdfDoc) return;
     const tmp = document.createElement('canvas');
     const size = await renderEditedColorPreviewToCanvas(sourceIndex, currentPageEdit(), tmp, false);
-    if (!size || token !== editedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'edit') {
+    if (!size || token !== editedPreviewRenderToken || sourceIndex !== currentSourceIndex() || activeTool !== 'edit' ||
+        (isMobileEditLayout() && !mobileEditFocused)) {
       tmp.width = 0;
       tmp.height = 0;
       return;
@@ -7171,13 +7331,13 @@
   signatureDragSource.addEventListener('pointerdown', beginSignatureDragFromSource);
   signatureOverlay.addEventListener('pointerdown', beginSignatureOverlayDrag);
 
-  fineQualityToggle.addEventListener('click', () => {
+  function toggleFineRotationQuality() {
     if (operationInProgress) return;
     state.fineRotationQuality = state.fineRotationQuality === 'ultra' ? 'high' : 'ultra';
     syncFineQualityToggle();
-  });
+  }
 
-  resetEditBtn.addEventListener('click', () => {
+  function resetSelectedPageEdit() {
     if (operationInProgress) return;
     const sourceIndex = currentSourceIndex();
     if (sourceIndex == null) return;
@@ -7189,7 +7349,13 @@
     renderPageEditor();
     requestEditedPreviewRender();
     requestEditedThumbnailRender(sourceIndex);
-  });
+  }
+
+  fineQualityToggle.addEventListener('click', toggleFineRotationQuality);
+  mobileEditQualityBtn.addEventListener('click', toggleFineRotationQuality);
+  resetEditBtn.addEventListener('click', resetSelectedPageEdit);
+  mobileEditResetBtn.addEventListener('click', resetSelectedPageEdit);
+  mobileEditCloseBtn.addEventListener('click', e => closeMobilePageEditor({ restoreFocus: e.detail === 0 }));
 
   contextSplitBtn.addEventListener('click', () => {
     const outputIndex = contextMenuState.outputIndex;
@@ -7214,6 +7380,11 @@
         e.preventDefault();
         return;
       }
+    }
+    if (e.key === 'Escape' && mobileEditFocused) {
+      e.preventDefault();
+      closeMobilePageEditor();
+      return;
     }
     if (e.key === 'Escape') hidePageContextMenu();
   });
@@ -7647,6 +7818,13 @@
   window.addEventListener('resize', () => {
     const updateLayout = () => {
       mobileResizeFrame = null;
+      const wasMobileEditor = document.body.classList.contains('mobile-edit-tool');
+      syncMobileEditMode();
+      if (activeTool === 'edit' && wasMobileEditor !== isMobileEditLayout()) {
+        renderPageEditor();
+        syncEditControls();
+        if (!isMobileEditLayout()) requestEditedPreviewRender();
+      }
       syncMobileDockLayout();
       syncPreviewStageHeight();
       updateToolIndicator();

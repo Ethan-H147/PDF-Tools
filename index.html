@@ -380,8 +380,22 @@ Ethan Hu -->
           <div class="organizer-grid" id="organizerGrid"></div>
         </div>
         <div class="page-editor" id="pageEditor" style="display:none">
+          <div class="mobile-edit-overview-intro" id="mobileEditOverviewHint">
+            <span class="mobile-edit-overview-glyph" aria-hidden="true"></span>
+            <span data-i18n="edit.mobileHold">Press and hold a page to crop or rotate it.</span>
+          </div>
           <div class="page-editor-strip" id="pageEditorStrip"></div>
           <div class="page-editor-main" id="pageEditorMain">
+            <div class="mobile-edit-header">
+              <button type="button" class="mobile-edit-close" id="mobileEditCloseBtn" aria-label="Back to all pages" data-i18n-aria-label="edit.mobileCloseAria">
+                <span aria-hidden="true">×</span>
+              </button>
+              <div class="mobile-edit-heading">
+                <b id="mobileEditPageLabel">Page 1 of 1</b>
+                <span id="mobileEditCropLabel">Full page</span>
+              </div>
+              <button type="button" class="mobile-edit-reset" id="mobileEditResetBtn" data-i18n="actions.reset">Reset</button>
+            </div>
             <div class="organizer-empty" id="pageEditorEmpty">Upload a PDF to crop or rotate pages.</div>
             <div class="page-editor-canvas-wrap" id="pageEditorCanvasWrap">
               <canvas id="pageEditorCanvas"></canvas>
@@ -424,6 +438,10 @@ Ethan Hu -->
                 </svg>
               </button>
             </div>
+            <button type="button" class="mobile-edit-quality" id="mobileEditQualityBtn" aria-pressed="false">
+              <span data-i18n="edit.fineRotationQuality">Fine Rotation Quality</span>
+              <b id="mobileEditQualityLabel">High · 600 dpi</b>
+            </button>
           </div>
         </div>
         <div class="loader" id="loader" role="status" aria-live="polite" aria-atomic="true" aria-busy="false" aria-hidden="true">
