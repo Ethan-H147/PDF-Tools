@@ -223,7 +223,14 @@
     opacity: 1;
     overflow: hidden;
     transform: translateY(0);
-    transition: background .2s, border-color .2s, opacity .18s ease, transform .18s ease;
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      opacity 280ms cubic-bezier(.4, 0, .2, 1),
+      transform 300ms cubic-bezier(.4, 0, .2, 1),
+      max-height 300ms cubic-bezier(.4, 0, .2, 1),
+      padding-top 300ms cubic-bezier(.4, 0, .2, 1),
+      padding-bottom 300ms cubic-bezier(.4, 0, .2, 1);
   }
   .drop.is-collapsed {
     pointer-events: none;
@@ -2839,6 +2846,10 @@
       z-index: 1001;
     }
 
+    .pages-section-label {
+      display: none;
+    }
+
     .pagenav button {
       height: 42px;
     }
@@ -3757,6 +3768,7 @@
 
     body.mobile-preview-workspace .panel-right {
       background: #fff;
+      border-radius: calc(var(--radius-lg) - 1px);
       order: 1;
       padding: 14px 12px 12px;
     }
