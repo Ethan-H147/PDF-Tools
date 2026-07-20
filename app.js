@@ -10,6 +10,8 @@
     const shortestScreenSide = Math.min(screen.width || innerWidth, screen.height || innerHeight);
     return navigator.maxTouchPoints > 1 && shortestScreenSide <= 700 && matchMedia('(pointer: coarse)').matches;
   })();
+  const REDUCED_MOTION_MEDIA = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const prefersReducedMotion = () => REDUCED_MOTION_MEDIA.matches;
   const FINE_ROTATION_EXPORT_DPI = { high: 600, ultra: 900 };
   const LARGE_PDF_SAFE_MODE_BYTES = 35 * 1024 * 1024;
   const LARGE_PDF_SAFE_MODE_PAGES = 80;
@@ -153,6 +155,8 @@
   let activeTool = 'preview';
   let processTool = 'threshold';
   let currentLocale = 'en';
+  const MOBILE_PREVIEW_WORKSPACE_TOOLS = new Set(['preview', 'sign', 'compress', 'threshold', 'greyscale']);
+  let mobileControlsOpen = false;
 
   const state = {
     pdfDoc: null, numPages: 0, curPage: 1,
@@ -362,6 +366,12 @@
   const signatureOverlay = $('signatureOverlay');
   const previewTitle  = $('previewTitle');
   const previewTools  = $('previewTools');
+  const mobileControlsSheet = $('mobileControlsSheet');
+  const mobileControlsToggle = $('mobileControlsToggle');
+  const mobileControlsLabel = $('mobileControlsLabel');
+  const mobileControlsTitle = $('mobileControlsTitle');
+  const mobileControlsClose = $('mobileControlsClose');
+  const emptyUploadBtn = $('emptyUploadBtn');
   const toolIndicator = $('toolIndicator');
   const proofMeta     = $('proofMeta');
   const zoomOutBtn    = $('zoomOut');
@@ -604,18 +614,46 @@
     }
   }
 
-  function setDarkMode(enabled, persist = false) {
-    document.body.classList.toggle('dark-mode', enabled);
-    themeToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    themeToggle.setAttribute('aria-label', enabled ? t('theme.offAria') : t('theme.onAria'));
-    themeToggleText.textContent = enabled ? t('theme.light') : t('theme.dark');
-    if (persist) saveTheme(enabled ? 'dark' : 'light');
-    syncPreviewStageHeight();
-    updateToolIndicator();
+  let themeTransitionGeneration = 0;
+
+  function setDarkMode(enabled, persist = false, animate = false) {
+    const applyThemeState = () => {
+      document.body.classList.toggle('dark-mode', enabled);
+      themeToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      themeToggle.setAttribute('aria-label', enabled ? t('theme.offAria') : t('theme.onAria'));
+      themeToggleText.textContent = enabled ? t('theme.light') : t('theme.dark');
+      if (persist) saveTheme(enabled ? 'dark' : 'light');
+      syncPreviewStageHeight();
+      updateToolIndicator();
+    };
+
+    if (!animate || prefersReducedMotion()) {
+      applyThemeState();
+      return;
+    }
+
+    const generation = ++themeTransitionGeneration;
+    document.documentElement.classList.add('theme-transitioning');
+    if (typeof document.startViewTransition === 'function') {
+      const transition = document.startViewTransition(applyThemeState);
+      transition.finished.catch(() => {}).finally(() => {
+        if (generation === themeTransitionGeneration) {
+          document.documentElement.classList.remove('theme-transitioning');
+        }
+      });
+      return;
+    }
+
+    applyThemeState();
+    requestAnimationFrame(() => {
+      if (generation === themeTransitionGeneration) {
+        document.documentElement.classList.remove('theme-transitioning');
+      }
+    });
   }
 
   themeToggle.addEventListener('click', () => {
-    setDarkMode(!document.body.classList.contains('dark-mode'), true);
+    setDarkMode(!document.body.classList.contains('dark-mode'), true, true);
   });
 
   if (languageSwitcher) {
@@ -626,11 +664,58 @@
     });
   }
 
+  let advancedPanelAnimation = null;
+
+  function setAdvancedPanelExpanded(expanded) {
+    const wasHidden = advancedPanel.hidden;
+    if (expanded && wasHidden) advancedPanel.hidden = false;
+    const currentStyle = getComputedStyle(advancedPanel);
+    const currentOpacity = wasHidden ? 0 : (Number.parseFloat(currentStyle.opacity) || 0);
+    const currentTransform = wasHidden
+      ? 'translateY(-4px) scale(.985)'
+      : currentStyle.transform === 'none'
+        ? 'translateY(0) scale(1)'
+        : currentStyle.transform;
+    if (advancedPanelAnimation) {
+      advancedPanelAnimation.cancel();
+      advancedPanelAnimation = null;
+    }
+
+    advancedToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    if (prefersReducedMotion()) {
+      advancedPanel.hidden = !expanded;
+      syncMobileDockMetrics();
+      return;
+    }
+
+    const targetOpacity = expanded ? 1 : 0;
+    const targetTransform = expanded
+      ? 'translateY(0) scale(1)'
+      : 'translateY(-4px) scale(.985)';
+    const animation = advancedPanel.animate([
+      { opacity: currentOpacity, transform: currentTransform },
+      { opacity: targetOpacity, transform: targetTransform },
+    ], {
+      duration: expanded ? 160 : 140,
+      easing: expanded ? 'cubic-bezier(.2, .8, .2, 1)' : 'cubic-bezier(.4, 0, 1, 1)',
+      fill: 'both',
+    });
+    advancedPanelAnimation = animation;
+    syncMobileDockMetrics();
+    animation.finished.then(() => {
+      if (advancedPanelAnimation !== animation) return;
+      if (!expanded && advancedToggle.getAttribute('aria-expanded') === 'false') {
+        advancedPanel.hidden = true;
+      }
+      animation.cancel();
+      advancedPanelAnimation = null;
+      syncMobileDockMetrics();
+    }).catch(() => {});
+  }
+
   advancedToggle.addEventListener('click', () => {
     const expanded = advancedToggle.getAttribute('aria-expanded') === 'true';
-    advancedToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-    advancedPanel.hidden = expanded;
-    syncMobileDockMetrics();
+    setAdvancedPanelExpanded(!expanded);
   });
   advancedCurrentOnly.addEventListener('change', () => {
     if (advancedCurrentOnly.checked) advancedRangeToggle.checked = false;
@@ -702,7 +787,7 @@
     const left = activeTab.offsetLeft - (nav.clientWidth - activeTab.offsetWidth) / 2;
     nav.scrollTo({
       left: Math.max(0, left),
-      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
     });
   }
 
@@ -716,10 +801,49 @@
     document.body.classList.toggle('preview-only-mode', activeTool === 'preview');
     syncMobileEditMode();
     syncMobileDockLayout();
+    syncMobilePreviewWorkspace();
   }
 
   function isPhoneViewport() {
     return window.matchMedia('(max-width: 700px)').matches;
+  }
+
+  function usesMobilePreviewWorkspace() {
+    return isPhoneViewport() && MOBILE_PREVIEW_WORKSPACE_TOOLS.has(activeTool);
+  }
+
+  function syncMobilePreviewWorkspace() {
+    const enabled = usesMobilePreviewWorkspace();
+    if (!enabled) mobileControlsOpen = false;
+    document.body.classList.toggle('mobile-preview-workspace', enabled);
+    document.body.classList.toggle('mobile-controls-open', enabled && mobileControlsOpen);
+
+    if (mobileControlsToggle) {
+      mobileControlsToggle.hidden = !enabled;
+      mobileControlsToggle.setAttribute('aria-expanded', enabled && mobileControlsOpen ? 'true' : 'false');
+      mobileControlsToggle.setAttribute('aria-label', t('mobile.openControls', {
+        tool: toolText(activeTool, 'label'),
+      }));
+    }
+    if (mobileControlsLabel) mobileControlsLabel.textContent = t('mobile.controls');
+    if (mobileControlsTitle) mobileControlsTitle.textContent = toolText(activeTool, 'label');
+    if (emptyUploadBtn) emptyUploadBtn.hidden = !enabled || !!state.pdfDoc;
+
+    if (mobileControlsSheet) {
+      const visuallyHidden = enabled && !mobileControlsOpen;
+      mobileControlsSheet.setAttribute('aria-hidden', visuallyHidden ? 'true' : 'false');
+      mobileControlsSheet.inert = visuallyHidden;
+    }
+  }
+
+  function setMobileControlsOpen(open, { restoreFocus = false, instant = false } = {}) {
+    const nextOpen = usesMobilePreviewWorkspace() && !!open;
+    if (!nextOpen && restoreFocus) mobileControlsToggle?.focus({ preventScroll: true });
+    if (instant) document.body.classList.add('mobile-controls-instant');
+    mobileControlsOpen = nextOpen;
+    syncMobilePreviewWorkspace();
+    syncMobileDockMetrics();
+    if (instant) requestAnimationFrame(() => document.body.classList.remove('mobile-controls-instant'));
   }
 
   function isMobileEditLayout() {
@@ -795,10 +919,9 @@
     const navHeight = toolNav ? Math.ceil(toolNav.getBoundingClientRect().height) : 0;
     const offset = navHeight + 20;
     const top = target.getBoundingClientRect().top + window.pageYOffset - offset;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.scrollTo({
       top: Math.max(0, top),
-      behavior: reducedMotion ? 'auto' : 'smooth',
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
     });
   }
 
@@ -874,6 +997,7 @@
     const organizing = activeTool === 'organize';
     const editing = activeTool === 'edit';
     syncMobileEditMode();
+    syncMobilePreviewWorkspace();
     if (MOBILE_PERFORMANCE_MODE) {
       if (organizing || editing) {
         previewCanvas.width = 0;
@@ -1217,6 +1341,10 @@
       'brand.subtitle': 'PDF Tools',
       'nav.tools': 'Tools',
       'nav.toolsAria': 'PDF tools',
+      'mobile.controls': 'Controls',
+      'mobile.closeControls': 'Close controls',
+      'mobile.openPdf': 'Open PDF',
+      'mobile.openControls': 'Open {tool} controls',
       'sections.source': 'I. Source PDF',
       'sections.organize': 'II. Organize Pages',
       'sections.cropRotate': 'II. Crop & Rotate',
@@ -1443,6 +1571,10 @@
       'brand.subtitle': 'PDF 工具',
       'nav.tools': '工具',
       'nav.toolsAria': 'PDF 工具',
+      'mobile.controls': '控制项',
+      'mobile.closeControls': '关闭控制项',
+      'mobile.openPdf': '打开 PDF',
+      'mobile.openControls': '打开{tool}控制项',
       'sections.source': 'I. 原始 PDF',
       'sections.organize': 'II. 整理页面',
       'sections.cropRotate': 'II. 裁剪与旋转',
@@ -1650,6 +1782,10 @@
       'brand.subtitle': 'PDF 工具',
       'nav.tools': '工具',
       'nav.toolsAria': 'PDF 工具',
+      'mobile.controls': '控制項',
+      'mobile.closeControls': '關閉控制項',
+      'mobile.openPdf': '開啟 PDF',
+      'mobile.openControls': '開啟{tool}控制項',
       'sections.source': 'I. 原始 PDF',
       'sections.organize': 'II. 整理頁面',
       'sections.cropRotate': 'II. 裁切與旋轉',
@@ -1872,6 +2008,10 @@
       'brand.subtitle': 'PDF 도구',
       'nav.tools': '도구',
       'nav.toolsAria': 'PDF 도구',
+      'mobile.controls': '제어',
+      'mobile.closeControls': '제어 닫기',
+      'mobile.openPdf': 'PDF 열기',
+      'mobile.openControls': '{tool} 제어 열기',
       'sections.source': 'I. 원본 PDF',
       'sections.organize': 'II. 페이지 정리',
       'sections.cropRotate': 'II. 자르기/회전',
@@ -2094,6 +2234,10 @@
       'brand.subtitle': 'PDFツール',
       'nav.tools': 'ツール',
       'nav.toolsAria': 'PDFツール',
+      'mobile.controls': 'コントロール',
+      'mobile.closeControls': 'コントロールを閉じる',
+      'mobile.openPdf': 'PDFを開く',
+      'mobile.openControls': '{tool}のコントロールを開く',
       'sections.source': 'I. 元のPDF',
       'sections.organize': 'II. ページ整理',
       'sections.cropRotate': 'II. トリミング/回転',
@@ -2315,6 +2459,10 @@
     es: {
       'brand.subtitle': 'Herramientas PDF',
       'nav.tools': 'Herramientas',
+      'mobile.controls': 'Controles',
+      'mobile.closeControls': 'Cerrar controles',
+      'mobile.openPdf': 'Abrir PDF',
+      'mobile.openControls': 'Abrir controles de {tool}',
       'sections.source': 'I. PDF de origen',
       'sections.organize': 'II. Organizar páginas',
       'sections.cropRotate': 'II. Recortar/Girar',
@@ -2536,6 +2684,10 @@
     fr: {
       'brand.subtitle': 'Outils PDF',
       'nav.tools': 'Outils',
+      'mobile.controls': 'Réglages',
+      'mobile.closeControls': 'Fermer les réglages',
+      'mobile.openPdf': 'Ouvrir un PDF',
+      'mobile.openControls': 'Ouvrir les réglages de {tool}',
       'sections.source': 'I. PDF source',
       'sections.organize': 'II. Organiser les pages',
       'sections.cropRotate': 'II. Recadrer/Pivoter',
@@ -3900,7 +4052,7 @@
       const clampedPct = Math.max(0, Math.min(100, Number(pct) || 0));
       const roundedPct = Math.round(clampedPct);
       loaderPct.textContent = roundedPct + '%';
-      loaderBar.style.width = clampedPct + '%';
+      loaderBar.style.transform = 'scaleX(' + (clampedPct / 100) + ')';
       loaderProgress.setAttribute('aria-valuenow', String(roundedPct));
       loaderProgress.setAttribute('aria-valuetext', roundedPct + '%');
     }
@@ -4215,6 +4367,18 @@
   mergeRunBtn.addEventListener('click', () => mergeSelectedPdfs());
 
   dropZone.addEventListener('click', () => fileInput.click());
+  emptyUploadBtn?.addEventListener('click', () => fileInput.click());
+  mobileControlsToggle?.addEventListener('click', e => {
+    setMobileControlsOpen(!mobileControlsOpen, { instant: e.detail === 0 });
+  });
+  mobileControlsClose?.addEventListener('click', e => {
+    setMobileControlsOpen(false, { restoreFocus: true, instant: e.detail === 0 });
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!mobileControlsOpen) return;
+    if (mobileControlsSheet?.contains(e.target) || mobileControlsToggle?.contains(e.target)) return;
+    setMobileControlsOpen(false);
+  });
   activateElementOnKeyboard(dropZone);
   document.querySelectorAll('.toggle[role="button"]').forEach(activateElementOnKeyboard);
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
@@ -4351,7 +4515,10 @@
         MOBILE_PERFORMANCE_MODE ? file : null,
         loadToken,
       );
-      if (loaded) queuePhonePreviewScroll();
+      if (loaded) {
+        setMobileControlsOpen(false);
+        queuePhonePreviewScroll();
+      }
     } catch (err) {
       if (loadToken !== pdfLoadGeneration) return;
       console.error(err);
@@ -6107,9 +6274,13 @@
     offsetY: 0,
     pointerX: 0,
     pointerY: 0,
+    spatialX: 0,
+    spatialY: 0,
+    candidateOriginX: 0,
+    candidateOriginY: 0,
+    pointerHistory: [],
     autoScrollFrame: null,
     pointerMoveFrame: null,
-    dragAnimationTimer: null,
   };
   const organizerTapState = {
     sourceIndex: null,
@@ -6165,7 +6336,7 @@
   }
 
   function animateOrganizerFrom(firstRects, opts = {}) {
-    if (!firstRects || !firstRects.size || !organizerGrid) return;
+    if (prefersReducedMotion() || !firstRects || !firstRects.size || !organizerGrid) return;
     const baseDuration = opts.duration ?? 200;
     const maxDuration = opts.maxDuration ?? baseDuration;
     const distanceDuration = opts.distanceDuration ?? 0;
@@ -6479,6 +6650,13 @@
     organizerDrag.offsetY = e.clientY - rect.top;
     organizerDrag.pointerX = e.clientX;
     organizerDrag.pointerY = e.clientY;
+    const spatialPoint = organizerSpatialPoint(e.clientX, e.clientY);
+    organizerDrag.spatialX = spatialPoint.x;
+    organizerDrag.spatialY = spatialPoint.y;
+    organizerDrag.candidateOriginX = spatialPoint.x;
+    organizerDrag.candidateOriginY = spatialPoint.y;
+    organizerDrag.pointerHistory = [];
+    recordOrganizerPointer(e.clientX, e.clientY);
 
     moveOrganizerClone(e.clientX, e.clientY);
     startOrganizerAutoScroll();
@@ -6494,6 +6672,36 @@
     organizerDrag.clone.style.transform = 'translate3d(' +
       (x - organizerDrag.offsetX) + 'px, ' +
       (y - organizerDrag.offsetY) + 'px, 0) scale(1.02)';
+  }
+
+  function recordOrganizerPointer(x, y) {
+    const time = performance.now();
+    organizerDrag.pointerHistory.push({ x, y, time });
+    while (organizerDrag.pointerHistory.length > 8
+      || (organizerDrag.pointerHistory[0] && time - organizerDrag.pointerHistory[0].time > 120)) {
+      organizerDrag.pointerHistory.shift();
+    }
+  }
+
+  function organizerReleaseVelocity() {
+    const history = organizerDrag.pointerHistory;
+    if (history.length < 2) return { x: 0, y: 0 };
+    const last = history[history.length - 1];
+    const first = history[0];
+    const seconds = (last.time - first.time) / 1000;
+    if (seconds <= 0) return { x: 0, y: 0 };
+    const clamp = value => Math.max(-2600, Math.min(2600, value));
+    return {
+      x: clamp((last.x - first.x) / seconds),
+      y: clamp((last.y - first.y) / seconds),
+    };
+  }
+
+  function organizerSpatialPoint(x, y) {
+    return {
+      x: x + (previewStage?.scrollLeft || 0),
+      y: y + (previewStage?.scrollTop || 0),
+    };
   }
 
   function organizerRows() {
@@ -6539,30 +6747,33 @@
     return rows[rows.length - 1].items.at(-1).index + 1;
   }
 
-  function clearOrganizerDragAnimationTimer() {
-    if (!organizerDrag.dragAnimationTimer) return;
-    clearTimeout(organizerDrag.dragAnimationTimer);
-    organizerDrag.dragAnimationTimer = null;
-  }
-
-  function scheduleOrganizerDragAnimation() {
-    clearOrganizerDragAnimationTimer();
-    if (!organizerDrag.active || organizerDrag.targetInsertIndex === organizerDrag.insertIndex) return;
-    organizerDrag.dragAnimationTimer = setTimeout(() => {
-      organizerDrag.dragAnimationTimer = null;
-      if (!organizerDrag.active || organizerDrag.targetInsertIndex === organizerDrag.insertIndex) return;
-      organizerDrag.insertIndex = organizerDrag.targetInsertIndex;
-      rerenderOrganizerDuringDrag();
-    }, 500);
-  }
-
   function updateOrganizerInsertIndex(x, y) {
     if (!organizerDrag.active) return;
+    const previousPoint = { x: organizerDrag.spatialX, y: organizerDrag.spatialY };
+    const spatialPoint = organizerSpatialPoint(x, y);
+    organizerDrag.spatialX = spatialPoint.x;
+    organizerDrag.spatialY = spatialPoint.y;
     const nextIndex = getOrganizerInsertIndex(x, y);
+    if (nextIndex === organizerDrag.insertIndex) {
+      organizerDrag.targetInsertIndex = nextIndex;
+      organizerDrag.candidateOriginX = spatialPoint.x;
+      organizerDrag.candidateOriginY = spatialPoint.y;
+      return;
+    }
     if (nextIndex !== organizerDrag.targetInsertIndex) {
       organizerDrag.targetInsertIndex = nextIndex;
-      scheduleOrganizerDragAnimation();
+      organizerDrag.candidateOriginX = previousPoint.x;
+      organizerDrag.candidateOriginY = previousPoint.y;
     }
+    const distanceIntoCandidate = Math.hypot(
+      spatialPoint.x - organizerDrag.candidateOriginX,
+      spatialPoint.y - organizerDrag.candidateOriginY,
+    );
+    if (distanceIntoCandidate < 12) return;
+    organizerDrag.insertIndex = organizerDrag.targetInsertIndex;
+    organizerDrag.candidateOriginX = spatialPoint.x;
+    organizerDrag.candidateOriginY = spatialPoint.y;
+    rerenderOrganizerDuringDrag();
   }
 
   function organizerAutoScrollDelta(pointerY) {
@@ -6616,6 +6827,7 @@
     e.preventDefault();
     organizerDrag.pointerX = e.clientX;
     organizerDrag.pointerY = e.clientY;
+    recordOrganizerPointer(e.clientX, e.clientY);
     moveOrganizerClone(e.clientX, e.clientY);
     if (MOBILE_PERFORMANCE_MODE) {
       if (organizerDrag.pointerMoveFrame) return;
@@ -6628,13 +6840,14 @@
     }
   }
 
-  function cleanupOrganizerDrag() {
+  function cleanupOrganizerDrag({ preserveClone = false } = {}) {
     window.removeEventListener('pointermove', onOrganizerPointerMove);
-    clearOrganizerDragAnimationTimer();
+    window.removeEventListener('pointerup', finishOrganizerDrag);
+    window.removeEventListener('pointercancel', cancelOrganizerDrag);
     stopOrganizerAutoScroll();
     if (organizerDrag.pointerMoveFrame) cancelAnimationFrame(organizerDrag.pointerMoveFrame);
     organizerDrag.pointerMoveFrame = null;
-    if (organizerDrag.clone) organizerDrag.clone.remove();
+    if (organizerDrag.clone && !preserveClone) organizerDrag.clone.remove();
     organizerDrag.active = false;
     organizerDrag.sourceOutputIndex = null;
     organizerDrag.sourcePageIndex = null;
@@ -6644,31 +6857,95 @@
     organizerDrag.clone = null;
     organizerDrag.pointerX = 0;
     organizerDrag.pointerY = 0;
+    organizerDrag.spatialX = 0;
+    organizerDrag.spatialY = 0;
+    organizerDrag.candidateOriginX = 0;
+    organizerDrag.candidateOriginY = 0;
+    organizerDrag.pointerHistory = [];
+  }
+
+  function settleOrganizerClone(clone, destination, start, velocity) {
+    if (!clone) return;
+    if (!destination || prefersReducedMotion()) {
+      clone.remove();
+      if (destination) destination.style.visibility = '';
+      return;
+    }
+    const target = destination.getBoundingClientRect();
+    destination.style.visibility = 'hidden';
+    let x = start.x;
+    let y = start.y;
+    let scale = 1.02;
+    let velocityX = velocity.x;
+    let velocityY = velocity.y;
+    let scaleVelocity = 0;
+    let previousTime = performance.now();
+    const startTime = previousTime;
+    const stiffness = 360;
+    const damping = 38;
+
+    const finish = () => {
+      clone.remove();
+      if (destination.isConnected) destination.style.visibility = '';
+    };
+
+    const step = now => {
+      const dt = Math.min(0.032, Math.max(0.001, (now - previousTime) / 1000));
+      previousTime = now;
+      velocityX += (stiffness * (target.left - x) - damping * velocityX) * dt;
+      velocityY += (stiffness * (target.top - y) - damping * velocityY) * dt;
+      scaleVelocity += (stiffness * (1 - scale) - damping * scaleVelocity) * dt;
+      x += velocityX * dt;
+      y += velocityY * dt;
+      scale += scaleVelocity * dt;
+      clone.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0) scale(' + scale + ')';
+
+      const settled = Math.abs(target.left - x) < 0.5
+        && Math.abs(target.top - y) < 0.5
+        && Math.abs(velocityX) < 8
+        && Math.abs(velocityY) < 8
+        && Math.abs(scale - 1) < 0.002;
+      if (settled || now - startTime > 650) {
+        finish();
+        return;
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   function finishOrganizerDrag(e) {
     if (!organizerDrag.active) return;
-    if (MOBILE_PERFORMANCE_MODE && e?.clientX != null && e?.clientY != null) {
+    if (e?.clientX != null && e?.clientY != null) {
       if (organizerDrag.pointerMoveFrame) cancelAnimationFrame(organizerDrag.pointerMoveFrame);
       organizerDrag.pointerMoveFrame = null;
       organizerDrag.pointerX = e.clientX;
       organizerDrag.pointerY = e.clientY;
+      recordOrganizerPointer(e.clientX, e.clientY);
       updateOrganizerInsertIndex(e.clientX, e.clientY);
     }
     const firstRects = MOBILE_PERFORMANCE_MODE ? null : captureOrganizerRects();
     const sourceIndex = organizerDrag.sourcePageIndex;
-    const targetInsertIndex = organizerDrag.targetInsertIndex ?? organizerDrag.insertIndex;
+    const targetInsertIndex = organizerDrag.insertIndex;
+    const clone = organizerDrag.clone;
+    const cloneStart = {
+      x: organizerDrag.pointerX - organizerDrag.offsetX,
+      y: organizerDrag.pointerY - organizerDrag.offsetY,
+    };
+    const releaseVelocity = organizerReleaseVelocity();
     const nextFlow = buildOrganizerFlow().filter(item =>
       item.type !== 'page' || item.sourceIndex !== sourceIndex);
     const insertionIndex = targetInsertIndex == null
       ? Math.max(0, Math.min(organizerDrag.sourceFlowIndex ?? 0, nextFlow.length))
       : Math.max(0, Math.min(targetInsertIndex, nextFlow.length));
-    cleanupOrganizerDrag();
+    cleanupOrganizerDrag({ preserveClone: true });
     nextFlow.splice(insertionIndex, 0, { type: 'page', sourceIndex });
     applyOrganizerFlow(nextFlow);
     state.curPage = state.pageOrder.indexOf(sourceIndex) + 1;
     updatePageState();
     animateOrganizerFrom(firstRects);
+    const destination = organizerGrid?.querySelector('[data-source-index="' + sourceIndex + '"]');
+    settleOrganizerClone(clone, destination, cloneStart, releaseVelocity);
     if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
   }
 
@@ -7381,6 +7658,11 @@
         return;
       }
     }
+    if (e.key === 'Escape' && mobileControlsOpen) {
+      e.preventDefault();
+      setMobileControlsOpen(false, { restoreFocus: true, instant: true });
+      return;
+    }
     if (e.key === 'Escape' && mobileEditFocused) {
       e.preventDefault();
       closeMobilePageEditor();
@@ -7826,6 +8108,7 @@
         if (!isMobileEditLayout()) requestEditedPreviewRender();
       }
       syncMobileDockLayout();
+      syncMobilePreviewWorkspace();
       syncPreviewStageHeight();
       updateToolIndicator();
       updateSignatureOverlay();
@@ -7842,10 +8125,6 @@
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(syncPreviewStageHeight);
   }
-  setTimeout(() => {
-    document.body.classList.add('title-condensed');
-    syncPreviewStageHeight();
-  }, 1000);
   currentLocale = readSavedLocale();
   applyStaticLocale();
   applyToolLocale();

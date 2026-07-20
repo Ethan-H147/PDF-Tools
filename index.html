@@ -26,7 +26,7 @@ Ethan Hu -->
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=91bd6e4">
+<link rel="stylesheet" href="styles.css?v=mobile-workspace-4">
 </head>
 <body>
 <div class="frame">
@@ -74,6 +74,18 @@ Ethan Hu -->
 
   <main>
     <section class="panel panel-left">
+
+      <div class="mobile-controls-sheet" id="mobileControlsSheet" aria-hidden="false">
+        <div class="mobile-controls-sheet-head">
+          <div class="mobile-controls-heading">
+            <span data-i18n="mobile.controls">Controls</span>
+            <strong id="mobileControlsTitle">Preview</strong>
+          </div>
+          <button class="mobile-controls-close" id="mobileControlsClose" type="button" aria-label="Close controls" data-i18n-aria-label="mobile.closeControls">
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <div class="mobile-controls-scroll">
 
       <!-- SHARED: Source -->
       <div class="section-label"><span data-i18n="sections.source">I. Source PDF</span><span>—</span></div>
@@ -299,6 +311,9 @@ Ethan Hu -->
         </div>
       </div>
 
+        </div>
+      </div>
+
       <!-- SHARED: Pages -->
       <div class="section-label" style="margin-top:26px"><span data-i18n="sections.pages">III. Pages</span><span>—</span></div>
       <div class="pagenav">
@@ -357,6 +372,15 @@ Ethan Hu -->
       <div class="preview-bar">
         <div class="title" id="previewTitle">Preview <em>— processed output</em></div>
         <div id="previewTools" style="display:flex;align-items:center;gap:14px;min-width:0">
+          <button class="mobile-controls-toggle" id="mobileControlsToggle" type="button" aria-expanded="false" aria-controls="mobileControlsSheet" hidden>
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M4 5h12M6.5 10h7M8.5 15h3"></path>
+              <circle cx="7" cy="5" r="1.4"></circle>
+              <circle cx="12" cy="10" r="1.4"></circle>
+              <circle cx="10" cy="15" r="1.4"></circle>
+            </svg>
+            <span id="mobileControlsLabel" data-i18n="mobile.controls">Controls</span>
+          </button>
           <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="proofMeta">awaiting PDF</div>
           <div class="zoom-bar">
             <button class="zoom-btn" id="zoomOut" disabled>−</button>
@@ -370,6 +394,7 @@ Ethan Hu -->
           <div class="empty-document" aria-hidden="true"><span></span></div>
           <div class="big" data-i18n="empty.noPreview">Your preview will appear here</div>
           <div class="small" data-i18n="empty.uploadToBegin">Choose a PDF to start</div>
+          <button class="empty-upload" id="emptyUploadBtn" type="button" data-i18n="mobile.openPdf" hidden>Open PDF</button>
         </div>
         <div class="preview-canvas-wrap" id="canvasWrap" style="display:none">
           <canvas id="previewCanvas"></canvas>
@@ -484,6 +509,6 @@ Ethan Hu -->
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.js?v=91bd6e4"></script>
+<script src="app.js?v=mobile-workspace-4"></script>
 </body>
 </html>
