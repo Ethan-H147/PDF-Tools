@@ -6632,10 +6632,17 @@
     const sourceFlowIndex = buildOrganizerFlow().findIndex(item =>
       item.type === 'page' && item.sourceIndex === sourceIndex);
     const rect = card.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
     const clone = card.cloneNode(true);
     clone.classList.add('page-drag-clone');
     clone.style.width = rect.width + 'px';
     clone.style.height = rect.height + 'px';
+    // Place the clone before it can paint. Starting at translate3d(0, 0, 0)
+    // makes the inherited page-card transform transition race in from the
+    // viewport origin on the first pointer update.
+    clone.style.transform = 'translate3d(' + rect.left + 'px, ' + rect.top + 'px, 0) scale(1.02)';
+    clone.style.transformOrigin = offsetX + 'px ' + offsetY + 'px';
     clone.querySelectorAll('button').forEach(button => button.tabIndex = -1);
     document.body.appendChild(clone);
 
@@ -6646,8 +6653,8 @@
     organizerDrag.insertIndex = sourceFlowIndex < 0 ? null : sourceFlowIndex;
     organizerDrag.targetInsertIndex = organizerDrag.insertIndex;
     organizerDrag.clone = clone;
-    organizerDrag.offsetX = e.clientX - rect.left;
-    organizerDrag.offsetY = e.clientY - rect.top;
+    organizerDrag.offsetX = offsetX;
+    organizerDrag.offsetY = offsetY;
     organizerDrag.pointerX = e.clientX;
     organizerDrag.pointerY = e.clientY;
     const spatialPoint = organizerSpatialPoint(e.clientX, e.clientY);

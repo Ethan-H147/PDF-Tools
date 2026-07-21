@@ -2538,6 +2538,7 @@
   }
 
   .page-drag-clone {
+    animation: none !important;
     border-radius: 14px;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
     cursor: grabbing;
@@ -2548,6 +2549,8 @@
     top: 0;
     transform: translate3d(0, 0, 0) scale(1.02);
     transform-origin: top left;
+    transition: none !important;
+    will-change: transform;
     z-index: 9999;
   }
 
