@@ -155,7 +155,6 @@
   let activeTool = 'preview';
   let processTool = 'threshold';
   let currentLocale = 'en';
-  const MOBILE_PREVIEW_WORKSPACE_TOOLS = new Set(['preview', 'sign', 'compress', 'threshold', 'greyscale']);
   let mobileControlsOpen = false;
 
   const state = {
@@ -805,17 +804,18 @@
   }
 
   function isPhoneViewport() {
-    return window.matchMedia('(max-width: 700px)').matches;
+    return window.matchMedia('(max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse)').matches;
   }
 
   function usesMobilePreviewWorkspace() {
-    return isPhoneViewport() && MOBILE_PREVIEW_WORKSPACE_TOOLS.has(activeTool);
+    return isPhoneViewport();
   }
 
   function syncMobilePreviewWorkspace() {
     const enabled = usesMobilePreviewWorkspace();
     if (!enabled) mobileControlsOpen = false;
     document.body.classList.toggle('mobile-preview-workspace', enabled);
+    document.documentElement.classList.toggle('mobile-workspace', enabled);
     document.body.classList.toggle('mobile-controls-open', enabled && mobileControlsOpen);
 
     if (mobileControlsToggle) {
@@ -843,6 +843,7 @@
     mobileControlsOpen = nextOpen;
     syncMobilePreviewWorkspace();
     syncMobileDockMetrics();
+    if (nextOpen) mobileControlsClose?.focus({ preventScroll: true });
     if (instant) requestAnimationFrame(() => document.body.classList.remove('mobile-controls-instant'));
   }
 
@@ -889,45 +890,36 @@
     syncMobileDockMetrics();
   }
 
+  // Move the existing controls, preserving their state and desktop positions.
+  const mobileDock = document.createElement('div');
+  mobileDock.className = 'mobile-workspace-dock';
+  document.querySelector('.frame').appendChild(mobileDock);
+  const mobileControlHomes = [pageNav, actionsDock, resolutionOptions, advancedOptions, document.querySelector('footer')]
+    .map(element => {
+      const anchor = document.createComment('desktop control position');
+      element.before(anchor);
+      return { element, anchor };
+    });
+
   function syncMobileDockLayout() {
-    if (!pageNav || !actionsDock) {
-      syncMobileDockMetrics();
-      return;
+    const phone = isPhoneViewport();
+    const scroll = mobileControlsSheet.querySelector('.mobile-controls-scroll');
+    for (const { element, anchor } of mobileControlHomes) {
+      const destination = element === pageNav || element === actionsDock ? mobileDock : scroll;
+      if (phone) {
+        if (element.parentElement !== destination) destination.appendChild(element);
+      } else if (element.previousSibling !== anchor) {
+        anchor.after(element);
+      }
     }
-    const dockPageNav = isPhoneViewport() && activeTool !== 'preview';
-    if (dockPageNav && pageNav.parentElement !== actionsDock) {
-      actionsDock.insertBefore(pageNav, actionsDock.firstChild);
-    } else if (!dockPageNav && pageNav.parentElement === actionsDock) {
-      actionsDock.parentElement.insertBefore(pageNav, actionsDock);
-    }
-    document.body.classList.toggle('page-nav-in-actions', dockPageNav);
+    document.body.classList.remove('page-nav-in-actions');
     syncMobileDockMetrics();
   }
 
   function syncMobileDockMetrics() {
     requestAnimationFrame(() => {
-      const visible = actionsDock && activeTool !== 'preview' && getComputedStyle(actionsDock).display !== 'none';
-      const height = visible ? Math.ceil(actionsDock.getBoundingClientRect().height) : 0;
+      const height = isPhoneViewport() ? Math.ceil(mobileDock.getBoundingClientRect().height) : 0;
       document.documentElement.style.setProperty('--mobile-actions-height', height + 'px');
-    });
-  }
-
-  function scrollPreviewIntoViewOnPhone() {
-    if (!window.matchMedia('(max-width: 700px)').matches || !state.pdfDoc) return;
-    const target = previewStage.closest('.panel-right') || previewStage;
-    const toolNav = document.querySelector('.tool-nav');
-    const navHeight = toolNav ? Math.ceil(toolNav.getBoundingClientRect().height) : 0;
-    const offset = navHeight + 20;
-    const top = target.getBoundingClientRect().top + window.pageYOffset - offset;
-    window.scrollTo({
-      top: Math.max(0, top),
-      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-    });
-  }
-
-  function queuePhonePreviewScroll() {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(scrollPreviewIntoViewOnPhone);
     });
   }
 
@@ -963,6 +955,7 @@
       forgetFullPageData();
     }
     activeTool = id;
+    setMobileControlsOpen(false);
     if (id === 'threshold' || id === 'greyscale') processTool = id;
     syncToolTabA11y();
     applyToolLocale();
@@ -1017,7 +1010,8 @@
     }
     previewStage.classList.toggle('organizing', organizing);
     previewStage.classList.toggle('editing', editing);
-    previewTools.classList.toggle('preview-tools-hidden', organizing || editing);
+    previewTools.classList.toggle('preview-tools-hidden', !isPhoneViewport() && (organizing || editing));
+    previewTools.querySelector('.zoom-bar').hidden = isPhoneViewport() && (organizing || editing);
     previewTitle.innerHTML = organizing
       ? t('preview.titleOrganize')
       : editing
@@ -1072,6 +1066,7 @@
 
   // ── Helpers ──
   function showError(msg) {
+    if (usesMobilePreviewWorkspace()) setMobileControlsOpen(true);
     if (errorHideTimer) clearTimeout(errorHideTimer);
     errBox.textContent = '⚠ ' + msg;
     errBox.classList.add('on');
@@ -1415,7 +1410,7 @@
       'edit.pageHint': 'page {page}',
       'edit.summaryEmpty': 'Upload a PDF, then choose a page from the editor to crop or rotate it.',
       'edit.summaryActive': 'Editing page {page} of {count}. Changes apply only to this page.',
-      'edit.mobileHold': 'Press and hold a page to crop or rotate it.',
+      'edit.mobileHold': 'Tap a page to crop or rotate it.',
       'edit.mobileCloseAria': 'Back to all pages',
       'edit.mobilePage': 'Page {page} of {count}',
       'edit.fullPage': 'Full page',
@@ -1639,7 +1634,7 @@
       'edit.pageHint': '第 {page} 页',
       'edit.summaryEmpty': '上传 PDF 后，选择要裁剪或旋转的页面。',
       'edit.summaryActive': '正在编辑第 {page}/{count} 页。改动只会应用到这一页。',
-      'edit.mobileHold': '长按页面即可裁剪或旋转。',
+      'edit.mobileHold': '轻点页面即可裁剪或旋转。',
       'edit.mobileCloseAria': '返回所有页面',
       'edit.mobilePage': '第 {page} 页，共 {count} 页',
       'edit.fullPage': '完整页面',
@@ -1856,7 +1851,7 @@
       'edit.pageHint': '第 {page} 頁',
       'edit.summaryEmpty': '上傳 PDF 後，選擇要裁切或旋轉的頁面。',
       'edit.summaryActive': '正在編輯第 {page}/{count} 頁。變更只會套用到這一頁。',
-      'edit.mobileHold': '長按頁面即可裁切或旋轉。',
+      'edit.mobileHold': '點一下頁面即可裁切或旋轉。',
       'edit.mobileCloseAria': '返回所有頁面',
       'edit.mobilePage': '第 {page} 頁，共 {count} 頁',
       'edit.fullPage': '完整頁面',
@@ -2082,7 +2077,7 @@
       'edit.pageHint': '{page}페이지',
       'edit.summaryEmpty': 'PDF를 올린 뒤 자르거나 회전할 페이지를 선택하세요.',
       'edit.summaryActive': '{count}페이지 중 {page}페이지를 편집 중입니다. 변경 사항은 이 페이지에만 적용됩니다.',
-      'edit.mobileHold': '페이지를 길게 눌러 자르거나 회전하세요.',
+      'edit.mobileHold': '페이지를 탭하여 자르거나 회전하세요.',
       'edit.mobileCloseAria': '모든 페이지로 돌아가기',
       'edit.mobilePage': '{count}페이지 중 {page}페이지',
       'edit.fullPage': '전체 페이지',
@@ -2308,7 +2303,7 @@
       'edit.pageHint': '{page}ページ',
       'edit.summaryEmpty': 'PDFを追加して、トリミングまたは回転するページを選択してください。',
       'edit.summaryActive': '{count}ページ中{page}ページを編集中です。変更はこのページにのみ適用されます。',
-      'edit.mobileHold': 'ページを長押しして切り抜きまたは回転します。',
+      'edit.mobileHold': 'ページをタップして切り抜きまたは回転します。',
       'edit.mobileCloseAria': 'すべてのページに戻る',
       'edit.mobilePage': '{count}ページ中{page}ページ',
       'edit.fullPage': 'ページ全体',
@@ -2533,7 +2528,7 @@
       'edit.pageHint': 'página {page}',
       'edit.summaryEmpty': 'Sube un PDF y elige una página en el editor para recortarla o girarla.',
       'edit.summaryActive': 'Editando página {page} de {count}. Los cambios solo afectan esta página.',
-      'edit.mobileHold': 'Mantén pulsada una página para recortarla o girarla.',
+      'edit.mobileHold': 'Toca una página para recortarla o girarla.',
       'edit.mobileCloseAria': 'Volver a todas las páginas',
       'edit.mobilePage': 'Página {page} de {count}',
       'edit.fullPage': 'Página completa',
@@ -2758,7 +2753,7 @@
       'edit.pageHint': 'page {page}',
       'edit.summaryEmpty': 'Importez un PDF, puis choisissez une page à recadrer ou faire pivoter.',
       'edit.summaryActive': 'Modification de la page {page} sur {count}. Les changements ne touchent que cette page.',
-      'edit.mobileHold': 'Appuyez longuement sur une page pour la recadrer ou la pivoter.',
+      'edit.mobileHold': 'Touchez une page pour la recadrer ou la pivoter.',
       'edit.mobileCloseAria': 'Revenir à toutes les pages',
       'edit.mobilePage': 'Page {page} sur {count}',
       'edit.fullPage': 'Page complète',
@@ -4517,7 +4512,6 @@
       );
       if (loaded) {
         setMobileControlsOpen(false);
-        queuePhonePreviewScroll();
       }
     } catch (err) {
       if (loadToken !== pdfLoadGeneration) return;
@@ -5785,7 +5779,7 @@
     card.addEventListener('click', e => {
       if (isMobileEditLayout()) {
         e.preventDefault();
-        if (e.detail === 0 && !longPressed) openMobilePageEditor(outputIndex);
+        if (!longPressed) openMobilePageEditor(outputIndex);
         longPressed = false;
         return;
       }
@@ -7832,61 +7826,32 @@
     applyZoom(opts);
   }
   let previewHeightRaf = null;
-  const previewLayoutState = {
-    phoneViewportHeight: 0,
-    width: 0,
-    orientation: '',
-    height: 0,
-    isPhone: false,
-  };
   const panState = { active: false, pointerId: null, x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
 
   function syncPreviewStageHeight() {
     if (previewHeightRaf) cancelAnimationFrame(previewHeightRaf);
     previewHeightRaf = requestAnimationFrame(() => {
       previewHeightRaf = null;
-      const isTablet = window.matchMedia('(max-width: 900px)').matches;
-      const isPhone = window.matchMedia('(max-width: 700px)').matches;
-      const minHeight = isPhone ? 280 : (isTablet ? 520 : 620);
-      const maxHeight = isPhone ? 430 : (isTablet ? 820 : 1100);
-      const viewportWidth = Math.round(document.documentElement.clientWidth || window.innerWidth || 0);
-      const rawViewportHeight = Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
-      const orientation = (screen.orientation && screen.orientation.type)
-        || (viewportWidth > rawViewportHeight ? 'landscape' : 'portrait');
-      const widthTolerance = isPhone ? 2 : 0;
-      const widthChanged = previewLayoutState.width > 0
-        && Math.abs(previewLayoutState.width - viewportWidth) > widthTolerance;
-      const phoneLayoutChanged = !previewLayoutState.isPhone
-        || widthChanged
-        || previewLayoutState.orientation !== orientation;
-      let stableViewportHeight = rawViewportHeight;
-      if (isPhone) {
-        if (!previewLayoutState.phoneViewportHeight || phoneLayoutChanged) {
-          previewLayoutState.phoneViewportHeight = rawViewportHeight;
-        }
-        stableViewportHeight = previewLayoutState.phoneViewportHeight;
-      } else {
-        previewLayoutState.phoneViewportHeight = 0;
+      // Phone layout is sized by the viewport grid, including the live browser bars.
+      if (isPhoneViewport()) {
+        if (state.pdfDoc) applyZoom();
+        return;
       }
+      const isTablet = window.matchMedia('(max-width: 900px)').matches;
+      const minHeight = isTablet ? 520 : 620;
+      const maxHeight = isTablet ? 820 : 1100;
+      const rawViewportHeight = Math.round(window.innerHeight || document.documentElement.clientHeight || 0);
       const mainPanel = previewStage.closest('main');
       const stageRect = previewStage.getBoundingClientRect();
       const mainRect = mainPanel ? mainPanel.getBoundingClientRect() : null;
       const panelStyle = getComputedStyle(previewStage.parentElement);
       const panelBottomInset = parseFloat(panelStyle.paddingBottom) || 0;
       const panelBottom = mainRect ? Math.max(0, mainRect.bottom - stageRect.top - panelBottomInset) : 0;
-      const viewportHeight = stableViewportHeight * (isPhone ? 0.46 : 0.82);
-      const preferredHeight = isPhone ? viewportHeight : Math.max(viewportHeight, panelBottom);
+      const preferredHeight = Math.max(rawViewportHeight * 0.82, panelBottom);
       const targetHeight = Math.max(minHeight, Math.min(maxHeight, preferredHeight));
       const roundedHeight = Math.round(targetHeight);
-      const heightChanged = previewLayoutState.height !== roundedHeight;
-      previewLayoutState.width = viewportWidth;
-      previewLayoutState.orientation = orientation;
-      previewLayoutState.height = roundedHeight;
-      previewLayoutState.isPhone = isPhone;
-      if (heightChanged) {
-        previewStage.style.setProperty('--preview-stage-height', roundedHeight + 'px');
-      }
-      if (state.pdfDoc && (heightChanged || widthChanged)) applyZoom();
+      previewStage.style.setProperty('--preview-stage-height', roundedHeight + 'px');
+      if (state.pdfDoc) applyZoom();
     });
   }
 
@@ -7938,10 +7903,12 @@
     const cs = getComputedStyle(pageEditorMain);
     const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
     const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    const bottomH = pageEditorBottom.offsetHeight || 0;
+    const siblings = [...pageEditorMain.children].filter(element =>
+      element !== pageEditorCanvasWrap && getComputedStyle(element).display !== 'none');
+    const bottomH = siblings.reduce((height, element) => height + element.offsetHeight, 0);
     const gap = parseFloat(cs.gap) || 0;
     const viewW = Math.max(1, pageEditorMain.clientWidth - padX - 1);
-    const viewH = Math.max(1, pageEditorMain.clientHeight - padY - bottomH - gap - 1);
+    const viewH = Math.max(1, pageEditorMain.clientHeight - padY - bottomH - gap * siblings.length - 1);
     const naturalW = pageEditorCanvas.width || 1;
     const naturalH = pageEditorCanvas.height || 1;
     const heightFitWidth = viewH * (naturalW / naturalH);
@@ -8033,6 +8000,10 @@
   // click the % readout to type any zoom level (Enter commits, Esc cancels, "fit" = calibrated 100%)
   zoomValEl.addEventListener('click', () => {
     if (!state.pdfDoc || zoomValEl.querySelector('input')) return;
+    if (isPhoneViewport()) {
+      setZoom(1, { preserveCenter: false });
+      return;
+    }
     const input = document.createElement('input');
     input.type = 'text';
     input.value = Math.round(zoomLevel * 100);
@@ -8116,6 +8087,8 @@
       }
       syncMobileDockLayout();
       syncMobilePreviewWorkspace();
+      previewTools.classList.toggle('preview-tools-hidden', !isPhoneViewport() && (activeTool === 'organize' || activeTool === 'edit'));
+      previewTools.querySelector('.zoom-bar').hidden = isPhoneViewport() && (activeTool === 'organize' || activeTool === 'edit');
       syncPreviewStageHeight();
       updateToolIndicator();
       updateSignatureOverlay();
@@ -8128,6 +8101,19 @@
     mobileResizeFrame = requestAnimationFrame(updateLayout);
   });
   document.querySelector('.tool-nav').addEventListener('scroll', updateToolIndicator);
+
+  // Browser chrome, rotation, and dock changes can resize the canvas without a window resize.
+  const workspaceResizeObserver = new ResizeObserver(() => {
+    if (isPhoneViewport()) syncPreviewStageHeight();
+  });
+
+  zoomValEl.addEventListener('keydown', e => {
+    if (e.target !== zoomValEl || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    zoomValEl.click();
+  });
+  workspaceResizeObserver.observe(previewStage);
+  workspaceResizeObserver.observe(pageEditorMain);
 
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(syncPreviewStageHeight);

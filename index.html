@@ -19,14 +19,14 @@ Ethan Hu -->
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>PDF Atelier</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=mobile-workspace-6">
+<link rel="stylesheet" href="styles.css?v=mobile-workspace-10">
 </head>
 <body>
 <div class="frame">
@@ -75,7 +75,7 @@ Ethan Hu -->
   <main>
     <section class="panel panel-left">
 
-      <div class="mobile-controls-sheet" id="mobileControlsSheet" aria-hidden="false">
+      <div class="mobile-controls-sheet" id="mobileControlsSheet" role="region" aria-labelledby="mobileControlsTitle" aria-hidden="false">
         <div class="mobile-controls-sheet-head">
           <div class="mobile-controls-heading">
             <span data-i18n="mobile.controls">Controls</span>
@@ -384,14 +384,32 @@ Ethan Hu -->
           <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="proofMeta">awaiting PDF</div>
           <div class="zoom-bar">
             <button class="zoom-btn" id="zoomOut" disabled>−</button>
-            <span class="zoom-val" id="zoomVal" title="Click to fit">fit</span>
+            <span class="zoom-val" id="zoomVal" role="button" tabindex="0" title="Click to fit">fit</span>
             <button class="zoom-btn" id="zoomIn" disabled>+</button>
           </div>
         </div>
       </div>
       <div class="preview-stage" id="previewStage">
         <div class="empty" id="emptyState">
-          <div class="empty-document" aria-hidden="true"><span></span></div>
+          <svg class="empty-document" viewBox="0 0 112 148" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="emptyPaperFill" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#f5f5f5" />
+                <stop offset=".48" stop-color="#eeeeee" />
+                <stop offset="1" stop-color="#f7f7f7" />
+              </linearGradient>
+              <linearGradient id="emptyFoldFill" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0" stop-color="#ffffff" />
+                <stop offset=".65" stop-color="#fafafa" />
+                <stop offset="1" stop-color="#e5e5e5" />
+              </linearGradient>
+              <filter id="emptyFoldShadow" x="-40%" y="-30%" width="180%" height="190%">
+                <feDropShadow dx="-1" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity=".2" />
+              </filter>
+            </defs>
+            <path d="M8 2h60a9 9 0 0 1 6.4 2.6l33 33A9 9 0 0 1 110 44v96a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Z" fill="url(#emptyPaperFill)" stroke="#000000" stroke-opacity=".12" stroke-width=".7" />
+            <path d="M72 3.4V33a6 6 0 0 0 6 6h30.6a9 9 0 0 0-1.2-1.4l-33-33A9 9 0 0 0 72 3.4Z" fill="url(#emptyFoldFill)" filter="url(#emptyFoldShadow)" />
+          </svg>
           <div class="big" data-i18n="empty.noPreview">Your preview will appear here</div>
           <div class="small" data-i18n="empty.uploadToBegin">Choose a PDF to start</div>
           <button class="empty-upload" id="emptyUploadBtn" type="button" data-i18n="mobile.openPdf" hidden>Open PDF</button>
@@ -407,7 +425,7 @@ Ethan Hu -->
         <div class="page-editor" id="pageEditor" style="display:none">
           <div class="mobile-edit-overview-intro" id="mobileEditOverviewHint">
             <span class="mobile-edit-overview-glyph" aria-hidden="true"></span>
-            <span data-i18n="edit.mobileHold">Press and hold a page to crop or rotate it.</span>
+            <span data-i18n="edit.mobileHold">Tap a page to crop or rotate it.</span>
           </div>
           <div class="page-editor-strip" id="pageEditorStrip"></div>
           <div class="page-editor-main" id="pageEditorMain">
@@ -509,6 +527,6 @@ Ethan Hu -->
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.js?v=mobile-workspace-4"></script>
+<script src="app.js?v=mobile-workspace-5"></script>
 </body>
 </html>
