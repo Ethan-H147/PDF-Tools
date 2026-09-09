@@ -4045,6 +4045,34 @@
 
   .mobile-workspace-dock { display: none; }
 
+  .mobile-document-name { display: none; }
+
+  .undo-pages {
+    align-items: center;
+    background: rgba(118, 118, 128, .11);
+    border: 0;
+    border-radius: 999px;
+    color: var(--ink);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font: 600 12px var(--font-ui);
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 14px;
+  }
+  .undo-pages[hidden] { display: none; }
+  .undo-pages:disabled { cursor: default; opacity: .35; }
+  .undo-pages svg {
+    fill: none;
+    height: 18px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.6;
+    width: 18px;
+  }
+
   /* Phones have one viewport, with scroll ownership inside the active surface. */
   @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse) {
     html.mobile-workspace,
@@ -4063,6 +4091,7 @@
       height: 100dvh;
       width: 100%;
       max-width: none;
+      background: #e9e9ed;
       margin: 0;
       padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
       overflow: hidden;
@@ -4110,9 +4139,27 @@
     body.mobile-preview-workspace .preview-bar {
       flex: 0 0 auto;
       margin: 0;
-      padding: 4px 8px;
+      padding: 12px 16px;
       border: 0;
     }
+
+    body.mobile-preview-workspace .mobile-document-name {
+      color: var(--ink-soft);
+      display: block;
+      font: 500 12px/18px var(--font-ui);
+      left: 16px;
+      min-width: 0;
+      overflow: hidden;
+      pointer-events: none;
+      position: absolute;
+      text-overflow: ellipsis;
+      top: 8px;
+      white-space: nowrap;
+    }
+    body.mobile-preview-workspace .mobile-document-name[hidden] { display: none; }
+    body.mobile-preview-workspace .preview-canvas-wrap:not(.zoomed) { translate: 0 12px; }
+    body.mobile-preview-workspace .preview-stage.organizing,
+    body.mobile-preview-workspace .preview-stage.editing { padding-top: 32px; }
 
     body.mobile-preview-workspace .mobile-controls-toggle,
     body.mobile-preview-workspace .zoom-btn {
@@ -4120,6 +4167,20 @@
     }
 
     body.mobile-preview-workspace .zoom-btn { width: 44px; }
+    body.mobile-preview-workspace .mobile-controls-toggle { padding-inline: 14px; }
+    body.mobile-preview-workspace .zoom-bar {
+      height: 44px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(118, 118, 128, .11);
+      box-shadow: inset 0 0 0 1px var(--line);
+      overflow: hidden;
+    }
+    body.mobile-preview-workspace .zoom-btn {
+      height: 44px;
+      border: 0;
+      background: transparent;
+    }
     body.mobile-preview-workspace .mobile-controls-close { height: 44px; width: 44px; }
     body.mobile-preview-workspace .zoom-bar[hidden] { display: none; }
 
@@ -4136,12 +4197,14 @@
       overscroll-behavior: contain;
     }
 
-    body.dark-mode.mobile-preview-workspace .preview-stage { background: #101012; }
+    body.dark-mode.mobile-preview-workspace .preview-stage,
+    body.dark-mode.mobile-preview-workspace .frame { background: #101012; }
 
     body.mobile-preview-workspace .preview-stage.zoomed,
     body.mobile-preview-workspace .preview-stage.organizing {
       overflow: auto;
       align-items: flex-start;
+      padding-top: 32px;
     }
 
     body.mobile-preview-workspace .preview-canvas-wrap.zoomed,
@@ -4159,9 +4222,12 @@
       align-items: center;
       gap: 8px;
       min-width: 0;
-      padding: 6px 8px;
-      border-top: 1px solid var(--line);
-      background: var(--paper);
+      margin: 8px 12px 12px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--paper-2);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .07);
     }
 
     body.mobile-preview-workspace .mobile-workspace-dock .pagenav,
@@ -4183,6 +4249,9 @@
       flex: 0 0 44px;
       height: 44px;
       width: 44px;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
     }
     body.mobile-preview-workspace .mobile-workspace-dock .pagenav .num {
       min-width: 0;
@@ -4194,6 +4263,7 @@
     body.mobile-preview-workspace .mobile-workspace-dock .actions { flex: 0 1 46%; }
     body.mobile-preview-workspace .mobile-workspace-dock .btn-print {
       min-height: 44px;
+      border-radius: 999px;
       padding: 8px 12px;
       font-size: 12px;
       line-height: 1.25;
@@ -4234,6 +4304,11 @@
     body.mobile-preview-workspace .page-editor.mobile-focused .page-editor-canvas-wrap canvas {
       max-height: none;
     }
+  }
+
+  @media (max-height: 500px) {
+    body.mobile-preview-workspace .preview-bar { padding-block: 6px; }
+    body.mobile-preview-workspace .mobile-workspace-dock { margin-block: 4px 6px; }
   }
 
   html.theme-transitioning .theme-toggle-track,

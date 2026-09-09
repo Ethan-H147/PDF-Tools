@@ -1,7 +1,12 @@
   // SPDX-License-Identifier: AGPL-3.0-or-later
 
+  import * as pdfjsLib from './vendor/pdfjs-6.3.289/legacy/build/pdf.min.mjs';
+  import { PageHistory, capturePageStructure } from './page-history.mjs';
+
+  const APP_ASSET_BASE = document.currentScript?.src || document.baseURI;
+
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    new URL('./vendor/pdfjs-6.3.289/legacy/build/pdf.worker.min.mjs', APP_ASSET_BASE).href;
 
   // ── Tool registry: add a new entry here to add a new tool ──
   const MOBILE_PERFORMANCE_MODE = (() => {
@@ -35,8 +40,7 @@
   const RASTER_PREVIEW_KEY = 'preview-raster';
   const PREVIEW_META_KEY = 'preview-meta';
   const PDF_LIB_SCRIPT_URLS = [
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
-    'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+    new URL('./vendor/pdf-lib-2.9.2/dist/pdf-lib.min.js', APP_ASSET_BASE).href,
   ];
   const JSPDF_SCRIPT_URLS = [
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
@@ -156,6 +160,7 @@
   let processTool = 'threshold';
   let currentLocale = 'en';
   let mobileControlsOpen = false;
+  const pageHistory = new PageHistory();
 
   const state = {
     pdfDoc: null, numPages: 0, curPage: 1,
@@ -297,6 +302,8 @@
   const advancedPasswordToggle = $('advancedPasswordToggle');
   const advancedPasswordInput = $('advancedPasswordInput');
   const resetPagesBtn = $('resetPagesBtn');
+  const undoPagesBtn = $('undoPagesBtn');
+  const mobileDocumentName = $('mobileDocumentName');
   const mergeHint     = $('mergeHint');
   const mergeSummary  = $('mergeSummary');
   const mergeList     = $('mergeList');
@@ -918,7 +925,9 @@
 
   function syncMobileDockMetrics() {
     requestAnimationFrame(() => {
-      const height = isPhoneViewport() ? Math.ceil(mobileDock.getBoundingClientRect().height) : 0;
+      const dockStyle = getComputedStyle(mobileDock);
+      const height = isPhoneViewport() ? Math.ceil(mobileDock.getBoundingClientRect().height
+        + parseFloat(dockStyle.marginTop) + parseFloat(dockStyle.marginBottom)) : 0;
       document.documentElement.style.setProperty('--mobile-actions-height', height + 'px');
     });
   }
@@ -987,6 +996,7 @@
   }
 
   function updatePreviewMode() {
+    syncPageHistory();
     const organizing = activeTool === 'organize';
     const editing = activeTool === 'edit';
     syncMobileEditMode();
@@ -1048,6 +1058,7 @@
   }
 
   function updateSourceDropMode() {
+    syncDocumentName();
     const merging = activeTool === 'merge';
     const hasCurrentPdf = !!state.pdfBytes || !!state.sourceFile || !!state.pdfDoc;
     const collapseDrop = hasCurrentPdf && !merging;
@@ -1065,6 +1076,41 @@
   }
 
   // ── Helpers ──
+  function syncDocumentName() {
+    mobileDocumentName.hidden = !state.pdfDoc;
+    mobileDocumentName.textContent = state.pdfDoc ? state.fileName : '';
+    mobileDocumentName.title = state.pdfDoc ? state.fileName : '';
+    $('mobileEditDocumentName').textContent = state.pdfDoc ? state.fileName : '';
+    $('mobileEditDocumentName').title = state.pdfDoc ? state.fileName : '';
+    requestAnimationFrame(positionDocumentName);
+  }
+
+  function positionDocumentName() {
+    if (!isPhoneViewport() || !state.pdfDoc) return;
+    const stage = previewStage.getBoundingClientRect();
+    const canvas = previewCanvas.getBoundingClientRect();
+    const hasCanvas = activeTool !== 'organize' && activeTool !== 'edit' && activePageCount() > 0 && !canvasWrap.classList.contains('zoomed');
+    const left = hasCanvas ? Math.max(8, canvas.left - stage.left) : 16;
+    const top = hasCanvas ? Math.max(6, canvas.top - stage.top - 24) : 8;
+    mobileDocumentName.style.left = left + 'px';
+    mobileDocumentName.style.top = top + 'px';
+    mobileDocumentName.style.width = (hasCanvas ? canvas.width : Math.max(0, stage.width - 32)) + 'px';
+  }
+
+  function syncPageHistory() {
+    undoPagesBtn.hidden = activeTool !== 'organize';
+    undoPagesBtn.disabled = !state.pdfDoc || !pageHistory.canUndo || operationInProgress || loader.classList.contains('on');
+  }
+
+  function undoPageChange() {
+    if (!state.pdfDoc || operationInProgress || loader.classList.contains('on') || activeTool !== 'organize' || organizerDrag.active) return;
+    const previous = pageHistory.undo();
+    if (!previous) return;
+    hidePageContextMenu();
+    Object.assign(state, previous);
+    updatePageState();
+  }
+
   function showError(msg) {
     if (usesMobilePreviewWorkspace()) setMobileControlsOpen(true);
     if (errorHideTimer) clearTimeout(errorHideTimer);
@@ -1276,7 +1322,7 @@
 
   function buildAdvancedExportProcessors(context, artifact) {
     const processors = [];
-    if (context.advanced.password && !artifact.meta?.passwordProtected) {
+    if (context.advanced.password) {
       processors.push({
         id: 'password',
         label: t('progress.lockingPdf'),
@@ -1287,38 +1333,29 @@
     return processors;
   }
 
-  async function loadNoRasterPdfEncryptionEngine() {
-    return noRasterPdfEncryptionEngine;
-  }
-
   async function applyPasswordProcessor(artifact, context) {
-    const engine = await loadNoRasterPdfEncryptionEngine();
-    const encryptedBytes = await engine.encrypt({
-      bytes: artifact.bytes,
+    const { PDFDocument } = await ensurePdfLib();
+    const bytes = artifact.blob instanceof Blob
+      ? new Uint8Array(await artifact.blob.arrayBuffer())
+      : normalizePdfBytes(artifact.bytes);
+    const document = await PDFDocument.load(bytes, { updateMetadata: false });
+    const ownerKey = crypto.getRandomValues(new Uint8Array(32));
+    const ownerPassword = Array.from(ownerKey, byte => byte.toString(16).padStart(2, '0')).join('');
+    document.encrypt({
+      algorithm: 'AES-256',
       userPassword: context.advanced.password,
-      ownerPassword: context.advanced.password,
+      ownerPassword,
     });
+    const encryptedBytes = await document.save();
     return clonePdfArtifact(artifact, {
       bytes: encryptedBytes,
+      blob: null,
       meta: {
         passwordProtected: true,
         processors: [...(artifact.meta?.processors || []), 'password'],
       },
     });
   }
-
-  const PDF_PASSWORD_PADDING = Uint8Array.from([
-    0x28, 0xbf, 0x4e, 0x5e, 0x4e, 0x75, 0x8a, 0x41,
-    0x64, 0x00, 0x4e, 0x56, 0xff, 0xfa, 0x01, 0x08,
-    0x2e, 0x2e, 0x00, 0xb6, 0xd0, 0x68, 0x3e, 0x80,
-    0x2f, 0x0c, 0xa9, 0xfe, 0x64, 0x53, 0x69, 0x7a,
-  ]);
-
-  const noRasterPdfEncryptionEngine = {
-    encrypt({ bytes, userPassword, ownerPassword }) {
-      return encryptPdfBytesNoRaster(normalizePdfBytes(bytes), userPassword, ownerPassword || userPassword);
-    },
-  };
 
   const LOCALE_STORAGE_KEY = 'pdf-atelier-language';
   const DEFAULT_LOCALE = 'en';
@@ -1340,14 +1377,14 @@
       'mobile.closeControls': 'Close controls',
       'mobile.openPdf': 'Open PDF',
       'mobile.openControls': 'Open {tool} controls',
-      'sections.source': 'I. Source PDF',
-      'sections.organize': 'II. Organize Pages',
-      'sections.cropRotate': 'II. Crop & Rotate',
-      'sections.merge': 'II. Merge PDFs',
-      'sections.compress': 'II. Compress PDF',
-      'sections.threshold': 'II. Threshold',
-      'sections.greyscale': 'II. Grayscale',
-      'sections.pages': 'III. Pages',
+      'sections.source': 'Source PDF',
+      'sections.organize': 'Organize Pages',
+      'sections.cropRotate': 'Crop & Rotate',
+      'sections.merge': 'Merge PDFs',
+      'sections.compress': 'Compress PDF',
+      'sections.threshold': 'Threshold',
+      'sections.greyscale': 'Grayscale',
+      'sections.pages': 'Pages',
       'file.pages': 'Pages',
       'file.page': 'Page',
       'file.pagePrefix': 'Page ',
@@ -1570,14 +1607,14 @@
       'mobile.closeControls': '关闭控制项',
       'mobile.openPdf': '打开 PDF',
       'mobile.openControls': '打开{tool}控制项',
-      'sections.source': 'I. 原始 PDF',
-      'sections.organize': 'II. 整理页面',
-      'sections.cropRotate': 'II. 裁剪与旋转',
-      'sections.merge': 'II. 合并 PDF',
-      'sections.compress': 'II. 压缩 PDF',
-      'sections.threshold': 'II. 黑白阈值',
-      'sections.greyscale': 'II. 灰度',
-      'sections.pages': 'III. 页面',
+      'sections.source': '原始 PDF',
+      'sections.organize': '整理页面',
+      'sections.cropRotate': '裁剪与旋转',
+      'sections.merge': '合并 PDF',
+      'sections.compress': '压缩 PDF',
+      'sections.threshold': '黑白阈值',
+      'sections.greyscale': '灰度',
+      'sections.pages': '页面',
       'file.pages': '页数',
       'file.page': '页',
       'file.pagePrefix': '第',
@@ -1781,14 +1818,14 @@
       'mobile.closeControls': '關閉控制項',
       'mobile.openPdf': '開啟 PDF',
       'mobile.openControls': '開啟{tool}控制項',
-      'sections.source': 'I. 原始 PDF',
-      'sections.organize': 'II. 整理頁面',
-      'sections.cropRotate': 'II. 裁切與旋轉',
-      'sections.merge': 'II. 合併 PDF',
-      'sections.compress': 'II. 壓縮 PDF',
-      'sections.threshold': 'II. 黑白閾值',
-      'sections.greyscale': 'II. 灰階',
-      'sections.pages': 'III. 頁面',
+      'sections.source': '原始 PDF',
+      'sections.organize': '整理頁面',
+      'sections.cropRotate': '裁切與旋轉',
+      'sections.merge': '合併 PDF',
+      'sections.compress': '壓縮 PDF',
+      'sections.threshold': '黑白閾值',
+      'sections.greyscale': '灰階',
+      'sections.pages': '頁面',
       'file.pages': '頁數',
       'file.page': '頁',
       'file.pagePrefix': '第',
@@ -2007,14 +2044,14 @@
       'mobile.closeControls': '제어 닫기',
       'mobile.openPdf': 'PDF 열기',
       'mobile.openControls': '{tool} 제어 열기',
-      'sections.source': 'I. 원본 PDF',
-      'sections.organize': 'II. 페이지 정리',
-      'sections.cropRotate': 'II. 자르기/회전',
-      'sections.merge': 'II. PDF 병합',
-      'sections.compress': 'II. PDF 압축',
-      'sections.threshold': 'II. 흑백',
-      'sections.greyscale': 'II. 그레이스케일',
-      'sections.pages': 'III. 페이지',
+      'sections.source': '원본 PDF',
+      'sections.organize': '페이지 정리',
+      'sections.cropRotate': '자르기/회전',
+      'sections.merge': 'PDF 병합',
+      'sections.compress': 'PDF 압축',
+      'sections.threshold': '흑백',
+      'sections.greyscale': '그레이스케일',
+      'sections.pages': '페이지',
       'file.pages': '페이지',
       'file.page': '페이지',
       'file.pagePrefix': '',
@@ -2233,14 +2270,14 @@
       'mobile.closeControls': 'コントロールを閉じる',
       'mobile.openPdf': 'PDFを開く',
       'mobile.openControls': '{tool}のコントロールを開く',
-      'sections.source': 'I. 元のPDF',
-      'sections.organize': 'II. ページ整理',
-      'sections.cropRotate': 'II. トリミング/回転',
-      'sections.merge': 'II. PDF結合',
-      'sections.compress': 'II. PDF圧縮',
-      'sections.threshold': 'II. 白黒',
-      'sections.greyscale': 'II. グレースケール',
-      'sections.pages': 'III. ページ',
+      'sections.source': '元のPDF',
+      'sections.organize': 'ページ整理',
+      'sections.cropRotate': 'トリミング/回転',
+      'sections.merge': 'PDF結合',
+      'sections.compress': 'PDF圧縮',
+      'sections.threshold': '白黒',
+      'sections.greyscale': 'グレースケール',
+      'sections.pages': 'ページ',
       'file.pages': 'ページ',
       'file.page': 'ページ',
       'file.pagePrefix': '',
@@ -2458,14 +2495,14 @@
       'mobile.closeControls': 'Cerrar controles',
       'mobile.openPdf': 'Abrir PDF',
       'mobile.openControls': 'Abrir controles de {tool}',
-      'sections.source': 'I. PDF de origen',
-      'sections.organize': 'II. Organizar páginas',
-      'sections.cropRotate': 'II. Recortar/Girar',
-      'sections.merge': 'II. Unir PDF',
-      'sections.compress': 'II. Comprimir PDF',
-      'sections.threshold': 'II. Umbral',
-      'sections.greyscale': 'II. Escala de grises',
-      'sections.pages': 'III. Páginas',
+      'sections.source': 'PDF de origen',
+      'sections.organize': 'Organizar páginas',
+      'sections.cropRotate': 'Recortar/Girar',
+      'sections.merge': 'Unir PDF',
+      'sections.compress': 'Comprimir PDF',
+      'sections.threshold': 'Umbral',
+      'sections.greyscale': 'Escala de grises',
+      'sections.pages': 'Páginas',
       'file.pages': 'Páginas',
       'file.page': 'Página',
       'file.pagePrefix': 'Página ',
@@ -2683,14 +2720,14 @@
       'mobile.closeControls': 'Fermer les réglages',
       'mobile.openPdf': 'Ouvrir un PDF',
       'mobile.openControls': 'Ouvrir les réglages de {tool}',
-      'sections.source': 'I. PDF source',
-      'sections.organize': 'II. Organiser les pages',
-      'sections.cropRotate': 'II. Recadrer/Pivoter',
-      'sections.merge': 'II. Fusionner des PDF',
-      'sections.compress': 'II. Compresser le PDF',
-      'sections.threshold': 'II. Seuil',
-      'sections.greyscale': 'II. Niveaux de gris',
-      'sections.pages': 'III. Pages',
+      'sections.source': 'PDF source',
+      'sections.organize': 'Organiser les pages',
+      'sections.cropRotate': 'Recadrer/Pivoter',
+      'sections.merge': 'Fusionner des PDF',
+      'sections.compress': 'Compresser le PDF',
+      'sections.threshold': 'Seuil',
+      'sections.greyscale': 'Niveaux de gris',
+      'sections.pages': 'Pages',
       'file.pages': 'Pages',
       'file.page': 'Page',
       'file.pagePrefix': 'Page ',
@@ -2905,7 +2942,7 @@
 
   const SIGN_LOCALES = {
     en: {
-      'sections.sign': 'II. Sign PDF',
+      'sections.sign': 'Sign PDF',
       'preview.titleSign': 'Sign <em>— drag your signature onto the page</em>',
       'progress.exportingSignedPdf': 'Exporting signed PDF…',
       'errors.noSignature': 'Draw a signature and place it on the PDF before exporting.',
@@ -2930,7 +2967,7 @@
       'tool.sign.downloadSub': 'stamp the signature onto the PDF',
     },
     'zh-Hans': {
-      'sections.sign': 'II. 签署 PDF',
+      'sections.sign': '签署 PDF',
       'preview.titleSign': '签署 <em>— 将签名拖到页面上</em>',
       'progress.exportingSignedPdf': '正在导出签署后的 PDF…',
       'errors.noSignature': '请先绘制签名并放到 PDF 上，再进行导出。',
@@ -2955,7 +2992,7 @@
       'tool.sign.downloadSub': '将签名盖到 PDF 上',
     },
     'zh-Hant-TW': {
-      'sections.sign': 'II. 簽署 PDF',
+      'sections.sign': '簽署 PDF',
       'preview.titleSign': '簽署 <em>— 將簽名拖到頁面上</em>',
       'progress.exportingSignedPdf': '正在匯出簽署後的 PDF…',
       'errors.noSignature': '請先繪製簽名並放到 PDF 上，再進行匯出。',
@@ -2980,7 +3017,7 @@
       'tool.sign.downloadSub': '將簽名加到 PDF 上',
     },
     ko: {
-      'sections.sign': 'II. PDF 서명',
+      'sections.sign': 'PDF 서명',
       'preview.titleSign': '서명 <em>— 서명을 페이지 위로 끌어 놓기</em>',
       'progress.exportingSignedPdf': '서명된 PDF 내보내는 중…',
       'errors.noSignature': '내보내기 전에 서명을 그리고 PDF에 배치하세요.',
@@ -3005,7 +3042,7 @@
       'tool.sign.downloadSub': 'PDF에 서명 추가',
     },
     ja: {
-      'sections.sign': 'II. PDFに署名',
+      'sections.sign': 'PDFに署名',
       'preview.titleSign': '署名 <em>— 署名をページ上へドラッグ</em>',
       'progress.exportingSignedPdf': '署名済みPDFを書き出しています…',
       'errors.noSignature': '書き出す前に署名を描いてPDF上に配置してください。',
@@ -3030,7 +3067,7 @@
       'tool.sign.downloadSub': 'PDFに署名を追加',
     },
     es: {
-      'sections.sign': 'II. Firmar PDF',
+      'sections.sign': 'Firmar PDF',
       'preview.titleSign': 'Firmar <em>— arrastra tu firma a la página</em>',
       'progress.exportingSignedPdf': 'Exportando PDF firmado…',
       'errors.noSignature': 'Dibuja una firma y colócala en el PDF antes de exportar.',
@@ -3055,7 +3092,7 @@
       'tool.sign.downloadSub': 'estampar la firma en el PDF',
     },
     fr: {
-      'sections.sign': 'II. Signer le PDF',
+      'sections.sign': 'Signer le PDF',
       'preview.titleSign': 'Signer <em>— faites glisser votre signature sur la page</em>',
       'progress.exportingSignedPdf': 'Export du PDF signé…',
       'errors.noSignature': 'Dessinez une signature et placez-la sur le PDF avant d’exporter.',
@@ -3085,458 +3122,17 @@
     Object.assign(LOCALES[locale], additions);
   });
 
-  function concatBytes(...parts) {
-    const length = parts.reduce((sum, part) => sum + part.length, 0);
-    const out = new Uint8Array(length);
-    let offset = 0;
-    parts.forEach(part => {
-      out.set(part, offset);
-      offset += part.length;
-    });
-    return out;
-  }
-
-  function bytesToBinaryString(bytes) {
-    let out = '';
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      out += String.fromCharCode(...bytes.subarray(i, i + chunk));
-    }
-    return out;
-  }
-
-  function binaryStringToBytes(str) {
-    const out = new Uint8Array(str.length);
-    for (let i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0xff;
-    return out;
-  }
-
-  function bytesToHex(bytes) {
-    let out = '';
-    for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');
-    return out;
-  }
-
-  function hexToBytes(hex) {
-    const clean = (hex || '').replace(/\s+/g, '');
-    const out = new Uint8Array(Math.ceil(clean.length / 2));
-    for (let i = 0; i < out.length; i++) {
-      const pair = clean.slice(i * 2, i * 2 + 2).padEnd(2, '0');
-      out[i] = parseInt(pair, 16) || 0;
-    }
-    return out;
-  }
-
-  function randomBytes(length) {
-    const out = new Uint8Array(length);
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(out);
-    else throw new Error('Secure browser randomness is required to lock PDFs.');
-    return out;
-  }
-
-  function passwordBytes(password) {
-    return new TextEncoder().encode(String(password || ''));
-  }
-
-  function padPdfPassword(password) {
-    const raw = passwordBytes(password);
-    const out = new Uint8Array(32);
-    const copyLength = Math.min(raw.length, 32);
-    out.set(raw.subarray(0, copyLength), 0);
-    if (copyLength < 32) out.set(PDF_PASSWORD_PADDING.subarray(0, 32 - copyLength), copyLength);
-    return out;
-  }
-
-  function int32BytesLE(value) {
-    const n = value >>> 0;
-    return Uint8Array.from([n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff]);
-  }
-
-  function rc4(key, data) {
-    const s = new Uint8Array(256);
-    for (let i = 0; i < 256; i++) s[i] = i;
-    let j = 0;
-    for (let i = 0; i < 256; i++) {
-      j = (j + s[i] + key[i % key.length]) & 255;
-      const t = s[i]; s[i] = s[j]; s[j] = t;
-    }
-    const out = new Uint8Array(data.length);
-    let i = 0;
-    j = 0;
-    for (let n = 0; n < data.length; n++) {
-      i = (i + 1) & 255;
-      j = (j + s[i]) & 255;
-      const t = s[i]; s[i] = s[j]; s[j] = t;
-      out[n] = data[n] ^ s[(s[i] + s[j]) & 255];
-    }
-    return out;
-  }
-
-  function xorKey(key, value) {
-    const out = new Uint8Array(key.length);
-    for (let i = 0; i < key.length; i++) out[i] = key[i] ^ value;
-    return out;
-  }
-
-  function leftRotate(value, shift) {
-    return ((value << shift) | (value >>> (32 - shift))) >>> 0;
-  }
-
-  function md5(bytes) {
-    const inputLength = bytes.length;
-    const paddedLength = (((inputLength + 8) >>> 6) + 1) << 6;
-    const buffer = new Uint8Array(paddedLength);
-    buffer.set(bytes);
-    buffer[inputLength] = 0x80;
-    const bitLength = inputLength * 8;
-    for (let i = 0; i < 8; i++) buffer[paddedLength - 8 + i] = Math.floor(bitLength / (2 ** (8 * i))) & 0xff;
-
-    let a0 = 0x67452301;
-    let b0 = 0xefcdab89;
-    let c0 = 0x98badcfe;
-    let d0 = 0x10325476;
-    const shifts = [
-      7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-      5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
-      4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-      6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
-    ];
-    const table = new Uint32Array(64);
-    for (let i = 0; i < 64; i++) table[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0;
-
-    for (let offset = 0; offset < paddedLength; offset += 64) {
-      const m = new Uint32Array(16);
-      for (let i = 0; i < 16; i++) {
-        const p = offset + i * 4;
-        m[i] = buffer[p] | (buffer[p + 1] << 8) | (buffer[p + 2] << 16) | (buffer[p + 3] << 24);
-      }
-      let a = a0, b = b0, c = c0, d = d0;
-      for (let i = 0; i < 64; i++) {
-        let f, g;
-        if (i < 16) {
-          f = (b & c) | (~b & d);
-          g = i;
-        } else if (i < 32) {
-          f = (d & b) | (~d & c);
-          g = (5 * i + 1) % 16;
-        } else if (i < 48) {
-          f = b ^ c ^ d;
-          g = (3 * i + 5) % 16;
-        } else {
-          f = c ^ (b | ~d);
-          g = (7 * i) % 16;
-        }
-        const next = d;
-        d = c;
-        c = b;
-        b = (b + leftRotate((a + f + table[i] + m[g]) >>> 0, shifts[i])) >>> 0;
-        a = next;
-      }
-      a0 = (a0 + a) >>> 0;
-      b0 = (b0 + b) >>> 0;
-      c0 = (c0 + c) >>> 0;
-      d0 = (d0 + d) >>> 0;
-    }
-
-    const out = new Uint8Array(16);
-    [a0, b0, c0, d0].forEach((word, index) => {
-      const offset = index * 4;
-      out[offset] = word & 0xff;
-      out[offset + 1] = (word >>> 8) & 0xff;
-      out[offset + 2] = (word >>> 16) & 0xff;
-      out[offset + 3] = (word >>> 24) & 0xff;
-    });
-    return out;
-  }
-
-  function computeOwnerPasswordValue(ownerPassword, userPassword, keyLength) {
-    let digest = md5(padPdfPassword(ownerPassword));
-    for (let i = 0; i < 50; i++) digest = md5(digest);
-    const key = digest.subarray(0, keyLength);
-    let value = padPdfPassword(userPassword);
-    for (let i = 0; i < 20; i++) value = rc4(xorKey(key, i), value);
-    return value;
-  }
-
-  function computeFileEncryptionKey(userPassword, ownerValue, permissions, fileId, keyLength) {
-    let digest = md5(concatBytes(
-      padPdfPassword(userPassword),
-      ownerValue,
-      int32BytesLE(permissions),
-      fileId,
-    ));
-    for (let i = 0; i < 50; i++) digest = md5(digest.subarray(0, keyLength));
-    return digest.subarray(0, keyLength);
-  }
-
-  function computeUserPasswordValue(fileKey, fileId) {
-    let value = md5(concatBytes(PDF_PASSWORD_PADDING, fileId));
-    for (let i = 0; i < 20; i++) value = rc4(xorKey(fileKey, i), value);
-    return concatBytes(value, randomBytes(16));
-  }
-
-  function objectEncryptionKey(fileKey, objectNumber, generationNumber) {
-    const suffix = Uint8Array.from([
-      objectNumber & 0xff,
-      (objectNumber >>> 8) & 0xff,
-      (objectNumber >>> 16) & 0xff,
-      generationNumber & 0xff,
-      (generationNumber >>> 8) & 0xff,
-    ]);
-    return md5(concatBytes(fileKey, suffix)).subarray(0, Math.min(fileKey.length + 5, 16));
-  }
-
-  function decodePdfLiteralString(content) {
-    const out = [];
-    for (let i = 0; i < content.length; i++) {
-      let code = content.charCodeAt(i) & 0xff;
-      if (code !== 0x5c) {
-        out.push(code);
-        continue;
-      }
-      i += 1;
-      if (i >= content.length) break;
-      const next = content.charAt(i);
-      const nextCode = content.charCodeAt(i) & 0xff;
-      if (next === 'n') out.push(0x0a);
-      else if (next === 'r') out.push(0x0d);
-      else if (next === 't') out.push(0x09);
-      else if (next === 'b') out.push(0x08);
-      else if (next === 'f') out.push(0x0c);
-      else if (next === '(' || next === ')' || next === '\\') out.push(nextCode);
-      else if (next === '\r' || next === '\n') {
-        if (next === '\r' && content.charAt(i + 1) === '\n') i += 1;
-      } else if (/[0-7]/.test(next)) {
-        let octal = next;
-        for (let j = 0; j < 2 && /[0-7]/.test(content.charAt(i + 1)); j++) {
-          i += 1;
-          octal += content.charAt(i);
-        }
-        out.push(parseInt(octal, 8) & 0xff);
-      } else {
-        out.push(nextCode);
-      }
-    }
-    return Uint8Array.from(out);
-  }
-
-  function parsePdfLiteralString(source, start) {
-    let depth = 1;
-    let escaped = false;
-    for (let i = start + 1; i < source.length; i++) {
-      const ch = source.charAt(i);
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (ch === '\\') {
-        escaped = true;
-        continue;
-      }
-      if (ch === '(') depth += 1;
-      else if (ch === ')') {
-        depth -= 1;
-        if (depth === 0) {
-          return {
-            end: i + 1,
-            bytes: decodePdfLiteralString(source.slice(start + 1, i)),
-          };
-        }
-      }
-    }
-    return null;
-  }
-
-  function encryptPdfStrings(source, key) {
-    let out = '';
-    for (let i = 0; i < source.length;) {
-      const ch = source.charAt(i);
-      if (ch === '%') {
-        const end = source.slice(i).search(/[\r\n]/);
-        if (end === -1) {
-          out += source.slice(i);
-          break;
-        }
-        out += source.slice(i, i + end);
-        i += end;
-        continue;
-      }
-      if (ch === '(') {
-        const parsed = parsePdfLiteralString(source, i);
-        if (!parsed) {
-          out += ch;
-          i += 1;
-          continue;
-        }
-        out += '<' + bytesToHex(rc4(key, parsed.bytes)) + '>';
-        i = parsed.end;
-        continue;
-      }
-      if (ch === '<' && source.charAt(i + 1) !== '<') {
-        const end = source.indexOf('>', i + 1);
-        const value = end === -1 ? '' : source.slice(i + 1, end);
-        if (end !== -1 && /^[\da-fA-F\s]*$/.test(value)) {
-          out += '<' + bytesToHex(rc4(key, hexToBytes(value))) + '>';
-          i = end + 1;
-          continue;
-        }
-      }
-      out += ch;
-      i += 1;
-    }
-    return out;
-  }
-
-  function encryptPdfObjectBody(body, key) {
-    const streamMatch = /\bstream(\r\n|\n|\r)/.exec(body);
-    if (!streamMatch) return encryptPdfStrings(body, key);
-    const markerStart = streamMatch.index;
-    const markerEnd = markerStart + streamMatch[0].length;
-    const prefix = body.slice(0, markerStart);
-    const lengthMatch = /\/Length\s+(\d+)/.exec(prefix);
-    if (!lengthMatch) throw new Error('Cannot lock this PDF because a stream has an indirect length.');
-    const streamLength = Number(lengthMatch[1]);
-    const streamEnd = markerEnd + streamLength;
-    const streamBytes = binaryStringToBytes(body.slice(markerEnd, streamEnd));
-    return encryptPdfStrings(prefix, key) +
-      body.slice(markerStart, markerEnd) +
-      bytesToBinaryString(rc4(key, streamBytes)) +
-      body.slice(streamEnd);
-  }
-
-  function readBalancedPdfDictionary(source, start) {
-    if (source.slice(start, start + 2) !== '<<') return null;
-    let depth = 0;
-    for (let i = start; i < source.length - 1; i++) {
-      const pair = source.slice(i, i + 2);
-      if (pair === '<<') {
-        depth += 1;
-        i += 1;
-      } else if (pair === '>>') {
-        depth -= 1;
-        i += 1;
-        if (depth === 0) return { value: source.slice(start, i + 1), end: i + 1 };
-      }
-    }
-    return null;
-  }
-
-  function parseTrailerDictionary(pdfText) {
-    const trailerIndex = pdfText.lastIndexOf('trailer');
-    if (trailerIndex === -1) throw new Error('Cannot lock this PDF because its trailer was not found.');
-    const dictStart = pdfText.indexOf('<<', trailerIndex);
-    const parsed = readBalancedPdfDictionary(pdfText, dictStart);
-    if (!parsed) throw new Error('Cannot lock this PDF because its trailer is invalid.');
-    return parsed.value;
-  }
-
-  function parsePdfObjectEntries(pdfText) {
-    const startxrefIndex = pdfText.lastIndexOf('startxref');
-    if (startxrefIndex === -1) throw new Error('Cannot lock this PDF because its cross-reference table was not found.');
-    const startxrefMatch = /startxref\s+(\d+)/.exec(pdfText.slice(startxrefIndex));
-    if (!startxrefMatch) throw new Error('Cannot lock this PDF because its cross-reference table was invalid.');
-    const xrefOffset = Number(startxrefMatch[1]);
-    if (pdfText.slice(xrefOffset, xrefOffset + 4) !== 'xref') {
-      throw new Error('Cannot lock this PDF because it uses a compressed cross-reference stream.');
-    }
-    const trailerIndex = pdfText.indexOf('trailer', xrefOffset);
-    const xrefBody = pdfText.slice(xrefOffset + 4, trailerIndex);
-    const lines = xrefBody.split(/\r?\n/);
-    const refs = [];
-    for (let i = 0; i < lines.length; i++) {
-      const header = /^\s*(\d+)\s+(\d+)\s*$/.exec(lines[i]);
-      if (!header) continue;
-      const first = Number(header[1]);
-      const count = Number(header[2]);
-      for (let j = 0; j < count && i + 1 + j < lines.length; j++) {
-        const entry = /^(\d{10})\s+(\d{5})\s+([nf])/.exec(lines[i + 1 + j]);
-        if (entry && entry[3] === 'n') {
-          refs.push({
-            number: first + j,
-            generation: Number(entry[2]),
-            offset: Number(entry[1]),
-          });
-        }
-      }
-      i += count;
-    }
-    refs.sort((a, b) => a.offset - b.offset);
-    return refs.map((ref, index) => {
-      const nextOffset = refs[index + 1]?.offset ?? pdfText.length;
-      const slice = pdfText.slice(ref.offset, nextOffset);
-      const header = new RegExp('^\\s*' + ref.number + '\\s+' + ref.generation + '\\s+obj\\s*').exec(slice);
-      const endIndex = slice.lastIndexOf('endobj');
-      if (!header || endIndex === -1) throw new Error('Cannot lock this PDF because object ' + ref.number + ' is invalid.');
-      return {
-        number: ref.number,
-        generation: ref.generation,
-        body: slice.slice(header[0].length, endIndex).replace(/^\r?\n/, '').replace(/\s*$/, ''),
-      };
-    });
-  }
-
-  function extractTrailerRef(trailer, name) {
-    const match = new RegExp('/' + name + '\\s+(\\d+\\s+\\d+\\s+R)').exec(trailer);
-    return match ? match[1] : '';
-  }
-
-  function extractTrailerId(trailer) {
-    const match = /\/ID\s*\[\s*<([\da-fA-F\s]+)>\s*<([\da-fA-F\s]+)>/.exec(trailer);
-    return match ? hexToBytes(match[1]).subarray(0, 16) : randomBytes(16);
-  }
-
-  function encryptionDictionary(objectNumber, ownerValue, userValue, permissions) {
-    return objectNumber + ' 0 obj\n' +
-      '<< /Filter /Standard /V 2 /R 3 /Length 128 ' +
-      '/O <' + bytesToHex(ownerValue) + '> ' +
-      '/U <' + bytesToHex(userValue) + '> ' +
-      '/P ' + permissions + ' >>\n' +
-      'endobj\n';
-  }
-
-  function encryptPdfBytesNoRaster(bytes, userPassword, ownerPassword) {
-    const pdfText = bytesToBinaryString(bytes);
-    const objects = parsePdfObjectEntries(pdfText);
-    const trailer = parseTrailerDictionary(pdfText);
-    const rootRef = extractTrailerRef(trailer, 'Root');
-    if (!rootRef) throw new Error('Cannot lock this PDF because its document catalog was not found.');
-    const infoRef = extractTrailerRef(trailer, 'Info');
-    const fileId = extractTrailerId(trailer);
-    const keyLength = 16;
-    const permissions = -4;
-    const ownerValue = computeOwnerPasswordValue(ownerPassword, userPassword, keyLength);
-    const fileKey = computeFileEncryptionKey(userPassword, ownerValue, permissions, fileId, keyLength);
-    const userValue = computeUserPasswordValue(fileKey, fileId);
-    const maxObjectNumber = objects.reduce((max, object) => Math.max(max, object.number), 0);
-    const encryptObjectNumber = maxObjectNumber + 1;
-
-    let output = '%PDF-1.7\n%\x81\x81\x81\x81\n';
-    const offsets = new Map();
-    objects.forEach(object => {
-      offsets.set(object.number, output.length);
-      const key = objectEncryptionKey(fileKey, object.number, object.generation);
-      output += object.number + ' ' + object.generation + ' obj\n' +
-        encryptPdfObjectBody(object.body, key) + '\nendobj\n';
-    });
-    offsets.set(encryptObjectNumber, output.length);
-    output += encryptionDictionary(encryptObjectNumber, ownerValue, userValue, permissions);
-
-    const xrefOffset = output.length;
-    const size = encryptObjectNumber + 1;
-    output += 'xref\n0 ' + size + '\n';
-    for (let i = 0; i < size; i++) {
-      if (i === 0) output += '0000000000 65535 f \n';
-      else if (offsets.has(i)) output += String(offsets.get(i)).padStart(10, '0') + ' 00000 n \n';
-      else output += '0000000000 65535 f \n';
-    }
-    output += 'trailer\n<< /Size ' + size +
-      ' /Root ' + rootRef +
-      (infoRef ? ' /Info ' + infoRef : '') +
-      ' /Encrypt ' + encryptObjectNumber + ' 0 R' +
-      ' /ID [<' + bytesToHex(fileId) + '><' + bytesToHex(fileId) + '>]' +
-      ' >>\nstartxref\n' + xrefOffset + '\n%%EOF\n';
-    return binaryStringToBytes(output);
-  }
+  Object.entries({
+    en: ['Undo', 'Undo page change'],
+    'zh-Hans': ['撤销', '撤销页面更改'],
+    'zh-Hant-TW': ['復原', '復原頁面變更'],
+    ko: ['실행 취소', '페이지 변경 실행 취소'],
+    ja: ['取り消す', 'ページの変更を取り消す'],
+    es: ['Deshacer', 'Deshacer cambio de páginas'],
+    fr: ['Annuler', 'Annuler la modification des pages'],
+  }).forEach(([locale, [undo, undoPages]]) => {
+    Object.assign(LOCALES[locale], { 'actions.undo': undo, 'actions.undoPages': undoPages });
+  });
 
   async function applyAdvancedExportProcessors(artifact, context) {
     let current = artifact;
@@ -3645,20 +3241,7 @@
   }
 
   function advancedPasswordValue() {
-    return advancedPasswordToggle.checked ? advancedPasswordInput.value.trim() : '';
-  }
-
-  function jsPdfExportOptions(options, context) {
-    const password = context?.advanced?.password || '';
-    if (!password || !canPasswordProtectExport(context?.toolId || activeTool)) return options;
-    return {
-      ...options,
-      encryption: {
-        userPassword: password,
-        ownerPassword: password,
-        userPermissions: ['print'],
-      },
-    };
+    return advancedPasswordToggle.checked ? advancedPasswordInput.value : '';
   }
 
   function syncAdvancedOptions() {
@@ -3995,6 +3578,8 @@
   }
 
   function updatePageState() {
+    syncPageHistory();
+    syncDocumentName();
     const count = activePageCount();
     normalizeSplitState();
     if (count === 0) state.curPage = 1;
@@ -4040,6 +3625,7 @@
 
   function setLoader(on, label, pct) {
     loader.classList.toggle('on', on);
+    syncPageHistory();
     loader.setAttribute('aria-busy', on ? 'true' : 'false');
     loader.setAttribute('aria-hidden', on ? 'false' : 'true');
     if (on && label != null) loaderLabel.textContent = label;
@@ -4119,6 +3705,7 @@
 
   function clearCurrentPdf() {
     if (operationInProgress) return;
+    pageHistory.clear();
     beginPdfLoad();
     clearError();
     const previousPdf = state.pdfDoc;
@@ -4400,6 +3987,7 @@
     loadToken = beginPdfLoad(),
   ) {
     if (loadToken !== pdfLoadGeneration) return false;
+    pageHistory.clear();
     const previousPdf = state.pdfDoc;
     state.pdfDoc = null;
     resetRenderCaches();
@@ -4440,7 +4028,21 @@
     updateSourceDropMode();
     setLoader(true, loadingLabel, 0);
     const pdfData = sourceFile ? inputBytes : inputBytes.slice();
-    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+    if (location.protocol === 'file:') {
+      // Local files cannot import module workers. PDF.js supports a same-thread
+      // worker handler loaded by a classic script without weakening browser policy.
+      await loadScriptOnce('PDF worker', [new URL('./vendor/pdfjs-6.3.289/legacy/build/pdf.worker.local.js', APP_ASSET_BASE).href]);
+      if (loadToken !== pdfLoadGeneration) return false;
+    }
+    const loadingTask = pdfjsLib.getDocument({
+      data: pdfData,
+      isEvalSupported: false,
+      cMapUrl: new URL('./vendor/pdfjs-6.3.289/cmaps/', APP_ASSET_BASE).href,
+      cMapPacked: true,
+      standardFontDataUrl: new URL('./vendor/pdfjs-6.3.289/standard_fonts/', APP_ASSET_BASE).href,
+      wasmUrl: new URL('./vendor/pdfjs-6.3.289/wasm/', APP_ASSET_BASE).href,
+      iccUrl: new URL('./vendor/pdfjs-6.3.289/iccs/', APP_ASSET_BASE).href,
+    });
     activePdfLoadingTask = loadingTask;
     let pdf;
     try {
@@ -6301,6 +5903,7 @@
   }
 
   function applyOrganizerFlow(flow) {
+    const previous = capturePageStructure(state);
     const nextOrder = [];
     const nextSplitPoints = [];
     flow.forEach(item => {
@@ -6313,6 +5916,7 @@
     state.pageOrder = nextOrder;
     state.splitPoints = nextSplitPoints;
     normalizeSplitState();
+    pageHistory.record(previous, state);
   }
 
   function captureOrganizerRects() {
@@ -6555,8 +6159,9 @@
   }, true);
 
   function toggleSplitAfter(outputIndex) {
-    if (!state.pdfDoc || typeof outputIndex !== 'number' || outputIndex < 0 || outputIndex >= activePageCount() - 1) return;
+    if (operationInProgress || !state.pdfDoc || typeof outputIndex !== 'number' || outputIndex < 0 || outputIndex >= activePageCount() - 1) return;
     normalizeSplitState();
+    const previous = capturePageStructure(state);
     const boundary = outputIndex + 1;
     const existingIndex = state.splitPoints.indexOf(boundary);
     if (existingIndex >= 0) {
@@ -6571,14 +6176,18 @@
       state.splitPoints.splice(pointIndex, 0, boundary);
       state.splitNames.splice(pointIndex + 1, 0, defaultSplitName(pointIndex + 1));
     }
+    pageHistory.record(previous, state);
     updatePageState();
   }
 
   function removeSplit(splitIndex) {
+    if (operationInProgress) return;
     normalizeSplitState();
     if (splitIndex < 0 || splitIndex >= state.splitPoints.length) return;
+    const previous = capturePageStructure(state);
     state.splitPoints.splice(splitIndex, 1);
     state.splitNames.splice(splitIndex + 1, 1);
+    pageHistory.record(previous, state);
     updatePageState();
   }
 
@@ -6610,7 +6219,7 @@
   }
 
   function beginOrganizerDrag(e, card, sourceIndex) {
-    if (!state.pdfDoc || organizerDrag.active || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (operationInProgress || !state.pdfDoc || organizerDrag.active || (e.pointerType === 'mouse' && e.button !== 0)) return;
     if (e.target.closest('.page-delete, .page-split-toggle')) return;
     hidePageContextMenu();
     const outputIndex = state.pageOrder.indexOf(sourceIndex);
@@ -6959,7 +6568,7 @@
   }
 
   function deleteOutputPage(outputIndex) {
-    if (!state.pdfDoc || outputIndex < 0 || outputIndex >= activePageCount()) return;
+    if (operationInProgress || !state.pdfDoc || outputIndex < 0 || outputIndex >= activePageCount()) return;
     hidePageContextMenu();
     const sourceIndex = state.pageOrder[outputIndex];
     if (MOBILE_PERFORMANCE_MODE && state.pages[sourceIndex]) {
@@ -7007,7 +6616,7 @@
       out.addPage(page);
       if (MOBILE_PERFORMANCE_MODE) await yieldToMainThread();
     }
-    const bytes = await out.save({ useObjectStreams: !context?.advanced?.password });
+    const bytes = await out.save();
     return createPdfArtifact(bytes, fileBase, {
       source: 'pdf-lib',
       rasterized: false,
@@ -7106,7 +6715,7 @@
       }
       await yieldToMainThread();
     }
-    const bytes = await out.save({ useObjectStreams: !context?.advanced?.password });
+    const bytes = await out.save();
     return createPdfArtifact(bytes, fileBase, {
       source: 'pdf-lib',
       rasterized,
@@ -7167,7 +6776,7 @@
       await new Promise(r => setTimeout(r, 0));
     }
 
-    const bytes = await out.save({ useObjectStreams: !context?.advanced?.password });
+    const bytes = await out.save();
     return createPdfArtifact(bytes, fileBase, {
       source: 'pdf-lib',
       rasterized: false,
@@ -7317,11 +6926,11 @@
         mobileGreyscaleJpeg ? mobileGreyscaleQuality : undefined,
       );
       if (i === 0) {
-        pdf = new jsPDF(jsPdfExportOptions({
+        pdf = new jsPDF({
           orientation: orient,
           unit: 'pt',
           format: [wPt, hPt],
-        }, context));
+        });
       } else {
         pdf.addPage([wPt, hPt], orient);
       }
@@ -7334,7 +6943,6 @@
     return createJsPdfOutputArtifact(pdf, context.fileBase, {
       source: 'jsPDF',
       rasterized: true,
-      passwordProtected: !!(context.advanced.password && canPasswordProtectExport(context.toolId)),
       preservesOriginalQuality: false,
     });
   }
@@ -7384,12 +6992,12 @@
       const orient = size.wPt > size.hPt ? 'l' : 'p';
       let imageInput = await canvasToImageInput(tmp, 'image/jpeg', preset.jpegQuality);
       if (i === 0) {
-        pdf = new jsPDF(jsPdfExportOptions({
+        pdf = new jsPDF({
           orientation: orient,
           unit: 'pt',
           format: [size.wPt, size.hPt],
           compress: true,
-        }, context));
+        });
       } else {
         pdf.addPage([size.wPt, size.hPt], orient);
       }
@@ -7403,7 +7011,6 @@
       source: 'jsPDF',
       compressionMode: context.settings.compressMode,
       rasterized: true,
-      passwordProtected: !!(context.advanced.password && canPasswordProtectExport(context.toolId)),
       preservesOriginalQuality: false,
     });
   }
@@ -7642,8 +7249,11 @@
   });
 
   clearSplitBtn.addEventListener('click', () => {
+    if (operationInProgress) return;
+    const previous = capturePageStructure(state);
     state.splitPoints = [];
     state.splitNames = [];
+    pageHistory.record(previous, state);
     updatePageState();
   });
 
@@ -7653,6 +7263,11 @@
 
   document.addEventListener('keydown', e => {
     const editingText = e.target.closest?.('input, textarea, [contenteditable="true"]');
+    if (!editingText && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z' && activeTool === 'organize') {
+      e.preventDefault();
+      undoPageChange();
+      return;
+    }
     if ((e.key === 'Delete' || e.key === 'Backspace') && activeTool === 'sign' && !editingText) {
       if (deleteSelectedSignatureStamp()) {
         e.preventDefault();
@@ -7674,11 +7289,15 @@
 
   window.addEventListener('scroll', hidePageContextMenu, true);
 
+  undoPagesBtn.addEventListener('click', undoPageChange);
+
   resetPagesBtn.addEventListener('click', () => {
-    if (!state.pdfDoc) return;
+    if (operationInProgress || !state.pdfDoc) return;
     hidePageContextMenu();
+    const previous = capturePageStructure(state);
     state.pageOrder = Array.from({ length: state.numPages }, (_, i) => i);
     state.curPage = 1;
+    pageHistory.record(previous, state);
     updatePageState();
     if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
     else if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
@@ -7866,7 +7485,8 @@
   function getFitCanvasWidth(pd) {
     const pad = getStagePadding();
     const stageW = Math.max(1, previewStage.clientWidth - pad.x - 1);
-    const stageH = Math.max(1, previewStage.clientHeight - pad.y - 1);
+    const captionHeight = isPhoneViewport() && !previewStage.classList.contains('zoomed') ? 24 : 0;
+    const stageH = Math.max(1, previewStage.clientHeight - pad.y - captionHeight - 1);
     const heightFitWidth = stageH * (pd.w / pd.h);
     return Math.max(1, Math.min(stageW, heightFitWidth, pd.w));
   }
@@ -7928,6 +7548,7 @@
   }
 
   function applyZoom(opts = {}) {
+    requestAnimationFrame(positionDocumentName);
     if (activeTool === 'organize') {
       canvasWrap.classList.remove('zoomed');
       pageEditorCanvasWrap.classList.remove('zoomed');

@@ -25,8 +25,7 @@ Ethan Hu -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=mobile-workspace-10">
+<link rel="stylesheet" href="styles.css?v=secure-workspace-1">
 </head>
 <body>
 <div class="frame">
@@ -47,28 +46,28 @@ Ethan Hu -->
     <div class="tool-nav-label" role="presentation" aria-hidden="true" data-i18n="nav.tools">Tools</div>
     <div class="tool-indicator" id="toolIndicator" role="presentation" aria-hidden="true"></div>
     <div class="tool-tab active" id="tab-preview" data-tool="preview" role="tab" aria-selected="true" aria-controls="tool-preview" tabindex="0">
-      <span class="tab-num">I.</span> <span data-tool-label="preview">Preview</span>
+      <span data-tool-label="preview">Preview</span>
     </div>
     <div class="tool-tab" id="tab-organize" data-tool="organize" role="tab" aria-selected="false" aria-controls="tool-organize" tabindex="-1">
-      <span class="tab-num">II.</span> <span data-tool-label="organize">Organize</span>
+      <span data-tool-label="organize">Organize</span>
     </div>
     <div class="tool-tab" id="tab-edit" data-tool="edit" role="tab" aria-selected="false" aria-controls="tool-edit" tabindex="-1">
-      <span class="tab-num">III.</span> <span data-tool-label="edit">Crop/Rotate</span>
+      <span data-tool-label="edit">Crop/Rotate</span>
     </div>
     <div class="tool-tab" id="tab-sign" data-tool="sign" role="tab" aria-selected="false" aria-controls="tool-sign" tabindex="-1">
-      <span class="tab-num">IV.</span> <span data-tool-label="sign">Sign</span>
+      <span data-tool-label="sign">Sign</span>
     </div>
     <div class="tool-tab" id="tab-merge" data-tool="merge" role="tab" aria-selected="false" aria-controls="tool-merge" tabindex="-1">
-      <span class="tab-num">V.</span> <span data-tool-label="merge">Merge</span>
+      <span data-tool-label="merge">Merge</span>
     </div>
     <div class="tool-tab" id="tab-compress" data-tool="compress" role="tab" aria-selected="false" aria-controls="tool-compress" tabindex="-1">
-      <span class="tab-num">VI.</span> <span data-tool-label="compress">Compress</span>
+      <span data-tool-label="compress">Compress</span>
     </div>
     <div class="tool-tab" id="tab-threshold" data-tool="threshold" role="tab" aria-selected="false" aria-controls="tool-threshold" tabindex="-1">
-      <span class="tab-num">VII.</span> <span data-tool-label="threshold">Threshold</span>
+      <span data-tool-label="threshold">Threshold</span>
     </div>
     <div class="tool-tab" id="tab-greyscale" data-tool="greyscale" role="tab" aria-selected="false" aria-controls="tool-greyscale" tabindex="-1">
-      <span class="tab-num">VIII.</span> <span data-tool-label="greyscale">Grayscale</span>
+      <span data-tool-label="greyscale">Grayscale</span>
     </div>
   </nav>
 
@@ -88,7 +87,7 @@ Ethan Hu -->
         <div class="mobile-controls-scroll">
 
       <!-- SHARED: Source -->
-      <div class="section-label"><span data-i18n="sections.source">I. Source PDF</span><span>—</span></div>
+      <div class="section-label"><span data-i18n="sections.source">Source PDF</span></div>
       <div class="drop" id="dropZone" role="button" tabindex="0" aria-label="Upload a PDF">
         <div class="glyph" id="dropGlyph">¶</div>
         <div class="lbl" id="dropLabel">Upload PDF</div>
@@ -115,7 +114,7 @@ Ethan Hu -->
       <!-- ═══ ORGANIZE PANEL ═══ -->
       <div class="tool-panel" id="tool-organize" role="tabpanel" aria-labelledby="tab-organize" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span data-i18n="sections.organize">II. Organize Pages</span><span id="organizeHint">ready</span></div>
+          <div class="section-label"><span data-i18n="sections.organize">Organize Pages</span><span id="organizeHint">ready</span></div>
           <div class="organize-summary" id="organizeSummary">Upload a PDF to reorder or remove pages.</div>
           <div class="split-panel" id="splitPanel" hidden>
             <div class="split-panel-head">
@@ -132,7 +131,7 @@ Ethan Hu -->
       <!-- ═══ CROP / ROTATE PANEL ═══ -->
       <div class="tool-panel" id="tool-edit" role="tabpanel" aria-labelledby="tab-edit" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span data-i18n="sections.cropRotate">II. Crop & Rotate</span><span id="editHint">select page</span></div>
+          <div class="section-label"><span data-i18n="sections.cropRotate">Crop & Rotate</span><span id="editHint">select page</span></div>
           <div class="organize-summary" id="editSummary">Upload a PDF, then choose a page from the editor to crop or rotate it.</div>
           <div class="edit-controls">
             <div class="edit-control-head">
@@ -181,7 +180,7 @@ Ethan Hu -->
       <!-- ═══ SIGN PANEL ═══ -->
       <div class="tool-panel" id="tool-sign" role="tabpanel" aria-labelledby="tab-sign" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span data-i18n="sections.sign">II. Sign PDF</span><span id="signHint">draw signature</span></div>
+          <div class="section-label"><span data-i18n="sections.sign">Sign PDF</span><span id="signHint">draw signature</span></div>
           <div class="sign-panel">
             <div class="sign-pad-wrap">
               <canvas id="signaturePad" data-i18n-aria-label="sign.padAria" aria-label="Signature drawing pad"></canvas>
@@ -202,7 +201,7 @@ Ethan Hu -->
       <!-- ═══ MERGE PANEL ═══ -->
       <div class="tool-panel" id="tool-merge" role="tabpanel" aria-labelledby="tab-merge" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span data-i18n="sections.merge">II. Merge PDFs</span><span id="mergeHint">ready</span></div>
+          <div class="section-label"><span data-i18n="sections.merge">Merge PDFs</span><span id="mergeHint">ready</span></div>
           <div class="organize-summary" id="mergeSummary">Choose multiple PDFs, arrange their order, then merge into the organizer.</div>
           <div class="merge-list" id="mergeList"></div>
           <div class="merge-actions">
@@ -215,7 +214,7 @@ Ethan Hu -->
       <!-- ═══ COMPRESS PANEL ═══ -->
       <div class="tool-panel" id="tool-compress" role="tabpanel" aria-labelledby="tab-compress" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span data-i18n="sections.compress">II. Compress PDF</span><span id="compressHint">original</span></div>
+          <div class="section-label"><span data-i18n="sections.compress">Compress PDF</span><span id="compressHint">original</span></div>
           <div class="organize-summary" id="compressSummary">Compact the PDF while keeping original page content.</div>
           <div class="compress-estimate" id="compressEstimate" aria-live="polite">Choose a PDF to see an estimated output size.</div>
           <div class="toggles compress-options">
@@ -229,7 +228,7 @@ Ethan Hu -->
       <!-- ═══ THRESHOLD PANEL ═══ -->
       <div class="tool-panel" id="tool-threshold" role="tabpanel" aria-labelledby="tab-threshold" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span data-i18n="sections.threshold">II. Threshold</span><span id="threshHint">mid range</span></div>
+          <div class="section-label"><span data-i18n="sections.threshold">Threshold</span><span id="threshHint">mid range</span></div>
           <div class="page-processing-scope" aria-label="Threshold settings scope">
             <div class="page-processing-scope-copy">
               <span class="page-processing-kicker">Apply settings to</span>
@@ -267,7 +266,7 @@ Ethan Hu -->
       <!-- ═══ GREYSCALE PANEL ═══ -->
       <div class="tool-panel" id="tool-greyscale" role="tabpanel" aria-labelledby="tab-greyscale" aria-hidden="true">
         <div style="margin-top:26px">
-          <div class="section-label"><span data-i18n="sections.greyscale">II. Grayscale</span><span id="greyHint">neutral</span></div>
+          <div class="section-label"><span data-i18n="sections.greyscale">Grayscale</span><span id="greyHint">neutral</span></div>
           <div class="page-processing-scope" aria-label="Grayscale settings scope">
             <div class="page-processing-scope-copy">
               <span class="page-processing-kicker">Apply settings to</span>
@@ -315,7 +314,7 @@ Ethan Hu -->
       </div>
 
       <!-- SHARED: Pages -->
-      <div class="section-label pages-section-label" style="margin-top:26px"><span data-i18n="sections.pages">III. Pages</span><span>—</span></div>
+      <div class="section-label pages-section-label" style="margin-top:26px"><span data-i18n="sections.pages">Pages</span></div>
       <div class="pagenav">
         <button id="prevPage" disabled>‹</button>
         <div class="num"><span data-i18n="file.pagePrefix">Page </span><b id="curPage">—</b> / <b id="totPage">—</b><span data-i18n="file.pageSuffix"></span><span class="page-custom-badge" id="pageCustomBadge" hidden>Custom</span></div>
@@ -381,6 +380,10 @@ Ethan Hu -->
             </svg>
             <span id="mobileControlsLabel" data-i18n="mobile.controls">Controls</span>
           </button>
+          <button class="undo-pages" id="undoPagesBtn" type="button" data-i18n-aria-label="actions.undoPages" aria-label="Undo page change" disabled hidden>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4 3 7.5 6.5 11M3.5 7.5H12a4.5 4.5 0 0 1 0 9H9" /></svg>
+            <span data-i18n="actions.undo">Undo</span>
+          </button>
           <div class="mono" style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="proofMeta">awaiting PDF</div>
           <div class="zoom-bar">
             <button class="zoom-btn" id="zoomOut" disabled>−</button>
@@ -390,6 +393,7 @@ Ethan Hu -->
         </div>
       </div>
       <div class="preview-stage" id="previewStage">
+        <div class="mobile-document-name" id="mobileDocumentName" hidden></div>
         <div class="empty" id="emptyState">
           <svg class="empty-document" viewBox="0 0 112 148" aria-hidden="true" focusable="false">
             <defs>
@@ -434,6 +438,7 @@ Ethan Hu -->
                 <span aria-hidden="true">×</span>
               </button>
               <div class="mobile-edit-heading">
+                <span id="mobileEditDocumentName"></span>
                 <b id="mobileEditPageLabel">Page 1 of 1</b>
                 <span id="mobileEditCropLabel">Full page</span>
               </div>
@@ -527,6 +532,6 @@ Ethan Hu -->
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.js?v=mobile-workspace-5"></script>
+<script src="app.bundle.js?v=section-labels-1"></script>
 </body>
 </html>

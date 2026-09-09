@@ -8,11 +8,12 @@ Files are processed locally in the browser. They are not uploaded to a server.
 
 - Preview PDFs with page navigation, zoom, and high-quality progressive rendering
 - Organize pages by reordering, deleting, and splitting PDFs into named parts
+- Undo page deletion, reordering, split changes, and restoring original order
 - Merge multiple PDFs and send the result into the organizer
 - Crop and rotate pages, including fine rotation when needed
 - Compress PDFs with original-quality, balanced, and small-size modes
 - Convert pages to black and white or grayscale with Fast, 300 dpi, 600 dpi, and warned 900 dpi render options
-- Export with page ranges, current-page-only export, and password protection
+- Export with page ranges, current-page-only export, and AES-256 password protection
 - Switch between light and dark mode
 - Use the interface in English, Simplified Chinese, Traditional Chinese, Korean, Japanese, Spanish, and French
 
@@ -24,7 +25,11 @@ Because processing happens in the browser, performance depends on the device and
 
 ## Using It Locally
 
-This is a static app. Open `index.html` in a browser, or publish the folder with any static host.
+Open `index.html` directly, or serve the folder with any static HTTP server. The checked-in `app.bundle.js` supports direct local-file loading; PDF.js uses a same-thread worker in this mode because browsers block module workers on `file://` origins.
+
+Publish the `vendor` directory along with the application. The host must serve `.mjs` files as JavaScript and `.wasm` files as `application/wasm`.
+
+After editing `app.js` or `page-history.mjs`, run `npm ci` once and `npm run build` to update the browser bundle. `npm test` rebuilds it and tests direct-file startup, mobile controls, undo, and protected exports.
 
 For the best browser compatibility, serve it over HTTPS when publishing. Some browser APIs and CDN-loaded dependencies behave more predictably on a normal web origin than from a local file URL.
 
@@ -33,10 +38,16 @@ For the best browser compatibility, serve it over HTTPS when publishing. Some br
 PDF Atelier uses third-party browser libraries including:
 
 - PDF.js
-- pdf-lib
+- @cantoo/pdf-lib
 - jsPDF
 
 Those libraries remain under their own licenses. See their upstream projects for details.
+
+The PDF.js and pdf-lib versions, archive integrity values, and bundled licenses are recorded in [vendor/README.md](vendor/README.md).
+
+## Development checks
+
+Run `npm install`, then `npx playwright install chromium` and `npm test`. Tests cover structural undo, mobile filename placement, local PDF loading, and encrypted exports reopened with an independent PDF reader. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use an already installed Chromium browser instead of downloading one.
 
 ## License
 
