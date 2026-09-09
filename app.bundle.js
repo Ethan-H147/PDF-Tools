@@ -21323,6 +21323,7 @@
   function setDarkMode(enabled, persist = false, animate = false) {
     const applyThemeState = () => {
       document.body.classList.toggle("dark-mode", enabled);
+      document.documentElement.classList.toggle("dark-mode", enabled);
       themeToggle.setAttribute("aria-pressed", enabled ? "true" : "false");
       themeToggle.setAttribute("aria-label", enabled ? t2("theme.offAria") : t2("theme.onAria"));
       themeToggleText.textContent = enabled ? t2("theme.light") : t2("theme.dark");
