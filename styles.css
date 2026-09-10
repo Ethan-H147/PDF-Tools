@@ -3554,6 +3554,11 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 
+  body.dark-mode .resolution-options .toggle {
+    background: transparent;
+    box-shadow: none;
+  }
+
   body.dark-mode .resolution-options .toggle:hover {
     background: rgba(255, 255, 255, 0.07);
   }
@@ -4404,20 +4409,8 @@
     }
   }
 
-  /* Dark surfaces use tonal contrast rather than raised or inset shadows. */
-  body.dark-mode {
-    --shadow-soft: none;
-    --shadow-card: none;
-  }
-  body.dark-mode *,
-  body.dark-mode *::before,
-  body.dark-mode *::after {
-    box-shadow: none !important;
-  }
-  body.dark-mode :is(button, input, select, textarea, [tabindex]):focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+  .preview-stage.organizing { overflow-anchor: none; }
+  body.organizer-dragging .preview-stage.organizing { overflow: hidden !important; }
 
   html.theme-transitioning .theme-toggle-track,
   html.theme-transitioning .theme-toggle-thumb {

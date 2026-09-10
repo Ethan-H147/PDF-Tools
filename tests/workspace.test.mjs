@@ -345,6 +345,20 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
         assert.equal(await mobile.locator('.page-drag-clone').count(), 1, 'Cancellation should animate home instead of removing the floating page immediately');
         await mobile.waitForFunction(() => !document.querySelector('.page-drag-clone'));
         assert.deepEqual(await mobile.locator('.organizer-grid .page-card[data-source-index]').evaluateAll(cards => cards.map(el => el.dataset.sourceIndex)), orderBeforeCancel);
+        await mobile.locator('#previewStage').evaluate(el => { el.scrollTop = 180; });
+        const stage = await mobile.locator('#previewStage').boundingBox();
+        const middleY = stage.y + stage.height / 2;
+        const scrollBeforeDrag = await mobile.locator('#previewStage').evaluate(el => el.scrollTop);
+        await dispatch('touchStart', 65, middleY);
+        await mobile.locator('.page-drag-clone').waitFor();
+        for (let step = 1; step <= 4; step++) {
+          await dispatch('touchMove', 65 + step * 12, middleY - step * 8);
+          await mobile.waitForTimeout(30);
+        }
+        assert.equal(await mobile.locator('#previewStage').evaluate(el => el.scrollTop), scrollBeforeDrag, 'Dragging in the middle must not move the scroller');
+        await dispatch('touchCancel');
+        await mobile.waitForFunction(() => !document.querySelector('.page-drag-clone'));
+        assert.equal(await mobile.locator('#previewStage').evaluate(el => getComputedStyle(el).overflowY), 'auto', 'Native scrolling must return after cancellation');
       } finally { await mobile.close(); }
     });
 

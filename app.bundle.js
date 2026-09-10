@@ -26632,6 +26632,7 @@
     clone.querySelectorAll("button").forEach((button) => button.tabIndex = -1);
     document.body.appendChild(clone);
     organizerDrag.active = true;
+    document.body.classList.add("organizer-dragging");
     organizerDrag.sourceOutputIndex = outputIndex;
     organizerDrag.sourcePageIndex = sourceIndex;
     organizerDrag.sourceFlowIndex = sourceFlowIndex;
@@ -26818,6 +26819,7 @@
     }
   }
   function cleanupOrganizerDrag({ preserveClone = false } = {}) {
+    document.body.classList.remove("organizer-dragging");
     stopOrganizerTouch?.();
     window.removeEventListener("pointermove", onOrganizerPointerMove);
     window.removeEventListener("pointerup", finishOrganizerDrag);
