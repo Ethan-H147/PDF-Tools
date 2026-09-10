@@ -471,6 +471,9 @@
   .pagenav button:disabled { opacity: 0.3; cursor: not-allowed; }
   .pagenav .num { flex: 1; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; }
   .pagenav .num b { font-weight: 700; }
+  #pageCounter { touch-action: manipulation; cursor: text; }
+  #pageJumpInput { width: 3ch; min-width: 2ch; max-width: 6ch; box-sizing: content-box; padding: 4px; border: 1px solid var(--accent); border-radius: 6px; background: var(--paper-2); color: var(--ink); font: inherit; font-size: 16px; text-align: center; }
+  #pageJumpInput[hidden], #curPage[hidden] { display: none; }
 
   /* ── DOWNLOAD ── */
   .actions { margin-top: 28px; }
@@ -878,9 +881,9 @@
 
   .subhead .meta {
     align-items: center;
-    border: 1px solid var(--accent);
+    border: 0;
     border-radius: 50%;
-    color: var(--accent);
+    color: #408df6;
     cursor: help;
     display: inline-flex;
     font-size: 0;
@@ -895,9 +898,11 @@
     z-index: 5;
   }
 
-  .subhead .meta::before {
-    content: "i";
-    font-size: 14px;
+  .subhead .meta svg {
+    display: block;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
   }
 
   .subhead .meta::after {
@@ -4423,6 +4428,20 @@
     background: var(--accent);
   }
   body.organizer-dragging .preview-stage.organizing { overflow: hidden !important; }
+
+  .zoom-btn { display: grid; place-items: center; padding: 0; }
+  .zoom-btn .step-icon,
+  .mobile-sign-actions .step-icon {
+    display: block;
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
 
   html.theme-transitioning .theme-toggle-track,
   html.theme-transitioning .theme-toggle-thumb {

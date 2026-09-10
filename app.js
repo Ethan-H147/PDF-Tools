@@ -3123,6 +3123,7 @@
   Object.entries(SIGN_LOCALES).forEach(([locale, additions]) => {
     Object.assign(LOCALES[locale], additions);
   });
+  Object.entries({ en: 'Jump to page', 'zh-Hans': '跳转到页面', 'zh-Hant-TW': '跳至頁面', ko: '페이지로 이동', ja: 'ページへ移動', es: 'Ir a la página', fr: 'Aller à la page' }).forEach(([locale, label]) => { LOCALES[locale]['pages.jump'] = label; });
 
   Object.entries({
     en: ['Use signature', 'Drag to position', 'Make signature smaller', 'Make signature larger', 'Use signature to place it on this page.'],
@@ -7489,6 +7490,64 @@
   function updatePageButtons() {
     updatePageState();
   }
+  const pageCounter = $('pageCounter');
+  const pageJumpInput = $('pageJumpInput');
+  let pageJumpDocument = null;
+  let lastPageCounterTap = null;
+  function beginPageJump() {
+    if (operationInProgress || !state.pdfDoc || !activePageCount() || !pageJumpInput.hidden) return;
+    pageJumpDocument = state.pdfDoc;
+    pageJumpInput.value = String(state.curPage);
+    pageJumpInput.style.width = Math.max(2, String(activePageCount()).length) + 'ch';
+    curPageEl.hidden = true;
+    pageJumpInput.hidden = false;
+    pageJumpInput.focus();
+    pageJumpInput.select();
+  }
+  function finishPageJump(commit) {
+    if (pageJumpInput.hidden) return;
+    const raw = pageJumpInput.value.trim();
+    const target = /^\d+$/.test(raw) ? Math.max(1, Math.min(activePageCount(), Number(raw))) : null;
+    const canJump = commit && target && !operationInProgress && state.pdfDoc === pageJumpDocument;
+    pageJumpInput.hidden = true;
+    curPageEl.hidden = false;
+    pageJumpInput.blur();
+    pageJumpDocument = null;
+    if (!canJump) return;
+    if (MOBILE_PERFORMANCE_MODE && isRasterTool(activeTool)) {
+      resetRenderCaches({ preserveThumbnailCache: true });
+      forgetFullPageData();
+    }
+    state.curPage = target;
+    updatePageButtons();
+    if (activeTool === 'edit') { syncEditControls(); requestEditedPreviewRender(); }
+    else if (activeTool === 'organize') organizerGrid.querySelector('[data-source-index="' + currentSourceIndex() + '"]')?.scrollIntoView({ block: 'center' });
+    else requestPreviewRender(isRasterTool(activeTool));
+  }
+  pageCounter.addEventListener('dblclick', beginPageJump);
+  pageCounter.addEventListener('pointerup', e => {
+    if (e.pointerType !== 'touch' || !pageJumpInput.hidden) return;
+    const now = performance.now();
+    if (lastPageCounterTap && now - lastPageCounterTap.time < 350 && Math.hypot(e.clientX - lastPageCounterTap.x, e.clientY - lastPageCounterTap.y) < 24) {
+      lastPageCounterTap = null;
+      beginPageJump();
+    } else lastPageCounterTap = { time: now, x: e.clientX, y: e.clientY };
+  });
+  pageCounter.addEventListener('keydown', e => {
+    if (e.target !== pageCounter || !['Enter', ' '].includes(e.key)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    beginPageJump();
+  });
+  pageJumpInput.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      e.preventDefault();
+      finishPageJump(e.key === 'Enter');
+      pageCounter.focus({ preventScroll: true });
+    }
+  });
+  pageJumpInput.addEventListener('blur', () => finishPageJump(true));
   prevBtn.addEventListener('click', () => {
     if (operationInProgress) return;
     if (state.curPage > 1) {

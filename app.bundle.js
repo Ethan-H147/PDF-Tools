@@ -23730,6 +23730,9 @@
   Object.entries(SIGN_LOCALES).forEach(([locale, additions]) => {
     Object.assign(LOCALES[locale], additions);
   });
+  Object.entries({ en: "Jump to page", "zh-Hans": "\u8DF3\u8F6C\u5230\u9875\u9762", "zh-Hant-TW": "\u8DF3\u81F3\u9801\u9762", ko: "\uD398\uC774\uC9C0\uB85C \uC774\uB3D9", ja: "\u30DA\u30FC\u30B8\u3078\u79FB\u52D5", es: "Ir a la p\xE1gina", fr: "Aller \xE0 la page" }).forEach(([locale, label]) => {
+    LOCALES[locale]["pages.jump"] = label;
+  });
   Object.entries({
     en: ["Use signature", "Drag to position", "Make signature smaller", "Make signature larger", "Use signature to place it on this page."],
     "zh-Hans": ["\u4F7F\u7528\u7B7E\u540D", "\u62D6\u52A8\u4EE5\u8C03\u6574\u4F4D\u7F6E", "\u7F29\u5C0F\u7B7E\u540D", "\u653E\u5927\u7B7E\u540D", "\u70B9\u51FB\u201C\u4F7F\u7528\u7B7E\u540D\u201D\u5C06\u5176\u653E\u5230\u5F53\u524D\u9875\u9762\u3002"],
@@ -27653,6 +27656,66 @@
   function updatePageButtons() {
     updatePageState();
   }
+  var pageCounter = $2("pageCounter");
+  var pageJumpInput = $2("pageJumpInput");
+  var pageJumpDocument = null;
+  var lastPageCounterTap = null;
+  function beginPageJump() {
+    if (operationInProgress || !state.pdfDoc || !activePageCount() || !pageJumpInput.hidden) return;
+    pageJumpDocument = state.pdfDoc;
+    pageJumpInput.value = String(state.curPage);
+    pageJumpInput.style.width = Math.max(2, String(activePageCount()).length) + "ch";
+    curPageEl.hidden = true;
+    pageJumpInput.hidden = false;
+    pageJumpInput.focus();
+    pageJumpInput.select();
+  }
+  function finishPageJump(commit) {
+    if (pageJumpInput.hidden) return;
+    const raw = pageJumpInput.value.trim();
+    const target = /^\d+$/.test(raw) ? Math.max(1, Math.min(activePageCount(), Number(raw))) : null;
+    const canJump = commit && target && !operationInProgress && state.pdfDoc === pageJumpDocument;
+    pageJumpInput.hidden = true;
+    curPageEl.hidden = false;
+    pageJumpInput.blur();
+    pageJumpDocument = null;
+    if (!canJump) return;
+    if (MOBILE_PERFORMANCE_MODE && isRasterTool(activeTool)) {
+      resetRenderCaches({ preserveThumbnailCache: true });
+      forgetFullPageData();
+    }
+    state.curPage = target;
+    updatePageButtons();
+    if (activeTool === "edit") {
+      syncEditControls();
+      requestEditedPreviewRender();
+    } else if (activeTool === "organize") organizerGrid.querySelector('[data-source-index="' + currentSourceIndex() + '"]')?.scrollIntoView({ block: "center" });
+    else requestPreviewRender(isRasterTool(activeTool));
+  }
+  pageCounter.addEventListener("dblclick", beginPageJump);
+  pageCounter.addEventListener("pointerup", (e2) => {
+    if (e2.pointerType !== "touch" || !pageJumpInput.hidden) return;
+    const now = performance.now();
+    if (lastPageCounterTap && now - lastPageCounterTap.time < 350 && Math.hypot(e2.clientX - lastPageCounterTap.x, e2.clientY - lastPageCounterTap.y) < 24) {
+      lastPageCounterTap = null;
+      beginPageJump();
+    } else lastPageCounterTap = { time: now, x: e2.clientX, y: e2.clientY };
+  });
+  pageCounter.addEventListener("keydown", (e2) => {
+    if (e2.target !== pageCounter || !["Enter", " "].includes(e2.key)) return;
+    e2.preventDefault();
+    e2.stopPropagation();
+    beginPageJump();
+  });
+  pageJumpInput.addEventListener("keydown", (e2) => {
+    e2.stopPropagation();
+    if (e2.key === "Enter" || e2.key === "Escape") {
+      e2.preventDefault();
+      finishPageJump(e2.key === "Enter");
+      pageCounter.focus({ preventScroll: true });
+    }
+  });
+  pageJumpInput.addEventListener("blur", () => finishPageJump(true));
   prevBtn.addEventListener("click", () => {
     if (operationInProgress) return;
     if (state.curPage > 1) {
