@@ -2554,6 +2554,21 @@
     z-index: 9999;
   }
 
+  .page-delete { padding: 0; flex-shrink: 0; }
+  .page-delete svg,
+  .page-split-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .page-split-icon { display: none; }
+
   .page-drag-clone .page-delete,
   .page-drag-clone .page-split-toggle {
     pointer-events: none;
@@ -2937,7 +2952,7 @@
     }
 
     .organizer-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -2956,16 +2971,24 @@
     .organizer-grid .page-delete {
       border-width: 1.5px;
       font-size: 16px;
-      height: 28px;
-      width: 28px;
+      height: 44px;
+      width: 44px;
     }
 
     .organizer-grid .page-split-toggle {
-      display: none;
+      display: inline-flex;
+      height: 44px;
+      width: 44px;
+      padding: 0;
+      flex-shrink: 0;
     }
 
+    .organizer-grid .page-split-icon { display: block; }
+    .organizer-grid .page-split-text { display: none; }
+    .organizer-grid .page-card-actions { gap: 4px; padding: 5px 4px; }
+
     .organizer-grid .page-number {
-      font-size: 20px;
+      font-size: 13px;
     }
 
     .preview-stage.organizing {

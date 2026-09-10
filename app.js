@@ -4330,7 +4330,6 @@
 
   async function renderThumbnail(sourceIndex, quality = 'low') {
     if (!state.pdfDoc || sourceIndex == null) return null;
-    if (MOBILE_PERFORMANCE_MODE) quality = 'low';
     const generation = state.renderGeneration;
     const pdfDoc = state.pdfDoc;
     const existing = state.pages[sourceIndex];
@@ -4792,7 +4791,6 @@
   }
 
   async function ensureThumbnail(sourceIndex, quality = 'low') {
-    if (MOBILE_PERFORMANCE_MODE) quality = 'low';
     const existing = state.pages[sourceIndex];
     if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) {
       touchMobileThumbnailCache(sourceIndex);
@@ -4806,7 +4804,7 @@
           applyThumbnailToElements(sourceIndex, url);
           touchMobileThumbnailCache(sourceIndex);
         }
-        if (!MOBILE_PERFORMANCE_MODE && quality === 'low') queueThumbnail(sourceIndex, 'high');
+        if (quality === 'low' && (!MOBILE_PERFORMANCE_MODE || isOrganizerThumbnailVisible(sourceIndex))) queueThumbnail(sourceIndex, 'high');
         return url;
       })
       .finally(() => thumbnailJobs.delete(jobKey));
@@ -4825,6 +4823,11 @@
         thumbnailQueued.delete(sourceIndex + ':' + quality);
         const existing = state.pages[sourceIndex];
         if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) continue;
+        if (MOBILE_PERFORMANCE_MODE && quality === 'high') {
+          const generation = state.renderGeneration;
+          await new Promise(resolve => setTimeout(resolve, 350));
+          if (generation !== state.renderGeneration || !isOrganizerThumbnailVisible(sourceIndex)) continue;
+        }
         try { await ensureThumbnail(sourceIndex, quality); }
         catch (err) { console.warn('Thumbnail render failed', err); }
         await new Promise(r => setTimeout(r, 0));
@@ -4835,14 +4838,25 @@
 
   function queueThumbnail(sourceIndex, quality = 'low') {
     if (sourceIndex == null) return;
-    if (MOBILE_PERFORMANCE_MODE) quality = 'low';
     const existing = state.pages[sourceIndex];
     if (existing?.thumbUrl && (quality === 'low' || existing.thumbQuality === 'high')) return;
     const queueKey = sourceIndex + ':' + quality;
     if (thumbnailQueued.has(queueKey)) return;
     thumbnailQueued.add(queueKey);
-    thumbnailQueue.push({ sourceIndex, quality });
+    const item = { sourceIndex, quality };
+    if (quality === 'low') thumbnailQueue.unshift(item);
+    else thumbnailQueue.push(item);
     runThumbnailQueue();
+  }
+
+  function isOrganizerThumbnailVisible(sourceIndex) {
+    if (activeTool !== 'organize' || document.hidden || organizerDrag.active) return false;
+    const thumb = organizerGrid.querySelector('[data-thumb-source="' + sourceIndex + '"]');
+    if (!thumb) return false;
+    const rect = thumb.getBoundingClientRect();
+    const viewport = previewStage.getBoundingClientRect();
+    return rect.width > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom
+      && rect.right > viewport.left && rect.left < viewport.right;
   }
 
   function getThumbnailObserver() {
@@ -4852,10 +4866,11 @@
         entries.forEach(entry => {
           if (!entry.isIntersecting) return;
           const sourceIndex = Number(entry.target.dataset.thumbSource);
-          observer.unobserve(entry.target);
+          if (!MOBILE_PERFORMANCE_MODE) observer.unobserve(entry.target);
           queueThumbnail(sourceIndex);
+          if (MOBILE_PERFORMANCE_MODE && isOrganizerThumbnailVisible(sourceIndex)) queueThumbnail(sourceIndex, 'high');
         });
-      }, { root: previewStage, rootMargin: MOBILE_PERFORMANCE_MODE ? '100px' : '420px' });
+      }, { root: previewStage, rootMargin: MOBILE_PERFORMANCE_MODE ? '0px' : '420px' });
     }
     return thumbnailObserver;
   }
@@ -4872,10 +4887,10 @@
         touchMobileThumbnailCache(sourceIndex);
       } else {
         thumb.textContent = 'Page ' + (sourceIndex + 1);
-        const observer = getThumbnailObserver();
-        if (observer) observer.observe(thumb);
-        else queueThumbnail(sourceIndex);
       }
+      const visibleObserver = getThumbnailObserver();
+      if (visibleObserver) visibleObserver.observe(thumb);
+      else queueThumbnail(sourceIndex);
       return thumb;
     }
     if (pd?.thumbUrl) {
@@ -6054,7 +6069,7 @@
       del.type = 'button';
       del.className = 'page-delete';
       del.setAttribute('aria-label', 'Delete original page ' + (sourceIndex + 1));
-      del.textContent = '×';
+      del.innerHTML = '<svg aria-hidden="true" viewBox="0 0 20 20"><path d="m6 6 8 8M14 6l-8 8"/></svg>';
       del.addEventListener('pointerdown', e => e.stopPropagation());
       del.addEventListener('click', e => {
         e.stopPropagation();
@@ -6067,7 +6082,11 @@
       split.type = 'button';
       split.className = 'page-split-toggle';
       split.disabled = !canSplit;
-      split.textContent = t('split.button');
+      split.innerHTML = '<svg class="page-split-icon" aria-hidden="true" viewBox="0 0 20 20"><path d="M4 7V3.5h12V7M4 13v3.5h12V13M2 10h2m3 0h2m3 0h2m3 0h1"/></svg>';
+      const splitLabel = document.createElement('span');
+      splitLabel.className = 'page-split-text';
+      splitLabel.textContent = t('split.button');
+      split.appendChild(splitLabel);
       split.setAttribute('aria-pressed', splitExists ? 'true' : 'false');
       split.setAttribute('aria-label', canSplit
         ? t(splitExists ? 'split.removeAfterOriginal' : 'split.afterOriginal', { num: sourceIndex + 1 })

@@ -9,10 +9,11 @@ import path from 'node:path';
 const { chromium } = createRequire(import.meta.url)('playwright');
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-function fixture() {
-  const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>'];
-  for (let index = 0; index < 3; index++) {
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 9 0 R >> >> /Contents ${4 + index * 2} 0 R >>`);
+function fixture(count = 3) {
+  const kids = Array.from({ length: count }, (_, index) => `${3 + index * 2} 0 R`).join(' ');
+  const objects = ['<< /Type /Catalog /Pages 2 0 R >>', `<< /Type /Pages /Kids [${kids}] /Count ${count} >>`];
+  for (let index = 0; index < count; index++) {
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${3 + count * 2} 0 R >> >> /Contents ${4 + index * 2} 0 R >>`);
     const content = `BT /F1 24 Tf 50 680 Td (Document page ${index + 1}) Tj ET`;
     objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
   }
@@ -266,6 +267,42 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
         assert.equal(downloads, 0);
         assert(await blocked.locator('#advancedPasswordToggle').isChecked());
       } finally { await blocked.close(); }
+    });
+
+    await t.test('mobile organizer sharpens visible pages and exposes split beside centered delete', async () => {
+      const mobile = await browser.newPage({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
+      try {
+        await mobile.goto(page.url());
+        await mobile.locator('#fileInput').setInputFiles({ name: 'Many pages.pdf', mimeType: 'application/pdf', buffer: fixture(24) });
+        await mobile.waitForFunction(() => Number(document.querySelector('#totPage').textContent) === 24 && !document.querySelector('#loader').classList.contains('on'));
+        await mobile.locator('#tab-organize').click();
+        const waitForSharp = index => mobile.waitForFunction(async index => {
+          const element = document.querySelector(`[data-thumb-source="${index}"]`);
+          const url = element?.style.backgroundImage.slice(5, -2);
+          if (!url) return false;
+          const image = new Image();
+          image.src = url;
+          await image.decode();
+          return image.naturalWidth > 300;
+        }, index);
+        await waitForSharp(0);
+        assert.equal(await mobile.locator('[data-thumb-source="23"]').evaluate(el => el.style.backgroundImage), '');
+        const card = mobile.locator('.page-card[data-source-index="0"]');
+        const alignment = await card.evaluate(el => {
+          const button = el.querySelector('.page-delete').getBoundingClientRect();
+          const icon = el.querySelector('.page-delete svg').getBoundingClientRect();
+          return { x: Math.abs(button.x + button.width / 2 - icon.x - icon.width / 2), y: Math.abs(button.y + button.height / 2 - icon.y - icon.height / 2), overflow: el.scrollWidth > el.clientWidth };
+        });
+        assert(alignment.x < 1 && alignment.y < 1);
+        assert.equal(alignment.overflow, false);
+        await card.locator('.page-split-toggle').click();
+        assert.equal(await mobile.locator('.page-split-divider').count(), 1);
+        await mobile.locator('#undoPagesBtn').click();
+        assert.equal(await mobile.locator('.page-split-divider').count(), 0);
+        await mobile.locator('[data-source-index="23"]').scrollIntoViewIfNeeded();
+        await waitForSharp(23);
+        assert(await mobile.locator('[data-source-index="23"] .page-split-toggle').isDisabled());
+      } finally { await mobile.close(); }
     });
 
     assert.deepEqual(errors, []);
