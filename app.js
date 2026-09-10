@@ -823,6 +823,7 @@
     const enabled = usesMobilePreviewWorkspace();
     if (!enabled) mobileControlsOpen = false;
     document.body.classList.toggle('mobile-preview-workspace', enabled);
+    document.body.classList.toggle('mobile-signing', enabled && activeTool === 'sign');
     document.documentElement.classList.toggle('mobile-workspace', enabled);
     document.body.classList.toggle('mobile-controls-open', enabled && mobileControlsOpen);
 
@@ -833,7 +834,7 @@
         tool: toolText(activeTool, 'label'),
       }));
     }
-    if (mobileControlsLabel) mobileControlsLabel.textContent = t('mobile.controls');
+    if (mobileControlsLabel) mobileControlsLabel.textContent = t(enabled && activeTool === 'sign' ? 'sign.drawSignature' : 'mobile.controls');
     if (mobileControlsTitle) mobileControlsTitle.textContent = toolText(activeTool, 'label');
     if (emptyUploadBtn) emptyUploadBtn.hidden = !enabled || !!state.pdfDoc;
 
@@ -3124,6 +3125,20 @@
   });
 
   Object.entries({
+    en: ['Use signature', 'Drag to position', 'Make signature smaller', 'Make signature larger', 'Use signature to place it on this page.'],
+    'zh-Hans': ['使用签名', '拖动以调整位置', '缩小签名', '放大签名', '点击“使用签名”将其放到当前页面。'],
+    'zh-Hant-TW': ['使用簽名', '拖曳以調整位置', '縮小簽名', '放大簽名', '點選「使用簽名」將其放到目前頁面。'],
+    ko: ['서명 사용', '드래그하여 배치', '서명 축소', '서명 확대', '서명 사용을 눌러 현재 페이지에 배치하세요.'],
+    ja: ['署名を使用', 'ドラッグして配置', '署名を縮小', '署名を拡大', '「署名を使用」を押してこのページに配置します。'],
+    es: ['Usar firma', 'Arrastra para colocar', 'Reducir firma', 'Ampliar firma', 'Pulsa Usar firma para colocarla en esta página.'],
+    fr: ['Utiliser la signature', 'Glisser pour placer', 'Réduire la signature', 'Agrandir la signature', 'Appuyez sur Utiliser la signature pour la placer sur cette page.'],
+  }).forEach(([locale, values]) => {
+    ['useSignature', 'moveHint', 'smaller', 'larger', 'useHint'].forEach((key, index) => {
+      LOCALES[locale]['sign.' + key] = values[index];
+    });
+  });
+
+  Object.entries({
     en: ['Undo', 'Undo page change'],
     'zh-Hans': ['撤销', '撤销页面更改'],
     'zh-Hant-TW': ['復原', '復原頁面變更'],
@@ -4440,7 +4455,7 @@
   function resetSignaturePadCanvas() {
     if (!signaturePad) return;
     signaturePad.width = MOBILE_PERFORMANCE_MODE ? 600 : 900;
-    signaturePad.height = MOBILE_PERFORMANCE_MODE ? 200 : 300;
+    signaturePad.height = MOBILE_PERFORMANCE_MODE ? 400 : 300;
     const ctx = signaturePad.getContext('2d');
     ctx.clearRect(0, 0, signaturePad.width, signaturePad.height);
     ctx.lineCap = 'round';
@@ -4542,6 +4557,11 @@
     const hasInk = !!signatureState.dataUrl;
     const placedCount = activeSignatureStamps().length;
     const selected = !!getSignatureStamp(signatureState.selectedId);
+    const mobileSigning = isPhoneViewport() && activeTool === 'sign';
+    const currentSelection = getSignatureStamp(signatureState.selectedId)?.pageIndex === currentSourceIndex();
+    $('mobileSignUse').disabled = !hasInk || !hasPdf || operationInProgress;
+    $('mobileSignActions').hidden = !mobileSigning || !currentSelection;
+    if (mobileSigning) mobileControlsLabel.textContent = t('sign.drawSignature');
     signHint.textContent = hasInk ? t('sign.ready') : t('sign.drawSignature');
     signatureClearBtn.disabled = !hasInk;
     signatureRemoveBtn.disabled = !selected;
@@ -4561,6 +4581,34 @@
     else if (!hasPdf) signSummary.textContent = t('sign.summaryNoPdf');
     else if (!placedCount) signSummary.textContent = t('sign.summaryReady');
     else signSummary.textContent = t('sign.summaryPlacedCount', { count: placedCount });
+    if (mobileSigning && hasPdf) signSummary.textContent = t(hasInk ? 'sign.useHint' : 'sign.drawFirst');
+  }
+
+  function placeMobileSignature() {
+    if (operationInProgress || !state.pdfDoc || !signatureState.dataUrl || activeTool !== 'sign') return;
+    const rect = previewCanvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const stamp = clampSignatureStamp(defaultSignaturePlacement(rect));
+    signatureState.stamps.push(stamp);
+    signatureState.selectedId = stamp.id;
+    setMobileControlsOpen(false, { restoreFocus: true });
+    updatePageState();
+  }
+
+  function resizeMobileSignature(factor) {
+    const stamp = getSignatureStamp(signatureState.selectedId);
+    if (!stamp || operationInProgress || stamp.pageIndex !== currentSourceIndex()) return;
+    const centerX = stamp.xPct + stamp.wPct / 2;
+    const centerY = stamp.yPct + stamp.hPct / 2;
+    const minScale = Math.max(5 / stamp.wPct, 2 / stamp.hPct);
+    const maxScale = Math.min(95 / stamp.wPct, 95 / stamp.hPct);
+    const scale = Math.max(minScale, Math.min(maxScale, factor));
+    stamp.wPct *= scale;
+    stamp.hPct *= scale;
+    stamp.xPct = centerX - stamp.wPct / 2;
+    stamp.yPct = centerY - stamp.hPct / 2;
+    clampSignatureStamp(stamp);
+    updateSignatureOverlay();
   }
 
   function defaultSignaturePlacement(rect, dataUrl = signatureState.dataUrl, ratio = signatureState.ratio) {
@@ -4737,6 +4785,7 @@
   }
 
   function beginSignatureDragFromSource(e) {
+    if (isPhoneViewport()) return;
     if (!signatureState.dataUrl || !state.pdfDoc || activeTool !== 'sign') return;
     e.preventDefault();
     signatureState.drag = {
@@ -5938,68 +5987,42 @@
   function captureOrganizerRects() {
     const rects = new Map();
     if (!organizerGrid) return rects;
+    const viewport = previewStage.getBoundingClientRect();
     organizerGrid.querySelectorAll('.page-card[data-source-index], .page-placeholder, .page-split-divider').forEach(el => {
       const key = el.classList.contains('page-placeholder')
         ? '__placeholder__'
         : el.classList.contains('page-split-divider')
           ? '__split_' + el.dataset.splitIndex
         : el.dataset.sourceIndex;
-      rects.set(key, el.getBoundingClientRect());
+      const rect = el.getBoundingClientRect();
+      if (!MOBILE_PERFORMANCE_MODE || (rect.bottom >= viewport.top && rect.top <= viewport.bottom)) rects.set(key, rect);
     });
     return rects;
   }
 
   function animateOrganizerFrom(firstRects, opts = {}) {
-    if (prefersReducedMotion() || !firstRects || !firstRects.size || !organizerGrid) return;
+    if (prefersReducedMotion() || !firstRects?.size || !organizerGrid) return;
     const baseDuration = opts.duration ?? 200;
-    const maxDuration = opts.maxDuration ?? baseDuration;
-    const distanceDuration = opts.distanceDuration ?? 0;
-    const easing = opts.easing || 'cubic-bezier(.2, .8, .2, 1)';
-    const moving = [];
     organizerGrid.querySelectorAll('.page-card[data-source-index], .page-placeholder, .page-split-divider').forEach(el => {
       if (opts.skipPlaceholder && el.classList.contains('page-placeholder')) return;
-      const key = el.classList.contains('page-placeholder')
-        ? '__placeholder__'
-        : el.classList.contains('page-split-divider')
-          ? '__split_' + el.dataset.splitIndex
-        : el.dataset.sourceIndex;
+      const key = el.classList.contains('page-placeholder') ? '__placeholder__'
+        : el.classList.contains('page-split-divider') ? '__split_' + el.dataset.splitIndex : el.dataset.sourceIndex;
       const first = firstRects.get(key);
       if (!first) return;
       const last = el.getBoundingClientRect();
       const dx = first.left - last.left;
       const dy = first.top - last.top;
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-      el.style.transition = 'none';
-      el.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
-      const distance = Math.hypot(dx, dy);
-      const duration = Math.min(maxDuration, Math.max(baseDuration, baseDuration + distance * distanceDuration));
-      moving.push({ el, duration });
-    });
-    if (!moving.length) return;
-    organizerGrid.getBoundingClientRect();
-    requestAnimationFrame(() => {
-      moving.forEach(({ el, duration }) => {
-        let cleared = false;
-        const clear = () => {
-          if (cleared) return;
-          cleared = true;
-          el.style.transition = '';
-          el.removeEventListener('transitionend', clear);
-        };
-        el.addEventListener('transitionend', clear, { once: true });
-        setTimeout(clear, duration + 80);
-        el.style.transition = 'transform ' + Math.round(duration) + 'ms ' + easing + ', box-shadow .16s, opacity .16s';
-        el.style.transform = '';
-      });
+      const duration = Math.min(opts.maxDuration ?? baseDuration, baseDuration + Math.hypot(dx, dy) * (opts.distanceDuration ?? 0));
+      el._organizerMove = el.animate([
+        { transform: 'translate(' + dx + 'px, ' + dy + 'px)' },
+        { transform: 'translate(0, 0)' },
+      ], { duration, easing: opts.easing || 'cubic-bezier(.2, .8, .2, 1)' });
     });
   }
 
   function rerenderOrganizerAnimated(opts) {
-    if (MOBILE_PERFORMANCE_MODE) {
-      renderOrganizer();
-      return;
-    }
-    const firstRects = MOBILE_PERFORMANCE_MODE ? null : captureOrganizerRects();
+    const firstRects = captureOrganizerRects();
     renderOrganizer();
     animateOrganizerFrom(firstRects, opts);
   }
@@ -6020,13 +6043,19 @@
       thumbnailObserver.disconnect();
       thumbnailObserver = null;
     }
-    organizerGrid.innerHTML = '';
+    if (organizerGrid._pdfDoc !== state.pdfDoc) {
+      organizerGrid.replaceChildren();
+      organizerGrid._pdfDoc = state.pdfDoc;
+    }
+    const existingCards = new Map(Array.from(organizerGrid.querySelectorAll('.page-card[data-source-index]'), card => [Number(card.dataset.sourceIndex), card]));
+    for (const card of organizerGrid.children) card._organizerMove?.cancel();
+    const nextChildren = [];
     const count = activePageCount();
     organizerEmpty.classList.toggle('on', !state.pdfDoc || count === 0);
     organizerEmpty.textContent = state.pdfDoc
       ? t('empty.organizeRemoved')
       : t('empty.organize');
-    if (!state.pdfDoc || count === 0) return;
+    if (!state.pdfDoc || count === 0) { organizerGrid.replaceChildren(); return; }
 
     const isDragging = organizerDrag.active;
     const flow = buildOrganizerFlow();
@@ -6045,23 +6074,28 @@
         const marker = document.createElement('div');
         marker.className = 'page-insert-marker';
         placeholder.appendChild(marker);
-        organizerGrid.appendChild(placeholder);
+        nextChildren.push(placeholder);
       }
       if (slot === visibleFlow.length) break;
       const item = visibleFlow[slot];
       if (item.type === 'split') {
-        appendSplitDivider(item.splitIndex, slot);
+        nextChildren.push(appendSplitDivider(item.splitIndex, slot));
         continue;
       }
       const sourceIndex = item.sourceIndex;
       const outputIndex = state.pageOrder.indexOf(sourceIndex);
-      const card = document.createElement('div');
+      const reused = existingCards.get(sourceIndex);
+      const card = reused || document.createElement('div');
       card.className = 'page-card organizer-flow-item';
       card.dataset.flowIndex = slot;
       card.dataset.outputIndex = outputIndex;
       card.dataset.sourceIndex = sourceIndex;
 
-      card.appendChild(createPageThumb(sourceIndex, 'Original page ' + (sourceIndex + 1)));
+      if (!reused) card.appendChild(createPageThumb(sourceIndex, 'Original page ' + (sourceIndex + 1)));
+      else {
+        card.querySelector('.page-card-actions')?.remove();
+        getThumbnailObserver()?.observe(card.querySelector('[data-thumb-source]'));
+      }
 
       const actions = document.createElement('div');
       actions.className = 'page-card-actions';
@@ -6104,10 +6138,17 @@
       actions.appendChild(num);
       card.appendChild(actions);
 
-      card.addEventListener('pointerdown', e => beginOrganizerDrag(e, card, sourceIndex));
-
-      organizerGrid.appendChild(card);
+      if (!reused) {
+        card.addEventListener('pointerdown', e => beginOrganizerDrag(e, card, sourceIndex));
+        card.addEventListener('touchstart', e => prepareOrganizerTouch(e, card, sourceIndex), { passive: true });
+      }
+      nextChildren.push(card);
     }
+    const retained = new Set(nextChildren);
+    for (const child of Array.from(organizerGrid.children)) if (!retained.has(child)) child.remove();
+    nextChildren.forEach((child, index) => {
+      if (organizerGrid.children[index] !== child) organizerGrid.insertBefore(child, organizerGrid.children[index] || null);
+    });
   }
 
   function appendSplitDivider(splitIndex, flowIndex) {
@@ -6130,7 +6171,7 @@
     });
     label.appendChild(remove);
     divider.appendChild(label);
-    organizerGrid.appendChild(divider);
+    return divider;
   }
 
   function positionPageContextMenu(x, y) {
@@ -6238,13 +6279,62 @@
     organizerTapState.y = 0;
   }
 
-  function beginOrganizerDrag(e, card, sourceIndex) {
+  let stopOrganizerTouch = null;
+
+  function prepareOrganizerTouch(event, card, sourceIndex) {
+    if (event.touches.length !== 1 || event.target.closest('button') || operationInProgress || organizerDrag.active) return;
+    stopOrganizerTouch?.();
+    const start = event.touches[0];
+    const startX = start.clientX;
+    const startY = start.clientY;
+    // Touch events keep their initial target even when the drag rebuilds the grid.
+    const touchTarget = event.target;
+    const pointer = touch => ({ clientX: touch.clientX, clientY: touch.clientY, pointerType: 'touch', target: card, preventDefault() {} });
+    const timer = setTimeout(() => {
+      if (!card.isConnected || activeTool !== 'organize') { stopOrganizerTouch?.(); return; }
+      beginOrganizerDrag(pointer({ clientX: startX, clientY: startY }), card, sourceIndex, true);
+    }, 400);
+    const move = e => {
+      if (e.touches.length !== 1) { cancel(); return; }
+      const touch = e.touches[0];
+      if (organizerDrag.active) {
+        e.preventDefault();
+        onOrganizerPointerMove(pointer(touch));
+      } else if (Math.hypot(touch.clientX - startX, touch.clientY - startY) > 8) {
+        stopOrganizerTouch?.();
+      }
+    };
+    const end = e => {
+      if (organizerDrag.active) {
+        if (e.cancelable) e.preventDefault();
+        finishOrganizerDrag(e.changedTouches[0]);
+      }
+      stopOrganizerTouch?.();
+    };
+    const cancel = () => {
+      stopOrganizerTouch?.();
+      cancelOrganizerDrag();
+    };
+    stopOrganizerTouch = () => {
+      clearTimeout(timer);
+      touchTarget.removeEventListener('touchmove', move);
+      touchTarget.removeEventListener('touchend', end);
+      touchTarget.removeEventListener('touchcancel', cancel);
+      stopOrganizerTouch = null;
+    };
+    touchTarget.addEventListener('touchmove', move, { passive: false });
+    touchTarget.addEventListener('touchend', end, { passive: false });
+    touchTarget.addEventListener('touchcancel', cancel);
+  }
+
+  function beginOrganizerDrag(e, card, sourceIndex, touchHold = false) {
+    if (e.pointerType === 'touch' && !touchHold) return;
     if (operationInProgress || !state.pdfDoc || organizerDrag.active || (e.pointerType === 'mouse' && e.button !== 0)) return;
     if (e.target.closest('.page-delete, .page-split-toggle')) return;
     hidePageContextMenu();
     const outputIndex = state.pageOrder.indexOf(sourceIndex);
     if (outputIndex < 0) return;
-    if (isOrganizerDoubleTap(e, outputIndex, sourceIndex)) {
+    if (!touchHold && isOrganizerDoubleTap(e, outputIndex, sourceIndex)) {
       clearOrganizerTap();
       showPageContextMenuAt(e.clientX, e.clientY, outputIndex, sourceIndex);
       e.preventDefault();
@@ -6290,9 +6380,11 @@
 
     moveOrganizerClone(e.clientX, e.clientY);
     startOrganizerAutoScroll();
-    window.addEventListener('pointermove', onOrganizerPointerMove, { passive: false });
-    window.addEventListener('pointerup', finishOrganizerDrag, { once: true });
-    window.addEventListener('pointercancel', cancelOrganizerDrag, { once: true });
+    if (!touchHold) {
+      window.addEventListener('pointermove', onOrganizerPointerMove, { passive: false });
+      window.addEventListener('pointerup', finishOrganizerDrag, { once: true });
+      window.addEventListener('pointercancel', cancelOrganizerDrag, { once: true });
+    }
     e.preventDefault();
     rerenderOrganizerDuringDrag();
   }
@@ -6471,6 +6563,7 @@
   }
 
   function cleanupOrganizerDrag({ preserveClone = false } = {}) {
+    stopOrganizerTouch?.();
     window.removeEventListener('pointermove', onOrganizerPointerMove);
     window.removeEventListener('pointerup', finishOrganizerDrag);
     window.removeEventListener('pointercancel', cancelOrganizerDrag);
@@ -6515,8 +6608,10 @@
     const damping = 38;
 
     const finish = () => {
+      // A viewport update may have rebuilt the grid during the spring.
+      const current = organizerGrid.querySelector('[data-source-index="' + clone.dataset.sourceIndex + '"]');
+      if (current) current.style.visibility = '';
       clone.remove();
-      if (destination.isConnected) destination.style.visibility = '';
     };
 
     const step = now => {
@@ -6554,7 +6649,7 @@
       recordOrganizerPointer(e.clientX, e.clientY);
       updateOrganizerInsertIndex(e.clientX, e.clientY);
     }
-    const firstRects = MOBILE_PERFORMANCE_MODE ? null : captureOrganizerRects();
+    const firstRects = captureOrganizerRects();
     const sourceIndex = organizerDrag.sourcePageIndex;
     const targetInsertIndex = organizerDrag.insertIndex;
     const clone = organizerDrag.clone;
@@ -6581,10 +6676,14 @@
 
   function cancelOrganizerDrag() {
     if (!organizerDrag.active) return;
-    const firstRects = MOBILE_PERFORMANCE_MODE ? null : captureOrganizerRects();
-    cleanupOrganizerDrag();
+    const firstRects = captureOrganizerRects();
+    const sourceIndex = organizerDrag.sourcePageIndex;
+    const clone = organizerDrag.clone;
+    const start = { x: organizerDrag.pointerX - organizerDrag.offsetX, y: organizerDrag.pointerY - organizerDrag.offsetY };
+    cleanupOrganizerDrag({ preserveClone: true });
     renderOrganizer();
     animateOrganizerFrom(firstRects);
+    settleOrganizerClone(clone, organizerGrid.querySelector('[data-source-index="' + sourceIndex + '"]'), start, { x: 0, y: 0 });
   }
 
   function deleteOutputPage(outputIndex) {
@@ -7233,6 +7332,10 @@
   signaturePad.addEventListener('pointercancel', finishSignaturePadStroke);
   signatureClearBtn.addEventListener('click', clearSignature);
   signatureRemoveBtn.addEventListener('click', deleteSelectedSignatureStamp);
+  $('mobileSignUse').addEventListener('click', placeMobileSignature);
+  $('mobileSignSmaller').addEventListener('click', () => resizeMobileSignature(0.88));
+  $('mobileSignLarger').addEventListener('click', () => resizeMobileSignature(1.12));
+  $('mobileSignDelete').addEventListener('click', deleteSelectedSignatureStamp);
   signatureDragSource.addEventListener('pointerdown', beginSignatureDragFromSource);
   signatureOverlay.addEventListener('pointerdown', beginSignatureOverlayDrag);
 

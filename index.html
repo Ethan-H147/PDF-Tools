@@ -25,7 +25,7 @@ Ethan Hu -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=mobile-organizer-1">
+<link rel="stylesheet" href="styles.css?v=flat-dark-mode-1">
 </head>
 <body>
 <div class="frame">
@@ -194,6 +194,7 @@ Ethan Hu -->
               <span id="signatureDragLabel" data-i18n="sign.drawFirst">Draw a signature first</span>
             </div>
             <div class="organize-summary" id="signSummary">Draw a signature, then drag it onto the page.</div>
+            <button class="btn-secondary mobile-sign-use" id="mobileSignUse" type="button" data-i18n="sign.useSignature" disabled>Use signature</button>
           </div>
         </div>
       </div>
@@ -392,6 +393,12 @@ Ethan Hu -->
           </div>
         </div>
       </div>
+      <div class="mobile-sign-actions" id="mobileSignActions" hidden>
+        <span data-i18n="sign.moveHint">Drag to position</span>
+        <button type="button" id="mobileSignSmaller" data-i18n-aria-label="sign.smaller" aria-label="Make signature smaller">−</button>
+        <button type="button" id="mobileSignLarger" data-i18n-aria-label="sign.larger" aria-label="Make signature larger">+</button>
+        <button type="button" id="mobileSignDelete" data-i18n-aria-label="sign.removeSelected" aria-label="Remove selected"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6h10l-1 11H6L5 6Zm-1 0h12M8 6V3h4v3M8 9v5m4-5v5"/></svg></button>
+      </div>
       <div class="preview-stage" id="previewStage">
         <div class="mobile-document-name" id="mobileDocumentName" hidden></div>
         <div class="empty" id="emptyState">
@@ -532,6 +539,6 @@ Ethan Hu -->
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.bundle.js?v=mobile-organizer-1"></script>
+<script src="app.bundle.js?v=mobile-organizer-motion-1"></script>
 </body>
 </html>

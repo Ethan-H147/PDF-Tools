@@ -31,7 +31,7 @@ function fixture(count = 3) {
 test('opening index.html directly initializes controls and renders a PDF', { timeout: 30000 }, async () => {
   const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined, headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1' });
     page.setDefaultTimeout(7000);
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -116,7 +116,7 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined, headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1' });
     const errors = [];
     const requests = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -247,7 +247,7 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
     });
 
     await t.test('encryption failure never falls back to an unprotected download', async () => {
-      const blocked = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      const blocked = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1' });
       try {
         await blocked.route('**/vendor/pdf-lib-2.9.2/**', route => route.abort());
         await blocked.goto(page.url());
@@ -270,7 +270,7 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
     });
 
     await t.test('mobile organizer sharpens visible pages and exposes split beside centered delete', async () => {
-      const mobile = await browser.newPage({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
+      const mobile = await browser.newPage({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1' });
       try {
         await mobile.goto(page.url());
         await mobile.locator('#fileInput').setInputFiles({ name: 'Many pages.pdf', mimeType: 'application/pdf', buffer: fixture(24) });
@@ -302,6 +302,91 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
         await mobile.locator('[data-source-index="23"]').scrollIntoViewIfNeeded();
         await waitForSharp(23);
         assert(await mobile.locator('[data-source-index="23"] .page-split-toggle').isDisabled());
+        await mobile.locator('#previewStage').evaluate(el => { el.scrollTop = 0; });
+        const touch = await mobile.context().newCDPSession(mobile);
+        const dispatch = (type, x, y) => touch.send('Input.dispatchTouchEvent', {
+          type, touchPoints: type === 'touchEnd' || type === 'touchCancel' ? [] : [{ x, y }],
+        });
+        const start = await mobile.locator('[data-source-index="0"] .page-thumb').boundingBox();
+        const x = start.x + start.width / 2;
+        const y = start.y + Math.min(130, start.height / 2);
+        await dispatch('touchStart', x, y);
+        for (let step = 1; step <= 6; step++) {
+          await dispatch('touchMove', x, y - step * 15);
+          await mobile.waitForTimeout(20);
+        }
+        await dispatch('touchEnd');
+        assert(await mobile.locator('#previewStage').evaluate(el => el.scrollTop > 20), 'A swipe over a page must scroll');
+        assert.equal(await mobile.locator('.page-drag-clone').count(), 0);
+        await mobile.waitForTimeout(400);
+        await mobile.locator('#previewStage').evaluate(el => { el.scrollTop = 0; });
+        await dispatch('touchStart', x, y);
+        await mobile.locator('.page-drag-clone').waitFor();
+        const clone = mobile.locator('.page-drag-clone');
+        const neighbor = await mobile.locator('.organizer-grid [data-source-index="1"]').elementHandle();
+        assert.equal(await clone.locator('.page-split-text').isVisible(), false);
+        assert.equal(await clone.locator('.page-split-icon').isVisible(), true);
+        assert.equal(await clone.locator('.page-delete').evaluate(el => getComputedStyle(el).color), await clone.locator('.page-split-toggle').evaluate(el => getComputedStyle(el).color));
+        await dispatch('touchMove', x + 180, y + 35);
+        await mobile.waitForTimeout(45);
+        await dispatch('touchMove', x, y);
+        await mobile.waitForTimeout(45);
+        await dispatch('touchMove', x + 180, y + 35);
+        assert(await neighbor.evaluate(el => el.isConnected), 'Reversing a drag must preserve neighboring thumbnail elements');
+        await dispatch('touchEnd');
+        await mobile.waitForFunction(() => !document.querySelector('.page-drag-clone'));
+        assert.equal(await mobile.locator('#undoPagesBtn').isEnabled(), true, 'Hold and drag should reorder');
+        const orderBeforeCancel = await mobile.locator('.organizer-grid .page-card[data-source-index]').evaluateAll(cards => cards.map(el => el.dataset.sourceIndex));
+        const nextCard = await mobile.locator('.organizer-grid .page-card[data-source-index]').first().boundingBox();
+        await dispatch('touchStart', nextCard.x + 50, nextCard.y + 70);
+        await mobile.locator('.page-drag-clone').waitFor();
+        await dispatch('touchMove', nextCard.x + 120, nextCard.y + 120);
+        await dispatch('touchCancel');
+        assert.equal(await mobile.locator('.page-drag-clone').count(), 1, 'Cancellation should animate home instead of removing the floating page immediately');
+        await mobile.waitForFunction(() => !document.querySelector('.page-drag-clone'));
+        assert.deepEqual(await mobile.locator('.organizer-grid .page-card[data-source-index]').evaluateAll(cards => cards.map(el => el.dataset.sourceIndex)), orderBeforeCancel);
+      } finally { await mobile.close(); }
+    });
+
+    await t.test('mobile signing draws, places, moves, resizes, removes and exports a signature', async () => {
+      const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1' });
+      try {
+        await mobile.goto(page.url());
+        await mobile.locator('#fileInput').setInputFiles({ name: 'Sign me.pdf', mimeType: 'application/pdf', buffer: fixture() });
+        await mobile.waitForFunction(() => Number(document.querySelector('#totPage').textContent) === 3 && !document.querySelector('#loader').classList.contains('on'));
+        await mobile.locator('#tab-sign').click();
+        await mobile.locator('#mobileControlsToggle').click();
+        await mobile.locator('#signaturePad').scrollIntoViewIfNeeded();
+        const pad = await mobile.locator('#signaturePad').boundingBox();
+        const touch = await mobile.context().newCDPSession(mobile);
+        const dispatch = (type, x, y) => touch.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+        await dispatch('touchStart', pad.x + 25, pad.y + 70);
+        for (let step = 1; step <= 12; step++) await dispatch('touchMove', pad.x + 25 + step * 13, pad.y + 65 + Math.sin(step) * 20);
+        await dispatch('touchEnd');
+        assert(await mobile.locator('#mobileSignUse').isEnabled());
+        await mobile.locator('#mobileSignUse').click();
+        await mobile.waitForFunction(() => !document.body.classList.contains('mobile-controls-open'));
+        const stamp = mobile.locator('.signature-stamp');
+        await stamp.waitFor();
+        await mobile.waitForTimeout(300);
+        const before = await stamp.boundingBox();
+        await mobile.locator('#mobileSignLarger').click();
+        assert((await stamp.boundingBox()).width > before.width);
+        await mobile.locator('#mobileSignSmaller').click();
+        const position = await stamp.boundingBox();
+        await dispatch('touchStart', position.x + position.width / 2, position.y + position.height / 2);
+        await dispatch('touchMove', position.x + position.width / 2 + 35, position.y + position.height / 2 + 45);
+        await dispatch('touchEnd');
+        const moved = await stamp.boundingBox();
+        assert(moved.x > position.x + 15 && moved.y > position.y + 20, 'Touch drag must move the placed signature');
+        const signed = await downloadBytes(mobile);
+        const inspected = await inspectPdf(mobile, signed);
+        assert.equal(inspected.pages, 3);
+        assert(inspected.text.includes('Document page 1'));
+        assert.match(signed.toString('latin1'), /\/Subtype\s*\/Image/);
+        await mobile.locator('#mobileSignDelete').click();
+        assert.equal(await stamp.count(), 0);
+        assert.equal(await mobile.locator('#mobileSignActions').isVisible(), false);
       } finally { await mobile.close(); }
     });
 
