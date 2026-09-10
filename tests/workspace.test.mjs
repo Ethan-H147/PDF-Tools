@@ -310,6 +310,7 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
         const start = await mobile.locator('[data-source-index="0"] .page-thumb').boundingBox();
         const x = start.x + start.width / 2;
         const y = start.y + Math.min(130, start.height / 2);
+        const initialTouchTarget = await mobile.locator('[data-source-index="0"] .page-thumb').elementHandle();
         await dispatch('touchStart', x, y);
         for (let step = 1; step <= 6; step++) {
           await dispatch('touchMove', x, y - step * 15);
@@ -323,6 +324,7 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
         await dispatch('touchStart', x, y);
         await mobile.locator('.page-drag-clone').waitFor();
         const clone = mobile.locator('.page-drag-clone');
+        assert(await initialTouchTarget.evaluate(el => el.isConnected && el.closest('.organizer-touch-anchor') !== null), 'The original touch target must remain connected throughout the held drag');
         const neighbor = await mobile.locator('.organizer-grid [data-source-index="1"]').elementHandle();
         assert.equal(await clone.locator('.page-split-text').isVisible(), false);
         assert.equal(await clone.locator('.page-split-icon').isVisible(), true);
@@ -333,6 +335,7 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
         await mobile.waitForTimeout(45);
         await dispatch('touchMove', x + 180, y + 35);
         assert(await neighbor.evaluate(el => el.isConnected), 'Reversing a drag must preserve neighboring thumbnail elements');
+        assert(await initialTouchTarget.evaluate(el => el.isConnected), 'Moving the insertion slot must not detach the touch target');
         await dispatch('touchEnd');
         await mobile.waitForFunction(() => !document.querySelector('.page-drag-clone'));
         assert.equal(await mobile.locator('#undoPagesBtn').isEnabled(), true, 'Hold and drag should reorder');

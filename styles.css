@@ -4410,6 +4410,18 @@
   }
 
   .preview-stage.organizing { overflow-anchor: none; }
+  .organizer-grid .page-card.organizer-touch-anchor { display: block; min-height: 0; border: 1px solid transparent; }
+  .organizer-touch-anchor > * { visibility: hidden; }
+  .organizer-touch-anchor::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: calc(50% - 2px);
+    width: 4px;
+    border-radius: 999px;
+    background: var(--accent);
+  }
   body.organizer-dragging .preview-stage.organizing { overflow: hidden !important; }
 
   html.theme-transitioning .theme-toggle-track,

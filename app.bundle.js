@@ -26365,11 +26365,13 @@
     const insertIndex = hasInsertSlot ? Math.max(0, Math.min(organizerDrag.insertIndex, visibleFlow.length)) : -1;
     for (let slot = 0; slot <= visibleFlow.length; slot++) {
       if (hasInsertSlot && slot === insertIndex) {
-        const placeholder = document.createElement("div");
-        placeholder.className = "page-card page-placeholder";
-        const marker = document.createElement("div");
-        marker.className = "page-insert-marker";
-        placeholder.appendChild(marker);
+        const placeholder = organizerDrag.touchAnchor || document.createElement("div");
+        if (!organizerDrag.touchAnchor) {
+          placeholder.className = "page-card page-placeholder";
+          const marker = document.createElement("div");
+          marker.className = "page-insert-marker";
+          placeholder.appendChild(marker);
+        }
         nextChildren.push(placeholder);
       }
       if (slot === visibleFlow.length) break;
@@ -26553,6 +26555,9 @@
     organizerTapState.y = 0;
   }
   var stopOrganizerTouch = null;
+  document.addEventListener("touchmove", (event) => {
+    if (organizerDrag.active && organizerDrag.touchAnchor && event.cancelable) event.preventDefault();
+  }, { capture: true, passive: false });
   function prepareOrganizerTouch(event, card, sourceIndex) {
     if (event.touches.length !== 1 || event.target.closest("button") || operationInProgress || organizerDrag.active) return;
     stopOrganizerTouch?.();
@@ -26633,6 +26638,11 @@
     document.body.appendChild(clone);
     organizerDrag.active = true;
     document.body.classList.add("organizer-dragging");
+    if (touchHold) {
+      organizerDrag.touchAnchor = card;
+      card.classList.add("organizer-touch-anchor", "page-placeholder");
+      card.classList.remove("organizer-flow-item");
+    }
     organizerDrag.sourceOutputIndex = outputIndex;
     organizerDrag.sourcePageIndex = sourceIndex;
     organizerDrag.sourceFlowIndex = sourceFlowIndex;
@@ -26820,6 +26830,11 @@
   }
   function cleanupOrganizerDrag({ preserveClone = false } = {}) {
     document.body.classList.remove("organizer-dragging");
+    if (organizerDrag.touchAnchor) {
+      organizerDrag.touchAnchor.classList.remove("organizer-touch-anchor", "page-placeholder");
+      organizerDrag.touchAnchor.classList.add("organizer-flow-item");
+      organizerDrag.touchAnchor = null;
+    }
     stopOrganizerTouch?.();
     window.removeEventListener("pointermove", onOrganizerPointerMove);
     window.removeEventListener("pointerup", finishOrganizerDrag);
