@@ -21381,7 +21381,10 @@
     const ratio = max > min ? (+el.value - min) / (max - min) : 0;
     el.style.setProperty("--fill-ratio", String(Math.max(0, Math.min(1, ratio))));
   }
-  var X_ICON = '<svg class="x-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m6 6 8 8M14 6l-8 8"/></svg>';
+  var circleIcon = (glyph) => '<svg class="circle-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle class="circle-icon-bg" cx="16" cy="16" r="16"/><path class="circle-icon-glyph" d="' + glyph + '"/></svg>';
+  var CIRCLE_X_ICON = circleIcon("m11.5 11.5 9 9m0-9-9 9");
+  var CIRCLE_UP_ICON = circleIcon("M16 22.5v-13m-5.5 5.5 5.5-5.5 5.5 5.5");
+  var CIRCLE_DOWN_ICON = circleIcon("M16 9.5v13m-5.5-5.5 5.5 5.5 5.5-5.5");
   var DROP_ICON_SINGLE = '<svg viewBox="0 0 24 24" focusable="false"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v3.5A1.5 1.5 0 0 0 15.5 8H19"/><path d="M12 17.5v-6.5M9.25 13.5 12 10.75l2.75 2.75"/></svg>';
   var DROP_ICON_MULTI = '<svg viewBox="0 0 24 24" focusable="false"><path d="M8.5 5V4.5A1.5 1.5 0 0 1 10 3h5.5L20 7.5v10a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M6.5 6h7L17 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 5 19.5v-12A1.5 1.5 0 0 1 6.5 6z"/><path d="M11 18v-5.5M8.75 14.5 11 12.25l2.25 2.25"/></svg>';
   function setSliderValue(el, value) {
@@ -25000,19 +25003,19 @@
       actions.className = "merge-file-actions";
       const up = document.createElement("button");
       up.type = "button";
-      up.innerHTML = '<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">\u2191</span>';
+      up.innerHTML = CIRCLE_UP_ICON;
       up.disabled = operationInProgress || index === 0;
       up.setAttribute("aria-label", t2("merge.moveUp", { name: file.name }));
       up.addEventListener("click", () => moveMergeFile(index, -1));
       const down = document.createElement("button");
       down.type = "button";
-      down.innerHTML = '<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">\u2193</span>';
+      down.innerHTML = CIRCLE_DOWN_ICON;
       down.disabled = operationInProgress || index === state.mergeFiles.length - 1;
       down.setAttribute("aria-label", t2("merge.moveDown", { name: file.name }));
       down.addEventListener("click", () => moveMergeFile(index, 1));
       const remove = document.createElement("button");
       remove.type = "button";
-      remove.innerHTML = X_ICON;
+      remove.innerHTML = CIRCLE_X_ICON;
       remove.setAttribute("aria-label", t2("merge.remove", { name: file.name }));
       remove.disabled = operationInProgress;
       remove.addEventListener("click", () => removeMergeFile(index));
@@ -27106,9 +27109,9 @@
         return el;
       };
       actions.append(
-        button('<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">\u2191</span>', t2("merge.moveUp", { name: entry.file.name }), index === 0, () => moveImageEntry(index, -1)),
-        button('<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">\u2193</span>', t2("merge.moveDown", { name: entry.file.name }), index === imageState.files.length - 1, () => moveImageEntry(index, 1)),
-        button(X_ICON, t2("merge.remove", { name: entry.file.name }), false, () => removeImageEntry(index))
+        button(CIRCLE_UP_ICON, t2("merge.moveUp", { name: entry.file.name }), index === 0, () => moveImageEntry(index, -1)),
+        button(CIRCLE_DOWN_ICON, t2("merge.moveDown", { name: entry.file.name }), index === imageState.files.length - 1, () => moveImageEntry(index, 1)),
+        button(CIRCLE_X_ICON, t2("merge.remove", { name: entry.file.name }), false, () => removeImageEntry(index))
       );
       row.append(thumb, info2, actions);
       imageList.appendChild(row);
@@ -28388,8 +28391,8 @@
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "page-split-remove";
+    remove.innerHTML = CIRCLE_X_ICON;
     remove.setAttribute("aria-label", t2("split.removeAria", { num: splitIndex + 1 }));
-    remove.innerHTML = X_ICON;
     remove.addEventListener("pointerdown", (e2) => e2.stopPropagation());
     remove.addEventListener("click", (e2) => {
       e2.stopPropagation();

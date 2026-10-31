@@ -5544,3 +5544,87 @@
   body.dark-mode .btn-print:hover:not(:disabled) { background: #409cff; }
   body.dark-mode .btn-print:disabled { background: #2c2c2e; color: #98989d; opacity: 1; }
   body.dark-mode input[type=range].slider { --slider-track: #3a3a3c; }
+
+  /* ── Round icon buttons: circle and glyph drawn as one SVG ── */
+  .circle-icon {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+
+  .circle-icon-bg {
+    fill: rgba(118, 118, 128, 0.12);
+    transition: fill .16s;
+  }
+
+  .circle-icon-glyph {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  body.dark-mode .circle-icon-bg { fill: rgba(118, 118, 128, 0.24); }
+
+  .file-remove,
+  .file-remove:disabled,
+  .merge-file-actions button,
+  .page-split-remove,
+  body.dark-mode .file-remove,
+  body.dark-mode .merge-file-actions button {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .file-remove { color: var(--ink-mute); }
+  .merge-file-actions button { color: var(--ink-soft); }
+
+  .file-remove:hover:not(:disabled),
+  .merge-file-actions button:hover:not(:disabled),
+  body.dark-mode .file-remove:hover:not(:disabled),
+  body.dark-mode .merge-file-actions button:hover:not(:disabled) {
+    background: transparent;
+    color: var(--ink);
+  }
+
+  .file-remove:hover:not(:disabled) .circle-icon-bg,
+  .merge-file-actions button:hover:not(:disabled) .circle-icon-bg { fill: rgba(118, 118, 128, 0.2); }
+
+  body.dark-mode .file-remove:hover:not(:disabled) .circle-icon-bg,
+  body.dark-mode .merge-file-actions button:hover:not(:disabled) .circle-icon-bg { fill: rgba(118, 118, 128, 0.36); }
+
+  .merge-file-actions button:disabled .circle-icon-bg { fill: rgba(118, 118, 128, 0.08); }
+
+  .page-split-remove { color: var(--accent); }
+  .page-split-remove .circle-icon-bg { fill: var(--accent-soft); }
+  .page-split-remove:hover .circle-icon-bg { fill: rgba(0, 113, 227, 0.22); }
+  .page-split-remove .circle-icon-glyph { stroke-width: 2px; }
+
+  /* The phone split button keeps its ring with an inset shadow, which is placed with the
+     icon instead of being snapped to device pixels like a border. */
+  @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse) {
+    :is(.organizer-grid, .page-drag-clone) .page-split-toggle {
+      border: 0;
+      box-shadow: inset 0 0 0 1.5px rgba(41, 151, 189, 0.45);
+    }
+
+    :is(.organizer-grid, .page-drag-clone) .page-split-toggle:hover:not(:disabled),
+    :is(.organizer-grid, .page-drag-clone) .page-split-toggle[aria-pressed="true"] {
+      box-shadow: inset 0 0 0 1.5px rgba(41, 151, 189, 0.72);
+    }
+  }
+
+  /* Colour orbs give a little when pressed. */
+  .color-swatch {
+    transition: transform .16s cubic-bezier(.2, .8, .2, 1), box-shadow .16s;
+  }
+
+  .color-swatch:active { transform: scale(.88); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .color-swatch:active { transform: none; }
+  }
