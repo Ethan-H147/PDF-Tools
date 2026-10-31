@@ -126,12 +126,26 @@
       downloadSub: 'stamp the signature onto the PDF',
       suffix: '_signed',
     },
+    text: {
+      lede: 'Add text, page numbers, or a watermark to your PDF.',
+      meta: 'Type text and drag it into place<br/>Number every page automatically<br/>Mark pages with a watermark',
+      downloadLabel: 'Export PDF',
+      downloadSub: 'add text to the original pages',
+      suffix: '_text',
+    },
     merge: {
       lede: 'Combine multiple PDFs into one document.',
       meta: 'Add as many PDFs as you need<br/>Arrange them in the right order<br/>Review the combined pages before export',
       downloadLabel: 'Merge PDFs',
       downloadSub: 'combine selected files into organize',
       suffix: '_merged',
+    },
+    image: {
+      lede: 'Turn images into a PDF, or save PDF pages as images.',
+      meta: 'Combine photos and screenshots into one PDF<br/>Save pages as PNG or JPEG<br/>Several pages download as a ZIP file',
+      downloadLabel: 'Create PDF',
+      downloadSub: 'one page per image',
+      suffix: '_images',
     },
     compress: {
       lede: 'Make a PDF smaller with a choice of quality levels.',
@@ -370,6 +384,37 @@
   const signatureDragLabel = $('signatureDragLabel');
   const signSummary   = $('signSummary');
   const signatureOverlay = $('signatureOverlay');
+  const textModeSegments = $('textModeSegments');
+  const textDraftInput = $('textDraftInput');
+  const textSizeSlider = $('textSizeSlider');
+  const textSizeValue = $('textSizeValue');
+  const textColorSwatches = $('textColorSwatches');
+  const textAddBtn    = $('textAddBtn');
+  const textRemoveBtn = $('textRemoveBtn');
+  const textSummary   = $('textSummary');
+  const pageNumbersToggle = $('pageNumbersToggle');
+  const numbersVertical = $('numbersVertical');
+  const numbersAlign  = $('numbersAlign');
+  const numbersFormat = $('numbersFormat');
+  const numbersSize   = $('numbersSize');
+  const numbersStartInput = $('numbersStartInput');
+  const watermarkToggle = $('watermarkToggle');
+  const watermarkInput = $('watermarkInput');
+  const watermarkSizeSlider = $('watermarkSizeSlider');
+  const watermarkSizeValue = $('watermarkSizeValue');
+  const watermarkOpacitySlider = $('watermarkOpacitySlider');
+  const watermarkOpacityValue = $('watermarkOpacityValue');
+  const watermarkLayout = $('watermarkLayout');
+  const watermarkColorSwatches = $('watermarkColorSwatches');
+  const imageModeSegments = $('imageModeSegments');
+  const imageSummary  = $('imageSummary');
+  const imageList     = $('imageList');
+  const imagePageSize = $('imagePageSize');
+  const imageClearBtn = $('imageClearBtn');
+  const pdfToImageSummary = $('pdfToImageSummary');
+  const imageFormat   = $('imageFormat');
+  const imageDpi      = $('imageDpi');
+  const imagePages    = $('imagePages');
   const previewTitle  = $('previewTitle');
   const previewTools  = $('previewTools');
   const mobileControlsSheet = $('mobileControlsSheet');
@@ -406,6 +451,25 @@
     padPointerId: null,
     lastPadPoint: null,
     drag: null,
+  };
+  // Placed text shares signatureState.stamps (kind: 'text') so it reuses the signature
+  // overlay for dragging and resizing. Page numbers and the watermark apply to every page.
+  const TEXT_COLORS = ['#1d1d1f', '#6e6e73', '#0071e3', '#d70015'];
+  const textState = {
+    mode: 'text',
+    size: 18,
+    color: TEXT_COLORS[0],
+    font: 'sans',
+    pageNumbers: { enabled: false, vertical: 'bottom', align: 'center', format: 'n', size: 'm', start: 1 },
+    watermark: { enabled: false, text: null, size: 64, opacity: 20, layout: 'diagonal', color: TEXT_COLORS[1] },
+  };
+  const imageState = {
+    mode: 'toPdf',
+    files: [],
+    nextId: 1,
+    pageSize: 'fit',
+    format: 'png',
+    dpi: 150,
   };
 
   let errorHideTimer = null;
@@ -483,6 +547,12 @@
     setElementHtml($('masterLede'), toolText(activeTool, 'lede'));
     $('masterMeta').dataset.tooltip = toolTipText(meta);
     $('masterMeta').setAttribute('aria-label', toolTipText(meta));
+    if (activeTool === 'image') {
+      const toPdf = imageState.mode === 'toPdf';
+      setElementHtml(downloadLabel, t(toPdf ? 'image.createPdf' : 'image.exportImages'));
+      setElementHtml(downloadSub, t(toPdf ? 'image.createPdfSub' : 'image.exportImagesSub'));
+      return;
+    }
     setElementHtml(downloadLabel, toolText(activeTool, 'downloadLabel'));
     setElementHtml(downloadSub, toolText(activeTool, 'downloadSub'));
   }
@@ -500,6 +570,7 @@
     syncFineQualityToggle();
     syncToneLabels();
     updateMergeState();
+    syncImageTool();
     updatePageState();
     syncEditControls();
     updatePreviewMode();
@@ -842,7 +913,7 @@
     const enabled = usesMobilePreviewWorkspace();
     if (!enabled) mobileControlsOpen = false;
     document.body.classList.toggle('mobile-preview-workspace', enabled);
-    document.body.classList.toggle('mobile-signing', enabled && activeTool === 'sign');
+    document.body.classList.toggle('mobile-signing', enabled && isStampTool());
     document.documentElement.classList.toggle('mobile-workspace', enabled);
     document.body.classList.toggle('mobile-controls-open', enabled && mobileControlsOpen);
 
@@ -1004,7 +1075,9 @@
     requestAnimationFrame(centerActiveToolTab);
     syncPreviewStageHeight();
     if (id === 'sign') syncSignatureControls();
-    if (state.pdfDoc && id !== 'organize' && id !== 'edit') {
+    if (id === 'text') syncTextControls();
+    syncImageTool();
+    if (state.pdfDoc && id !== 'organize' && id !== 'edit' && !imageCollecting()) {
       const enteringRasterTool = isRasterTool(id) && !isRasterTool(previousTool);
       if (!MOBILE_PERFORMANCE_MODE && enteringRasterTool) scheduleRasterToolEntryRender(id);
       else requestPreviewRender(isRasterTool(id));
@@ -1041,11 +1114,15 @@
     } else if (!isRasterTool(activeTool)) {
       previewCanvas._processedImage = null;
     }
+    const collectingImages = imageCollecting();
     previewStage.classList.toggle('organizing', organizing);
     previewStage.classList.toggle('editing', editing);
-    previewTools.classList.toggle('preview-tools-hidden', !isPhoneViewport() && (organizing || editing));
-    previewTools.querySelector('.zoom-bar').hidden = isPhoneViewport() && (organizing || editing);
-    previewTitle.innerHTML = organizing
+    previewStage.classList.toggle('image-collecting', collectingImages);
+    previewTools.classList.toggle('preview-tools-hidden', !isPhoneViewport() && (organizing || editing || collectingImages));
+    previewTools.querySelector('.zoom-bar').hidden = (isPhoneViewport() && (organizing || editing)) || collectingImages;
+    previewTitle.innerHTML = collectingImages
+      ? t('preview.titleImages')
+      : organizing
       ? t('preview.titleOrganize')
       : editing
         ? t('preview.titleEdit')
@@ -1059,6 +1136,14 @@
     organizer.style.display = organizing ? 'block' : 'none';
     pageEditor.style.display = editing ? 'flex' : 'none';
     if (!editing) cropOverlay.hidden = true;
+    imagePages.hidden = !collectingImages;
+    if (collectingImages) {
+      emptyState.style.display = 'none';
+      canvasWrap.style.display = 'none';
+      renderImagePages();
+      updateSignatureOverlay();
+      return;
+    }
     if (organizing) {
       emptyState.style.display = 'none';
       canvasWrap.style.display = 'none';
@@ -1083,16 +1168,25 @@
   function updateSourceDropMode() {
     syncDocumentName();
     const merging = activeTool === 'merge';
+    const collectingImages = imageCollecting();
     const hasCurrentPdf = !!state.pdfBytes || !!state.sourceFile || !!state.pdfDoc;
-    const collapseDrop = hasCurrentPdf && !merging;
-    fileInput.multiple = merging;
+    const collapseDrop = hasCurrentPdf && !merging && !collectingImages;
+    fileInput.multiple = merging || collectingImages;
+    fileInput.accept = collectingImages ? 'image/*' : 'application/pdf';
     dropZone.classList.toggle('is-collapsed', collapseDrop);
     dropZone.setAttribute('aria-hidden', collapseDrop ? 'true' : 'false');
     dropZone.tabIndex = collapseDrop ? -1 : 0;
-    dropGlyph.innerHTML = merging ? DROP_ICON_MULTI : DROP_ICON_SINGLE;
-    dropLabel.textContent = merging ? t('drop.uploadPdfs') : t('drop.uploadPdf');
-    dropSub.textContent = merging ? t('drop.multiSub') : t('drop.singleSub');
-    dropZone.setAttribute('aria-label', merging ? t('drop.multiAria') : t('drop.singleAria'));
+    if (collectingImages) {
+      dropGlyph.innerHTML = DROP_ICON_IMAGE;
+      dropLabel.textContent = t('drop.addImages');
+      dropSub.textContent = t('drop.imagesSub');
+      dropZone.setAttribute('aria-label', t('drop.addImages'));
+    } else {
+      dropGlyph.innerHTML = merging ? DROP_ICON_MULTI : DROP_ICON_SINGLE;
+      dropLabel.textContent = merging ? t('drop.uploadPdfs') : t('drop.uploadPdf');
+      dropSub.textContent = merging ? t('drop.multiSub') : t('drop.singleSub');
+      dropZone.setAttribute('aria-label', merging ? t('drop.multiAria') : t('drop.singleAria'));
+    }
     fileRemoveBtn.disabled = !hasCurrentPdf;
     fileRemoveBtn.hidden = !hasCurrentPdf;
     fileRemoveBtn.setAttribute('aria-label', t('file.removeAria', { name: state.fileName || 'PDF' }));
@@ -1339,6 +1433,8 @@
         fineRotationDpi: fineRotationExportDpi(),
         pageEdits: state.pageEdits.map(edit => clonePageEdit(edit)),
         signatureStamps: signatureState.stamps.map(stamp => ({ ...stamp })),
+        pageNumbers: { ...textState.pageNumbers },
+        watermark: { ...textState.watermark },
       },
     };
   }
@@ -3147,6 +3243,567 @@
   Object.entries({ en: 'Jump to page', 'zh-Hans': '跳转到页面', 'zh-Hant-TW': '跳至頁面', ko: '페이지로 이동', ja: 'ページへ移動', es: 'Ir a la página', fr: 'Aller à la page' }).forEach(([locale, label]) => { LOCALES[locale]['pages.jump'] = label; });
   Object.entries({ en: 'Previous page', 'zh-Hans': '上一页', 'zh-Hant-TW': '上一頁', ko: '이전 페이지', ja: '前のページ', es: 'Página anterior', fr: 'Page précédente' }).forEach(([locale, label]) => { LOCALES[locale]['pages.previous'] = label; });
   Object.entries({ en: 'Next page', 'zh-Hans': '下一页', 'zh-Hant-TW': '下一頁', ko: '다음 페이지', ja: '次のページ', es: 'Página siguiente', fr: 'Page suivante' }).forEach(([locale, label]) => { LOCALES[locale]['pages.next'] = label; });
+  // Strings for the Text and Image tools.
+  Object.entries({
+    en: {
+      'tool.text.label': 'Text',
+      'tool.text.lede': 'Add text, page numbers, or a watermark to your PDF.',
+      'tool.text.meta': 'Type text and drag it into place<br/>Number every page automatically<br/>Mark pages with a watermark',
+      'tool.text.downloadLabel': 'Export PDF',
+      'tool.text.downloadSub': 'add text to the original pages',
+      'tool.image.label': 'Image',
+      'tool.image.lede': 'Turn images into a PDF, or save PDF pages as images.',
+      'tool.image.meta': 'Combine photos and screenshots into one PDF<br/>Save pages as PNG or JPEG<br/>Several pages download as a ZIP file',
+      'sections.text': 'Text',
+      'sections.image': 'Image',
+      'text.modeAria': 'Text type',
+      'text.modeText': 'Text',
+      'text.modeNumbers': 'Page numbers',
+      'text.modeWatermark': 'Watermark',
+      'text.placeholder': 'Type your text',
+      'text.size': 'Size',
+      'text.color': 'Color',
+      'text.colorBlack': 'Black',
+      'text.colorGray': 'Gray',
+      'text.colorBlue': 'Blue',
+      'text.colorRed': 'Red',
+      'text.add': 'Add to page',
+      'text.remove': 'Remove selected',
+      'text.summaryEmpty': 'Type something, add it to the page, then drag it into place.',
+      'text.summaryNoPdf': 'Upload a PDF to add text.',
+      'text.summaryEditing': 'Editing the selected text. Click the page outside it to start new text.',
+      'text.summaryPlaced': 'Text added: {count}. Select text on the page to edit it.',
+      'text.showNumbers': 'Show page numbers',
+      'text.position': 'Position',
+      'text.top': 'Top',
+      'text.bottom': 'Bottom',
+      'text.left': 'Left',
+      'text.center': 'Center',
+      'text.right': 'Right',
+      'text.style': 'Style',
+      'text.pageFormat': 'Page {n}',
+      'text.small': 'Small',
+      'text.medium': 'Medium',
+      'text.large': 'Large',
+      'text.startAt': 'Start at',
+      'text.showWatermark': 'Show watermark',
+      'text.watermarkPlaceholder': 'Watermark text',
+      'text.watermarkDefault': 'Confidential',
+      'text.opacity': 'Opacity',
+      'text.angle': 'Angle',
+      'text.diagonal': 'Diagonal',
+      'text.horizontal': 'Horizontal',
+      'image.modeAria': 'Conversion',
+      'image.toPdf': 'Images to PDF',
+      'image.fromPdf': 'PDF to images',
+      'image.pageSize': 'Page size',
+      'image.fit': 'Fit image',
+      'image.letter': 'Letter',
+      'image.format': 'Format',
+      'image.quality': 'Resolution',
+      'image.summaryEmpty': 'Add photos or screenshots. Each image becomes one page.',
+      'image.summaryCount': 'Images added: {count}. Each becomes a page; use the arrows to reorder.',
+      'image.fromSummary': 'Save pages as images. Several pages download together as a ZIP file.',
+      'image.fromSummaryNoPdf': 'Upload a PDF to save its pages as images.',
+      'image.createPdf': 'Create PDF',
+      'image.createPdfSub': 'one page per image',
+      'image.exportImages': 'Export Images',
+      'image.exportImagesSub': 'one image per page',
+      'image.unreadable': "Can't read this image",
+      'image.pagesEmpty': 'Your pages will appear here',
+      'image.pagesEmptySub': 'Each image becomes one page',
+      'drop.addImages': 'Add images',
+      'drop.imagesSub': 'Choose images or drag them here',
+      'preview.titleImages': 'Pages',
+      'progress.addingImage': 'Adding image {page} of {count}',
+      'progress.creatingPdf': 'Creating PDF',
+      'progress.savingImage': 'Saving page {page} of {count}',
+      'progress.zipping': 'Packing images',
+      'errors.chooseImages': 'Choose JPG, PNG, or other image files.',
+      'errors.imageUnreadable': "Couldn't read {name}. Try a JPG or PNG.",
+      'errors.noText': 'Add text, page numbers, or a watermark first.',
+    },
+    'zh-Hans': {
+      'tool.text.label': '文字',
+      'tool.text.lede': '为 PDF 添加文字、页码或水印。',
+      'tool.text.meta': '输入文字并拖到合适位置<br/>自动为每页编号<br/>为页面添加水印',
+      'tool.text.downloadLabel': '导出 PDF',
+      'tool.text.downloadSub': '在原始页面上添加文字',
+      'tool.image.label': '图片',
+      'tool.image.lede': '把图片转成 PDF，或把 PDF 页面存为图片。',
+      'tool.image.meta': '将照片和截图合成一个 PDF<br/>将页面存为 PNG 或 JPEG<br/>多页会打包为 ZIP 下载',
+      'sections.text': '文字',
+      'sections.image': '图片',
+      'text.modeAria': '文字类型',
+      'text.modeText': '文字',
+      'text.modeNumbers': '页码',
+      'text.modeWatermark': '水印',
+      'text.placeholder': '输入文字',
+      'text.size': '大小',
+      'text.color': '颜色',
+      'text.colorBlack': '黑色',
+      'text.colorGray': '灰色',
+      'text.colorBlue': '蓝色',
+      'text.colorRed': '红色',
+      'text.add': '添加到页面',
+      'text.remove': '删除所选',
+      'text.summaryEmpty': '输入文字，添加到页面后拖到合适位置。',
+      'text.summaryNoPdf': '上传 PDF 后即可添加文字。',
+      'text.summaryEditing': '正在编辑所选文字。点按页面空白处可开始新的文字。',
+      'text.summaryPlaced': '已添加文字：{count}。选中页面上的文字即可编辑。',
+      'text.showNumbers': '显示页码',
+      'text.position': '位置',
+      'text.top': '顶部',
+      'text.bottom': '底部',
+      'text.left': '左',
+      'text.center': '居中',
+      'text.right': '右',
+      'text.style': '样式',
+      'text.pageFormat': '第 {n} 页',
+      'text.small': '小',
+      'text.medium': '中',
+      'text.large': '大',
+      'text.startAt': '起始页码',
+      'text.showWatermark': '显示水印',
+      'text.watermarkPlaceholder': '水印文字',
+      'text.watermarkDefault': '机密',
+      'text.opacity': '不透明度',
+      'text.angle': '角度',
+      'text.diagonal': '对角',
+      'text.horizontal': '水平',
+      'image.modeAria': '转换方式',
+      'image.toPdf': '图片转 PDF',
+      'image.fromPdf': 'PDF 转图片',
+      'image.pageSize': '页面大小',
+      'image.fit': '适合图片',
+      'image.letter': 'Letter',
+      'image.format': '格式',
+      'image.quality': '分辨率',
+      'image.summaryEmpty': '添加照片或截图，每张图片成为一页。',
+      'image.summaryCount': '已添加图片：{count}。每张一页，可用箭头调整顺序。',
+      'image.fromSummary': '将页面存为图片。多页会一起打包为 ZIP 文件。',
+      'image.fromSummaryNoPdf': '上传 PDF 后即可将页面存为图片。',
+      'image.createPdf': '创建 PDF',
+      'image.createPdfSub': '每张图片一页',
+      'image.exportImages': '导出图片',
+      'image.exportImagesSub': '每页一张图片',
+      'image.unreadable': '无法读取此图片',
+      'image.pagesEmpty': '页面会显示在这里',
+      'image.pagesEmptySub': '每张图片成为一页',
+      'drop.addImages': '添加图片',
+      'drop.imagesSub': '选择图片或拖到这里',
+      'preview.titleImages': '页面',
+      'progress.addingImage': '正在添加第 {page}/{count} 张图片',
+      'progress.creatingPdf': '正在创建 PDF',
+      'progress.savingImage': '正在保存第 {page}/{count} 页',
+      'progress.zipping': '正在打包图片',
+      'errors.chooseImages': '请选择 JPG、PNG 或其他图片文件。',
+      'errors.imageUnreadable': '无法读取 {name}。请尝试 JPG 或 PNG。',
+      'errors.noText': '请先添加文字、页码或水印。',
+    },
+    'zh-Hant-TW': {
+      'tool.text.label': '文字',
+      'tool.text.lede': '為 PDF 加入文字、頁碼或浮水印。',
+      'tool.text.meta': '輸入文字並拖曳到合適位置<br/>自動為每頁編號<br/>為頁面加上浮水印',
+      'tool.text.downloadLabel': '匯出 PDF',
+      'tool.text.downloadSub': '在原始頁面上加入文字',
+      'tool.image.label': '圖片',
+      'tool.image.lede': '把圖片轉成 PDF，或把 PDF 頁面存成圖片。',
+      'tool.image.meta': '將照片和截圖合成一份 PDF<br/>將頁面存成 PNG 或 JPEG<br/>多頁會打包成 ZIP 下載',
+      'sections.text': '文字',
+      'sections.image': '圖片',
+      'text.modeAria': '文字類型',
+      'text.modeText': '文字',
+      'text.modeNumbers': '頁碼',
+      'text.modeWatermark': '浮水印',
+      'text.placeholder': '輸入文字',
+      'text.size': '大小',
+      'text.color': '顏色',
+      'text.colorBlack': '黑色',
+      'text.colorGray': '灰色',
+      'text.colorBlue': '藍色',
+      'text.colorRed': '紅色',
+      'text.add': '加到頁面',
+      'text.remove': '刪除所選',
+      'text.summaryEmpty': '輸入文字，加到頁面後拖曳到合適位置。',
+      'text.summaryNoPdf': '上傳 PDF 後即可加入文字。',
+      'text.summaryEditing': '正在編輯所選文字。點一下頁面空白處即可開始新的文字。',
+      'text.summaryPlaced': '已加入文字：{count}。選取頁面上的文字即可編輯。',
+      'text.showNumbers': '顯示頁碼',
+      'text.position': '位置',
+      'text.top': '頂端',
+      'text.bottom': '底端',
+      'text.left': '左',
+      'text.center': '置中',
+      'text.right': '右',
+      'text.style': '樣式',
+      'text.pageFormat': '第 {n} 頁',
+      'text.small': '小',
+      'text.medium': '中',
+      'text.large': '大',
+      'text.startAt': '起始頁碼',
+      'text.showWatermark': '顯示浮水印',
+      'text.watermarkPlaceholder': '浮水印文字',
+      'text.watermarkDefault': '機密',
+      'text.opacity': '不透明度',
+      'text.angle': '角度',
+      'text.diagonal': '對角',
+      'text.horizontal': '水平',
+      'image.modeAria': '轉換方式',
+      'image.toPdf': '圖片轉 PDF',
+      'image.fromPdf': 'PDF 轉圖片',
+      'image.pageSize': '頁面大小',
+      'image.fit': '符合圖片',
+      'image.letter': 'Letter',
+      'image.format': '格式',
+      'image.quality': '解析度',
+      'image.summaryEmpty': '加入照片或截圖，每張圖片成為一頁。',
+      'image.summaryCount': '已加入圖片：{count}。每張一頁，可用箭頭調整順序。',
+      'image.fromSummary': '將頁面存成圖片。多頁會一起打包成 ZIP 檔。',
+      'image.fromSummaryNoPdf': '上傳 PDF 後即可將頁面存成圖片。',
+      'image.createPdf': '建立 PDF',
+      'image.createPdfSub': '每張圖片一頁',
+      'image.exportImages': '匯出圖片',
+      'image.exportImagesSub': '每頁一張圖片',
+      'image.unreadable': '無法讀取這張圖片',
+      'image.pagesEmpty': '頁面會顯示在這裡',
+      'image.pagesEmptySub': '每張圖片成為一頁',
+      'drop.addImages': '加入圖片',
+      'drop.imagesSub': '選擇圖片或拖曳到這裡',
+      'preview.titleImages': '頁面',
+      'progress.addingImage': '正在加入第 {page}/{count} 張圖片',
+      'progress.creatingPdf': '正在建立 PDF',
+      'progress.savingImage': '正在儲存第 {page}/{count} 頁',
+      'progress.zipping': '正在打包圖片',
+      'errors.chooseImages': '請選擇 JPG、PNG 或其他圖片檔。',
+      'errors.imageUnreadable': '無法讀取 {name}。請改用 JPG 或 PNG。',
+      'errors.noText': '請先加入文字、頁碼或浮水印。',
+    },
+    ko: {
+      'tool.text.label': '텍스트',
+      'tool.text.lede': 'PDF에 텍스트, 페이지 번호, 워터마크를 추가하세요.',
+      'tool.text.meta': '텍스트를 입력하고 원하는 곳으로 드래그<br/>모든 페이지에 자동으로 번호 매기기<br/>페이지에 워터마크 넣기',
+      'tool.text.downloadLabel': 'PDF 내보내기',
+      'tool.text.downloadSub': '원본 페이지에 텍스트 추가',
+      'tool.image.label': '이미지',
+      'tool.image.lede': '이미지를 PDF로 만들거나 PDF 페이지를 이미지로 저장하세요.',
+      'tool.image.meta': '사진과 스크린샷을 PDF 하나로 합치기<br/>페이지를 PNG 또는 JPEG로 저장<br/>여러 페이지는 ZIP 파일로 다운로드',
+      'sections.text': '텍스트',
+      'sections.image': '이미지',
+      'text.modeAria': '텍스트 종류',
+      'text.modeText': '텍스트',
+      'text.modeNumbers': '페이지 번호',
+      'text.modeWatermark': '워터마크',
+      'text.placeholder': '텍스트 입력',
+      'text.size': '크기',
+      'text.color': '색상',
+      'text.colorBlack': '검정',
+      'text.colorGray': '회색',
+      'text.colorBlue': '파랑',
+      'text.colorRed': '빨강',
+      'text.add': '페이지에 추가',
+      'text.remove': '선택 항목 삭제',
+      'text.summaryEmpty': '텍스트를 입력해 페이지에 추가한 다음 원하는 곳으로 드래그하세요.',
+      'text.summaryNoPdf': 'PDF를 업로드하면 텍스트를 추가할 수 있습니다.',
+      'text.summaryEditing': '선택한 텍스트를 편집하는 중입니다. 새 텍스트를 시작하려면 페이지의 빈 곳을 누르세요.',
+      'text.summaryPlaced': '추가한 텍스트: {count}개. 페이지의 텍스트를 선택하면 편집할 수 있습니다.',
+      'text.showNumbers': '페이지 번호 표시',
+      'text.position': '위치',
+      'text.top': '위',
+      'text.bottom': '아래',
+      'text.left': '왼쪽',
+      'text.center': '가운데',
+      'text.right': '오른쪽',
+      'text.style': '스타일',
+      'text.pageFormat': '{n}페이지',
+      'text.small': '작게',
+      'text.medium': '보통',
+      'text.large': '크게',
+      'text.startAt': '시작 번호',
+      'text.showWatermark': '워터마크 표시',
+      'text.watermarkPlaceholder': '워터마크 텍스트',
+      'text.watermarkDefault': '대외비',
+      'text.opacity': '불투명도',
+      'text.angle': '각도',
+      'text.diagonal': '대각선',
+      'text.horizontal': '가로',
+      'image.modeAria': '변환 방식',
+      'image.toPdf': '이미지 → PDF',
+      'image.fromPdf': 'PDF → 이미지',
+      'image.pageSize': '페이지 크기',
+      'image.fit': '이미지에 맞춤',
+      'image.letter': 'Letter',
+      'image.format': '형식',
+      'image.quality': '해상도',
+      'image.summaryEmpty': '사진이나 스크린샷을 추가하세요. 이미지마다 한 페이지가 됩니다.',
+      'image.summaryCount': '추가한 이미지: {count}개. 이미지마다 한 페이지이며 화살표로 순서를 바꿀 수 있습니다.',
+      'image.fromSummary': '페이지를 이미지로 저장합니다. 여러 페이지는 ZIP 파일 하나로 다운로드됩니다.',
+      'image.fromSummaryNoPdf': 'PDF를 업로드하면 페이지를 이미지로 저장할 수 있습니다.',
+      'image.createPdf': 'PDF 만들기',
+      'image.createPdfSub': '이미지마다 한 페이지',
+      'image.exportImages': '이미지 내보내기',
+      'image.exportImagesSub': '페이지마다 이미지 한 장',
+      'image.unreadable': '이 이미지를 읽을 수 없음',
+      'image.pagesEmpty': '페이지가 여기에 표시됩니다',
+      'image.pagesEmptySub': '이미지마다 한 페이지가 됩니다',
+      'drop.addImages': '이미지 추가',
+      'drop.imagesSub': '이미지를 선택하거나 여기로 끌어오세요',
+      'preview.titleImages': '페이지',
+      'progress.addingImage': '이미지 추가 중 {page}/{count}',
+      'progress.creatingPdf': 'PDF 만드는 중',
+      'progress.savingImage': '페이지 저장 중 {page}/{count}',
+      'progress.zipping': '이미지 묶는 중',
+      'errors.chooseImages': 'JPG, PNG 또는 다른 이미지 파일을 선택하세요.',
+      'errors.imageUnreadable': '{name}을(를) 읽을 수 없습니다. JPG 또는 PNG를 사용해 보세요.',
+      'errors.noText': '먼저 텍스트, 페이지 번호 또는 워터마크를 추가하세요.',
+    },
+    ja: {
+      'tool.text.label': 'テキスト',
+      'tool.text.lede': 'PDF にテキスト、ページ番号、透かしを追加します。',
+      'tool.text.meta': 'テキストを入力して好きな位置へドラッグ<br/>全ページに自動で番号を付ける<br/>ページに透かしを入れる',
+      'tool.text.downloadLabel': 'PDF を書き出す',
+      'tool.text.downloadSub': '元のページにテキストを追加',
+      'tool.image.label': '画像',
+      'tool.image.lede': '画像を PDF にしたり、PDF のページを画像として保存したりできます。',
+      'tool.image.meta': '写真やスクリーンショットを 1 つの PDF に<br/>ページを PNG または JPEG で保存<br/>複数ページは ZIP でダウンロード',
+      'sections.text': 'テキスト',
+      'sections.image': '画像',
+      'text.modeAria': 'テキストの種類',
+      'text.modeText': 'テキスト',
+      'text.modeNumbers': 'ページ番号',
+      'text.modeWatermark': '透かし',
+      'text.placeholder': 'テキストを入力',
+      'text.size': 'サイズ',
+      'text.color': '色',
+      'text.colorBlack': '黒',
+      'text.colorGray': 'グレー',
+      'text.colorBlue': '青',
+      'text.colorRed': '赤',
+      'text.add': 'ページに追加',
+      'text.remove': '選択項目を削除',
+      'text.summaryEmpty': 'テキストを入力してページに追加し、好きな位置へドラッグします。',
+      'text.summaryNoPdf': 'PDF をアップロードするとテキストを追加できます。',
+      'text.summaryEditing': '選択したテキストを編集中です。新しいテキストを始めるにはページの空いている所をクリックします。',
+      'text.summaryPlaced': '追加したテキスト：{count}。ページ上のテキストを選ぶと編集できます。',
+      'text.showNumbers': 'ページ番号を表示',
+      'text.position': '位置',
+      'text.top': '上',
+      'text.bottom': '下',
+      'text.left': '左',
+      'text.center': '中央',
+      'text.right': '右',
+      'text.style': 'スタイル',
+      'text.pageFormat': '{n} ページ',
+      'text.small': '小',
+      'text.medium': '中',
+      'text.large': '大',
+      'text.startAt': '開始番号',
+      'text.showWatermark': '透かしを表示',
+      'text.watermarkPlaceholder': '透かしのテキスト',
+      'text.watermarkDefault': '社外秘',
+      'text.opacity': '不透明度',
+      'text.angle': '角度',
+      'text.diagonal': '斜め',
+      'text.horizontal': '水平',
+      'image.modeAria': '変換方法',
+      'image.toPdf': '画像を PDF に',
+      'image.fromPdf': 'PDF を画像に',
+      'image.pageSize': 'ページサイズ',
+      'image.fit': '画像に合わせる',
+      'image.letter': 'Letter',
+      'image.format': '形式',
+      'image.quality': '解像度',
+      'image.summaryEmpty': '写真やスクリーンショットを追加します。画像 1 枚が 1 ページになります。',
+      'image.summaryCount': '追加した画像：{count}。1 枚ずつ 1 ページになり、矢印で順番を変えられます。',
+      'image.fromSummary': 'ページを画像として保存します。複数ページは 1 つの ZIP ファイルでダウンロードされます。',
+      'image.fromSummaryNoPdf': 'PDF をアップロードするとページを画像として保存できます。',
+      'image.createPdf': 'PDF を作成',
+      'image.createPdfSub': '画像 1 枚につき 1 ページ',
+      'image.exportImages': '画像を書き出す',
+      'image.exportImagesSub': '1 ページにつき画像 1 枚',
+      'image.unreadable': 'この画像を読み込めません',
+      'image.pagesEmpty': 'ここにページが表示されます',
+      'image.pagesEmptySub': '画像 1 枚が 1 ページになります',
+      'drop.addImages': '画像を追加',
+      'drop.imagesSub': '画像を選択するか、ここにドラッグ',
+      'preview.titleImages': 'ページ',
+      'progress.addingImage': '画像を追加中 {page}/{count}',
+      'progress.creatingPdf': 'PDF を作成中',
+      'progress.savingImage': 'ページを保存中 {page}/{count}',
+      'progress.zipping': '画像をまとめています',
+      'errors.chooseImages': 'JPG、PNG などの画像ファイルを選んでください。',
+      'errors.imageUnreadable': '{name} を読み込めませんでした。JPG または PNG をお試しください。',
+      'errors.noText': '先にテキスト、ページ番号、または透かしを追加してください。',
+    },
+    es: {
+      'tool.text.label': 'Texto',
+      'tool.text.lede': 'Añade texto, números de página o una marca de agua a tu PDF.',
+      'tool.text.meta': 'Escribe texto y arrástralo a su sitio<br/>Numera todas las páginas automáticamente<br/>Marca las páginas con una marca de agua',
+      'tool.text.downloadLabel': 'Exportar PDF',
+      'tool.text.downloadSub': 'añade texto a las páginas originales',
+      'tool.image.label': 'Imagen',
+      'tool.image.lede': 'Convierte imágenes en un PDF o guarda páginas de un PDF como imágenes.',
+      'tool.image.meta': 'Junta fotos y capturas en un solo PDF<br/>Guarda páginas como PNG o JPEG<br/>Varias páginas se descargan en un ZIP',
+      'sections.text': 'Texto',
+      'sections.image': 'Imagen',
+      'text.modeAria': 'Tipo de texto',
+      'text.modeText': 'Texto',
+      'text.modeNumbers': 'Números',
+      'text.modeWatermark': 'Marca de agua',
+      'text.placeholder': 'Escribe tu texto',
+      'text.size': 'Tamaño',
+      'text.color': 'Color',
+      'text.colorBlack': 'Negro',
+      'text.colorGray': 'Gris',
+      'text.colorBlue': 'Azul',
+      'text.colorRed': 'Rojo',
+      'text.add': 'Añadir a la página',
+      'text.remove': 'Eliminar selección',
+      'text.summaryEmpty': 'Escribe algo, añádelo a la página y arrástralo a su sitio.',
+      'text.summaryNoPdf': 'Sube un PDF para añadir texto.',
+      'text.summaryEditing': 'Editando el texto seleccionado. Haz clic fuera de él en la página para empezar un texto nuevo.',
+      'text.summaryPlaced': 'Textos añadidos: {count}. Selecciona un texto en la página para editarlo.',
+      'text.showNumbers': 'Mostrar números de página',
+      'text.position': 'Posición',
+      'text.top': 'Arriba',
+      'text.bottom': 'Abajo',
+      'text.left': 'Izquierda',
+      'text.center': 'Centro',
+      'text.right': 'Derecha',
+      'text.style': 'Estilo',
+      'text.pageFormat': 'Página {n}',
+      'text.small': 'Pequeño',
+      'text.medium': 'Mediano',
+      'text.large': 'Grande',
+      'text.startAt': 'Empezar en',
+      'text.showWatermark': 'Mostrar marca de agua',
+      'text.watermarkPlaceholder': 'Texto de la marca de agua',
+      'text.watermarkDefault': 'Confidencial',
+      'text.opacity': 'Opacidad',
+      'text.angle': 'Ángulo',
+      'text.diagonal': 'Diagonal',
+      'text.horizontal': 'Horizontal',
+      'image.modeAria': 'Conversión',
+      'image.toPdf': 'Imágenes a PDF',
+      'image.fromPdf': 'PDF a imágenes',
+      'image.pageSize': 'Tamaño de página',
+      'image.fit': 'Ajustar a la imagen',
+      'image.letter': 'Carta',
+      'image.format': 'Formato',
+      'image.quality': 'Resolución',
+      'image.summaryEmpty': 'Añade fotos o capturas. Cada imagen se convierte en una página.',
+      'image.summaryCount': 'Imágenes añadidas: {count}. Cada una es una página; usa las flechas para reordenar.',
+      'image.fromSummary': 'Guarda las páginas como imágenes. Varias páginas se descargan juntas en un archivo ZIP.',
+      'image.fromSummaryNoPdf': 'Sube un PDF para guardar sus páginas como imágenes.',
+      'image.createPdf': 'Crear PDF',
+      'image.createPdfSub': 'una página por imagen',
+      'image.exportImages': 'Exportar imágenes',
+      'image.exportImagesSub': 'una imagen por página',
+      'image.unreadable': 'No se puede leer esta imagen',
+      'image.pagesEmpty': 'Tus páginas aparecerán aquí',
+      'image.pagesEmptySub': 'Cada imagen se convierte en una página',
+      'drop.addImages': 'Añadir imágenes',
+      'drop.imagesSub': 'Elige imágenes o arrástralas aquí',
+      'preview.titleImages': 'Páginas',
+      'progress.addingImage': 'Añadiendo imagen {page} de {count}',
+      'progress.creatingPdf': 'Creando PDF',
+      'progress.savingImage': 'Guardando página {page} de {count}',
+      'progress.zipping': 'Empaquetando imágenes',
+      'errors.chooseImages': 'Elige archivos JPG, PNG u otras imágenes.',
+      'errors.imageUnreadable': 'No se pudo leer {name}. Prueba con un JPG o PNG.',
+      'errors.noText': 'Primero añade texto, números de página o una marca de agua.',
+    },
+    fr: {
+      'tool.text.label': 'Texte',
+      'tool.text.lede': 'Ajoutez du texte, des numéros de page ou un filigrane à votre PDF.',
+      'tool.text.meta': 'Saisissez du texte et faites-le glisser en place<br/>Numérotez toutes les pages automatiquement<br/>Marquez les pages d’un filigrane',
+      'tool.text.downloadLabel': 'Exporter le PDF',
+      'tool.text.downloadSub': 'ajoute du texte aux pages d’origine',
+      'tool.image.label': 'Image',
+      'tool.image.lede': 'Transformez des images en PDF ou enregistrez des pages PDF en images.',
+      'tool.image.meta': 'Réunissez photos et captures dans un seul PDF<br/>Enregistrez les pages en PNG ou JPEG<br/>Plusieurs pages se téléchargent dans un ZIP',
+      'sections.text': 'Texte',
+      'sections.image': 'Image',
+      'text.modeAria': 'Type de texte',
+      'text.modeText': 'Texte',
+      'text.modeNumbers': 'Numéros',
+      'text.modeWatermark': 'Filigrane',
+      'text.placeholder': 'Saisissez votre texte',
+      'text.size': 'Taille',
+      'text.color': 'Couleur',
+      'text.colorBlack': 'Noir',
+      'text.colorGray': 'Gris',
+      'text.colorBlue': 'Bleu',
+      'text.colorRed': 'Rouge',
+      'text.add': 'Ajouter à la page',
+      'text.remove': 'Supprimer la sélection',
+      'text.summaryEmpty': 'Saisissez du texte, ajoutez-le à la page, puis faites-le glisser en place.',
+      'text.summaryNoPdf': 'Importez un PDF pour ajouter du texte.',
+      'text.summaryEditing': 'Modification du texte sélectionné. Cliquez sur la page en dehors pour commencer un nouveau texte.',
+      'text.summaryPlaced': 'Textes ajoutés : {count}. Sélectionnez un texte sur la page pour le modifier.',
+      'text.showNumbers': 'Afficher les numéros de page',
+      'text.position': 'Position',
+      'text.top': 'Haut',
+      'text.bottom': 'Bas',
+      'text.left': 'Gauche',
+      'text.center': 'Centre',
+      'text.right': 'Droite',
+      'text.style': 'Style',
+      'text.pageFormat': 'Page {n}',
+      'text.small': 'Petit',
+      'text.medium': 'Moyen',
+      'text.large': 'Grand',
+      'text.startAt': 'Commencer à',
+      'text.showWatermark': 'Afficher le filigrane',
+      'text.watermarkPlaceholder': 'Texte du filigrane',
+      'text.watermarkDefault': 'Confidentiel',
+      'text.opacity': 'Opacité',
+      'text.angle': 'Angle',
+      'text.diagonal': 'Diagonale',
+      'text.horizontal': 'Horizontal',
+      'image.modeAria': 'Conversion',
+      'image.toPdf': 'Images en PDF',
+      'image.fromPdf': 'PDF en images',
+      'image.pageSize': 'Format de page',
+      'image.fit': 'Ajuster à l’image',
+      'image.letter': 'Lettre US',
+      'image.format': 'Format',
+      'image.quality': 'Résolution',
+      'image.summaryEmpty': 'Ajoutez des photos ou des captures. Chaque image devient une page.',
+      'image.summaryCount': 'Images ajoutées : {count}. Chacune devient une page ; utilisez les flèches pour réordonner.',
+      'image.fromSummary': 'Enregistrez les pages en images. Plusieurs pages se téléchargent ensemble dans un fichier ZIP.',
+      'image.fromSummaryNoPdf': 'Importez un PDF pour enregistrer ses pages en images.',
+      'image.createPdf': 'Créer le PDF',
+      'image.createPdfSub': 'une page par image',
+      'image.exportImages': 'Exporter les images',
+      'image.exportImagesSub': 'une image par page',
+      'image.unreadable': 'Impossible de lire cette image',
+      'image.pagesEmpty': 'Vos pages apparaîtront ici',
+      'image.pagesEmptySub': 'Chaque image devient une page',
+      'drop.addImages': 'Ajouter des images',
+      'drop.imagesSub': 'Choisissez des images ou déposez-les ici',
+      'preview.titleImages': 'Pages',
+      'progress.addingImage': 'Ajout de l’image {page} sur {count}',
+      'progress.creatingPdf': 'Création du PDF',
+      'progress.savingImage': 'Enregistrement de la page {page} sur {count}',
+      'progress.zipping': 'Regroupement des images',
+      'errors.chooseImages': 'Choisissez des fichiers JPG, PNG ou d’autres images.',
+      'errors.imageUnreadable': 'Impossible de lire {name}. Essayez un JPG ou un PNG.',
+      'errors.noText': 'Ajoutez d’abord du texte, des numéros de page ou un filigrane.',
+    },
+  }).forEach(([locale, strings]) => Object.assign(LOCALES[locale], strings));
+  Object.entries({
+    en: ['Font', 'Custom color', 'Default', 'Serif', 'Rounded', 'Mono', 'Handwritten', 'Script'],
+    'zh-Hans': ['字体', '自定义颜色', '默认', '衬线', '圆体', '等宽', '手写', '花体'],
+    'zh-Hant-TW': ['字體', '自訂顏色', '預設', '襯線', '圓體', '等寬', '手寫', '花體'],
+    ko: ['글꼴', '사용자 지정 색상', '기본', '세리프', '둥근체', '고정폭', '손글씨', '필기체'],
+    ja: ['フォント', 'カスタムカラー', '標準', 'セリフ', '丸ゴシック', '等幅', '手書き', '筆記体'],
+    es: ['Fuente', 'Color personalizado', 'Predeterminada', 'Con serifa', 'Redondeada', 'Monoespaciada', 'Manuscrita', 'Caligráfica'],
+    fr: ['Police', 'Couleur personnalisée', 'Par défaut', 'Serif', 'Arrondie', 'Chasse fixe', 'Manuscrite', 'Calligraphiée'],
+  }).forEach(([locale, values]) => {
+    ['text.font', 'text.colorCustom', 'text.font.sans', 'text.font.serif', 'text.font.rounded', 'text.font.mono', 'text.font.handwritten', 'text.font.script']
+      .forEach((key, index) => { LOCALES[locale][key] = values[index]; });
+  });
 
   Object.entries({
     en: ['Use signature', 'Drag to position', 'Make signature smaller', 'Make signature larger', 'Use signature to place it on this page.'],
@@ -3277,6 +3934,7 @@
   }
 
   function canPasswordProtectExport(toolId = activeTool) {
+    if (toolId === 'image') return imageState.mode === 'toPdf';
     return toolId !== 'preview' && toolId !== 'merge';
   }
 
@@ -3289,8 +3947,9 @@
     const applies = activeTool !== 'preview' && activeTool !== 'merge';
     const passwordAvailable = applies && canPasswordProtectExport();
     advancedOptions.classList.toggle('hidden', !applies);
-    const rangeAvailable = applies && hasPages;
-    advancedCurrentOnly.disabled = !applies || !hasPages || advancedRangeToggle.checked;
+    const rangeAvailable = applies && hasPages && !imageCollecting();
+    if (!rangeAvailable) advancedCurrentOnly.checked = false;
+    advancedCurrentOnly.disabled = !rangeAvailable || advancedRangeToggle.checked;
     advancedRangeToggle.disabled = !rangeAvailable || advancedCurrentOnly.checked;
     advancedRangeRow.classList.toggle('is-disabled', !rangeAvailable || advancedCurrentOnly.checked);
     advancedRangeInput.disabled = !rangeAvailable || !advancedRangeToggle.checked;
@@ -3629,13 +4288,8 @@
     curPageEl.textContent = state.pdfDoc && count ? padPage(state.curPage) : '—';
     prevBtn.disabled = operationInProgress || !state.pdfDoc || state.curPage <= 1;
     nextBtn.disabled = operationInProgress || !state.pdfDoc || state.curPage >= count;
-    downloadBtn.disabled = operationInProgress || (activeTool === 'preview'
-      ? true
-      : activeTool === 'merge'
-        ? state.mergeFiles.length === 0
-        : activeTool === 'sign'
-          ? !signatureCanExport()
-          : !state.pdfDoc || count === 0);
+    downloadBtn.disabled = activeToolExportDisabled();
+    if (pdfToImageSummary) pdfToImageSummary.textContent = state.pdfDoc ? t('image.fromSummary') : t('image.fromSummaryNoPdf');
     resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
     organizeHint.textContent = state.pdfDoc
       ? (state.splitPoints.length
@@ -3655,12 +4309,21 @@
     syncRasterControls();
     syncCompressControls();
     syncSignatureControls();
+    syncTextControls();
     updateSignatureOverlay();
     updatePreviewMode();
     if (activeTool === 'edit') {
       syncEditControls();
       requestEditedPreviewRender();
     }
+  }
+
+  function activeToolExportDisabled() {
+    if (operationInProgress || activeTool === 'preview') return true;
+    if (activeTool === 'merge') return state.mergeFiles.length === 0;
+    if (isStampTool()) return !signatureCanExport();
+    if (imageCollecting()) return !imageState.files.some(entry => !entry.broken);
+    return !state.pdfDoc || activePageCount() === 0;
   }
 
   function setLoader(on, label, pct) {
@@ -4013,11 +4676,13 @@
     e.preventDefault(); dropZone.classList.remove('drag');
     if (!e.dataTransfer.files.length) return;
     if (activeTool === 'merge') addMergeFiles(e.dataTransfer.files);
+    else if (imageCollecting()) addImageFiles(e.dataTransfer.files);
     else handleFile(e.dataTransfer.files[0]);
   });
   fileInput.addEventListener('change', e => {
     if (!e.target.files.length) return;
     if (activeTool === 'merge') addMergeFiles(e.target.files);
+    else if (imageCollecting()) addImageFiles(e.target.files);
     else handleFile(e.target.files[0]);
     fileInput.value = '';
   });
@@ -4111,7 +4776,7 @@
     state.splitPoints = [];
     state.splitNames = [];
     updatePageState();
-    const lazyOpen = state.largePdfSafeMode || isRasterTool(activeTool) || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit' || activeTool === 'sign' || activeTool === 'compress';
+    const lazyOpen = state.largePdfSafeMode || isRasterTool(activeTool) || activeTool === 'preview' || activeTool === 'organize' || activeTool === 'edit' || isStampTool() || activeTool === 'image' || activeTool === 'compress';
     if (lazyOpen) {
       setLoader(true, state.largePdfSafeMode ? t('progress.openingLargePdf') : t('progress.openingPdf'), 45);
       await ensurePageMeta(0);
@@ -4213,7 +4878,9 @@
   }
 
   function isOriginalPreviewTool(id = activeTool) {
-    return id === 'preview' || id === 'merge' || id === 'sign' || (id === 'compress' && state.compressMode === 'original');
+    return id === 'preview' || id === 'merge' || id === 'sign' || id === 'text'
+      || (id === 'image' && imageState.mode === 'fromPdf')
+      || (id === 'compress' && state.compressMode === 'original');
   }
 
   function getOriginalPreviewScale(baseVp, targetCssWidth) {
@@ -4617,19 +5284,21 @@
   }
 
   function signatureCanExport(pageOrder = state.pageOrder) {
-    return !!state.pdfDoc && activeSignatureStamps(pageOrder).length > 0;
+    if (!state.pdfDoc) return false;
+    return activeSignatureStamps(pageOrder).length > 0 || textState.pageNumbers.enabled || watermarkActive();
   }
 
   function syncSignatureControls() {
     if (!signaturePad) return;
     const hasPdf = !!state.pdfDoc;
     const hasInk = !!signatureState.dataUrl;
-    const placedCount = activeSignatureStamps().length;
+    const placedCount = activeSignatureStamps().filter(stamp => stamp.kind !== 'text').length;
     const selected = !!getSignatureStamp(signatureState.selectedId);
     const mobileSigning = isPhoneViewport() && activeTool === 'sign';
+    const mobileStamping = isPhoneViewport() && isStampTool();
     const currentSelection = getSignatureStamp(signatureState.selectedId)?.pageIndex === currentSourceIndex();
     $('mobileSignUse').disabled = !hasInk || !hasPdf || operationInProgress;
-    $('mobileSignActions').hidden = !mobileSigning || !currentSelection;
+    $('mobileSignActions').hidden = !mobileStamping || !currentSelection;
     if (mobileSigning) mobileControlsLabel.textContent = t('sign.drawSignature');
     signHint.textContent = hasInk ? t('sign.ready') : t('sign.drawSignature');
     signatureClearBtn.disabled = !hasInk;
@@ -4669,7 +5338,7 @@
     if (!stamp || operationInProgress || stamp.pageIndex !== currentSourceIndex()) return;
     const centerX = stamp.xPct + stamp.wPct / 2;
     const centerY = stamp.yPct + stamp.hPct / 2;
-    const minScale = Math.max(5 / stamp.wPct, 2 / stamp.hPct);
+    const minScale = stamp.kind === 'text' ? Math.max(1 / stamp.wPct, 0.5 / stamp.hPct) : Math.max(5 / stamp.wPct, 2 / stamp.hPct);
     const maxScale = Math.min(95 / stamp.wPct, 95 / stamp.hPct);
     const scale = Math.max(minScale, Math.min(maxScale, factor));
     stamp.wPct *= scale;
@@ -4677,6 +5346,14 @@
     stamp.xPct = centerX - stamp.wPct / 2;
     stamp.yPct = centerY - stamp.hPct / 2;
     clampSignatureStamp(stamp);
+    if (stamp.kind === 'text') {
+      stamp.size = Math.max(4, Math.min(400, Math.round(stamp.size * scale)));
+      refreshTextStamp(stamp);
+      stamp.xPct = centerX - stamp.wPct / 2;
+      stamp.yPct = centerY - stamp.hPct / 2;
+      clampSignatureStamp(stamp);
+      loadTextStampIntoControls(stamp);
+    }
     updateSignatureOverlay();
   }
 
@@ -4696,8 +5373,9 @@
   }
 
   function clampSignatureStamp(stamp) {
-    stamp.wPct = Math.max(5, Math.min(100, stamp.wPct));
-    stamp.hPct = Math.max(2, Math.min(100, stamp.hPct));
+    const text = stamp.kind === 'text';
+    stamp.wPct = Math.max(text ? 1 : 5, Math.min(100, stamp.wPct));
+    stamp.hPct = Math.max(text ? 0.5 : 2, Math.min(100, stamp.hPct));
     stamp.xPct = Math.max(0, Math.min(100 - stamp.wPct, stamp.xPct));
     stamp.yPct = Math.max(0, Math.min(100 - stamp.hPct, stamp.yPct));
     return stamp;
@@ -4722,7 +5400,7 @@
     clampSignatureStamp(stamp);
     syncSignatureControls();
     updateSignatureOverlay();
-    downloadBtn.disabled = !signatureCanExport();
+    downloadBtn.disabled = activeToolExportDisabled();
     return true;
   }
 
@@ -4758,13 +5436,14 @@
     clampSignatureStamp(stamp);
     syncSignatureControls();
     updateSignatureOverlay();
-    downloadBtn.disabled = !signatureCanExport();
+    downloadBtn.disabled = activeToolExportDisabled();
     return true;
   }
 
   function createSignatureStampElement(stamp) {
     const el = document.createElement('div');
     el.className = 'signature-stamp';
+    if (stamp.kind === 'text') el.classList.add('text-stamp');
     if (stamp.id === signatureState.selectedId) el.classList.add('selected');
     if (signatureState.drag?.id === stamp.id) el.classList.add('dragging');
     el.dataset.signatureId = String(stamp.id);
@@ -4787,14 +5466,24 @@
     return el;
   }
 
+  function isStampTool(id = activeTool) {
+    return id === 'sign' || id === 'text';
+  }
+
   function updateSignatureOverlay() {
     if (!signatureOverlay) return;
-    const visible = activeTool === 'sign'
+    const visible = isStampTool()
       && !!state.pdfDoc
       && canvasWrap.style.display !== 'none';
     signatureOverlay.hidden = !visible;
     signatureOverlay.innerHTML = '';
     if (!visible) return;
+    const sourceIndex = currentSourceIndex();
+    if (sourceIndex != null) {
+      pageDecorationsFor(state.curPage - 1, activePageCount(), pageSizePt(sourceIndex)).forEach(item => {
+        signatureOverlay.appendChild(createDecorationElement(item));
+      });
+    }
     currentPageSignatureStamps().forEach(stamp => {
       signatureOverlay.appendChild(createSignatureStampElement(stamp));
     });
@@ -4828,7 +5517,7 @@
       return;
     }
     const rect = previewCanvas.getBoundingClientRect();
-    const overPage = activeTool === 'sign' && state.pdfDoc && rect.width && rect.height
+    const overPage = isStampTool() && state.pdfDoc && rect.width && rect.height
       && e.clientX >= rect.left && e.clientX <= rect.right
       && e.clientY >= rect.top && e.clientY <= rect.bottom;
     if (overPage || drag.id) {
@@ -4844,6 +5533,13 @@
   function endSignatureDrag(e) {
     if (!signatureState.drag) return;
     moveSignatureDrag(e);
+    const drag = signatureState.drag;
+    const resized = drag.mode === 'resize' ? getSignatureStamp(drag.id) : null;
+    if (resized?.kind === 'text' && drag.startStamp?.hPct) {
+      resized.size = Math.max(4, Math.min(400, Math.round(resized.size * resized.hPct / drag.startStamp.hPct)));
+      refreshTextStamp(resized);
+      loadTextStampIntoControls(resized);
+    }
     signatureDragSource.classList.remove('dragging');
     if (signatureState.drag.ghost) signatureState.drag.ghost.remove();
     window.removeEventListener('pointermove', moveSignatureDrag);
@@ -4874,7 +5570,7 @@
   }
 
   function beginSignatureOverlayDrag(e) {
-    if (activeTool !== 'sign' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (!isStampTool() || (e.pointerType === 'mouse' && e.button !== 0)) return;
     const stampEl = e.target.closest('.signature-stamp');
     if (!stampEl || !signatureOverlay.contains(stampEl)) return;
     const stamp = getSignatureStamp(Number(stampEl.dataset.signatureId));
@@ -4882,6 +5578,8 @@
     e.preventDefault();
     e.stopPropagation();
     signatureState.selectedId = stamp.id;
+    if (stamp.kind === 'text') loadTextStampIntoControls(stamp);
+    else syncTextControls();
     const handleEl = e.target.closest('[data-signature-handle]');
     if (handleEl && stampEl.contains(handleEl)) {
       signatureState.drag = {
@@ -4907,6 +5605,1007 @@
     window.addEventListener('pointerup', endSignatureDrag);
     window.addEventListener('pointercancel', endSignatureDrag);
   }
+
+  // ── Text tool ──
+  const TEXT_RENDER_SCALE = 4; // canvas pixels per PDF point, so text stays sharp in print
+  const TEXT_RENDER_MAX_SIDE = 6000;
+  const PAGE_NUMBER_SIZES = { s: 9, m: 11, l: 14 };
+  const PAGE_NUMBER_MARGIN = 28;
+  const DEFAULT_PAGE_PT = { w: 612, h: 792 };
+  const textImageCache = new Map();
+
+  function textFontFamily() {
+    return getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim() || 'sans-serif';
+  }
+
+  const TEXT_FONTS = {
+    sans: { family: null, weight: 500 },
+    serif: { family: '"Source Serif 4", Georgia, "Times New Roman", serif', weight: 500 },
+    rounded: { family: 'Nunito, "SF Pro Rounded", system-ui, sans-serif', weight: 600 },
+    mono: { family: '"Roboto Mono", Menlo, Consolas, monospace', weight: 500 },
+    handwritten: { family: 'Caveat, "Segoe Print", cursive', weight: 600 },
+    script: { family: '"Dancing Script", "Brush Script MT", cursive', weight: 600 },
+  };
+
+  function textFont(key) {
+    const font = TEXT_FONTS[key] || TEXT_FONTS.sans;
+    return { weight: font.weight, family: font.family || textFontFamily() };
+  }
+
+  // Canvas text silently falls back if a web font hasn't arrived, so wait for it first.
+  async function ensureTextFont(key) {
+    const font = textFont(key);
+    try {
+      await document.fonts?.load(font.weight + ' 32px ' + font.family);
+    } catch (err) {
+      console.warn('Font did not load', key, err);
+    }
+  }
+
+  // Text is drawn by the browser so every script and the site's font render the same in
+  // the preview and the exported PDF. The result is a transparent PNG sized in points.
+  function renderTextImage(text, sizePt, color, weight = 500, family = textFontFamily()) {
+    const key = [text, sizePt, color, weight, family].join('\u0000');
+    if (textImageCache.has(key)) return textImageCache.get(key);
+    const lines = String(text).split('\n');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const fontAt = px => weight + ' ' + px + 'px ' + family;
+    ctx.font = fontAt(sizePt);
+    const widthPt = Math.max(1, ...lines.map(line => ctx.measureText(line || ' ').width));
+    const padPt = sizePt * 0.12;
+    const lineHeightPt = sizePt * 1.25;
+    const boxW = widthPt + padPt * 2;
+    const boxH = lineHeightPt * lines.length + padPt * 2;
+    const scale = Math.min(TEXT_RENDER_SCALE, TEXT_RENDER_MAX_SIDE / Math.max(boxW, boxH));
+    canvas.width = Math.max(1, Math.ceil(boxW * scale));
+    canvas.height = Math.max(1, Math.ceil(boxH * scale));
+    ctx.font = fontAt(sizePt * scale);
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'middle';
+    lines.forEach((line, index) => {
+      ctx.fillText(line, padPt * scale, (padPt + lineHeightPt * (index + 0.5)) * scale);
+    });
+    const image = {
+      dataUrl: canvas.toDataURL('image/png'),
+      wPt: canvas.width / scale,
+      hPt: canvas.height / scale,
+    };
+    image.ratio = image.wPt / image.hPt;
+    canvas.width = 0;
+    canvas.height = 0;
+    if (textImageCache.size > 240) textImageCache.clear();
+    textImageCache.set(key, image);
+    return image;
+  }
+
+  function pageSizePt(sourceIndex) {
+    const pd = state.pages[sourceIndex];
+    return pd?.w && pd.scale ? { w: pd.w / pd.scale, h: pd.h / pd.scale } : DEFAULT_PAGE_PT;
+  }
+
+  function watermarkActive(settings = textState) {
+    return !!settings.watermark.enabled && !!String(settings.watermark.text || '').trim();
+  }
+
+  function textStampCount(pageOrder = state.pageOrder) {
+    return activeSignatureStamps(pageOrder).filter(stamp => stamp.kind === 'text').length;
+  }
+
+  function selectedTextStamp() {
+    const stamp = getSignatureStamp(signatureState.selectedId);
+    return stamp?.kind === 'text' ? stamp : null;
+  }
+
+  // Re-renders a text stamp after its text, size or colour changes. The top-left corner
+  // stays put so typing grows the box to the right like a normal text field.
+  function refreshTextStamp(stamp) {
+    const page = pageSizePt(stamp.pageIndex);
+    const font = textFont(stamp.font);
+    const image = renderTextImage(stamp.text, stamp.size, stamp.color, font.weight, font.family);
+    stamp.dataUrl = image.dataUrl;
+    stamp.ratio = image.ratio;
+    stamp.wPct = image.wPt / page.w * 100;
+    stamp.hPct = image.hPt / page.h * 100;
+    if (stamp.wPct > 96) {
+      const fit = 96 / stamp.wPct;
+      stamp.wPct *= fit;
+      stamp.hPct *= fit;
+    }
+    clampSignatureStamp(stamp);
+  }
+
+  async function addTextStampToPage() {
+    const text = textDraftInput.value.replace(/\s+$/, '');
+    if (operationInProgress || !state.pdfDoc || !text.trim() || activeTool !== 'text') return;
+    const sourceIndex = currentSourceIndex();
+    if (sourceIndex == null) return;
+    await ensureTextFont(textState.font);
+    const stamp = {
+      id: signatureState.nextId++,
+      kind: 'text',
+      pageIndex: sourceIndex,
+      text,
+      size: textState.size,
+      color: textState.color,
+      font: textState.font,
+      xPct: 0,
+      yPct: 0,
+      wPct: 0,
+      hPct: 0,
+    };
+    refreshTextStamp(stamp);
+    stamp.xPct = 50 - stamp.wPct / 2;
+    stamp.yPct = 50 - stamp.hPct / 2;
+    clampSignatureStamp(stamp);
+    signatureState.stamps.push(stamp);
+    signatureState.selectedId = stamp.id;
+    if (isPhoneViewport()) setMobileControlsOpen(false, { restoreFocus: true });
+    updatePageState();
+  }
+
+  function loadTextStampIntoControls(stamp) {
+    if (!stamp || stamp.kind !== 'text') return;
+    textDraftInput.value = stamp.text;
+    textState.size = stamp.size;
+    textState.color = stamp.color;
+    textState.font = stamp.font || 'sans';
+    syncTextControls();
+  }
+
+  function updateSelectedTextStamp(changes) {
+    const stamp = selectedTextStamp();
+    if (!stamp || operationInProgress) return;
+    Object.assign(stamp, changes);
+    refreshTextStamp(stamp);
+    updateSignatureOverlay();
+  }
+
+  // Geometry of the decorations every exported page gets, in percentages of the
+  // displayed page so the preview overlay and the PDF writer share one layout.
+  function pageDecorationsFor(outputIndex, outputCount, page, settings = textState) {
+    const items = [];
+    const mark = settings.watermark;
+    if (watermarkActive(settings)) {
+      const image = renderTextImage(String(mark.text).trim(), mark.size, mark.color, 600);
+      const diagonal = mark.layout === 'diagonal';
+      const angle = diagonal ? Math.atan2(page.h, page.w) * 180 / Math.PI : 0;
+      const room = diagonal ? Math.hypot(page.w, page.h) * 0.85 : page.w * 0.9;
+      const fit = Math.min(1, room / image.wPt);
+      items.push({
+        image,
+        cxPct: 50,
+        cyPct: 50,
+        wPct: image.wPt * fit / page.w * 100,
+        hPct: image.hPt * fit / page.h * 100,
+        angle,
+        opacity: mark.opacity / 100,
+      });
+    }
+    const numbers = settings.pageNumbers;
+    if (numbers.enabled) {
+      const start = Math.max(0, Math.floor(Number(numbers.start) || 0));
+      const n = start + outputIndex;
+      const label = numbers.format === 'page'
+        ? t('text.pageFormat', { n })
+        : numbers.format === 'of'
+          ? n + ' / ' + (start + outputCount - 1)
+          : String(n);
+      const image = renderTextImage(label, PAGE_NUMBER_SIZES[numbers.size] || PAGE_NUMBER_SIZES.m, '#3a3a3c');
+      const margin = Math.min(PAGE_NUMBER_MARGIN, page.w * 0.08, page.h * 0.08);
+      const cx = numbers.align === 'left'
+        ? margin + image.wPt / 2
+        : numbers.align === 'right'
+          ? page.w - margin - image.wPt / 2
+          : page.w / 2;
+      const cy = numbers.vertical === 'top' ? margin + image.hPt / 2 : page.h - margin - image.hPt / 2;
+      items.push({
+        image,
+        cxPct: cx / page.w * 100,
+        cyPct: cy / page.h * 100,
+        wPct: image.wPt / page.w * 100,
+        hPct: image.hPt / page.h * 100,
+        angle: 0,
+        opacity: 1,
+      });
+    }
+    return items;
+  }
+
+  function createDecorationElement(item) {
+    const el = document.createElement('div');
+    el.className = 'page-decoration';
+    el.style.left = (item.cxPct - item.wPct / 2) + '%';
+    el.style.top = (item.cyPct - item.hPct / 2) + '%';
+    el.style.width = item.wPct + '%';
+    el.style.height = item.hPct + '%';
+    el.style.opacity = String(item.opacity);
+    if (item.angle) el.style.transform = 'rotate(' + (-item.angle) + 'deg)';
+    const img = document.createElement('img');
+    img.alt = '';
+    img.src = item.image.dataUrl;
+    el.appendChild(img);
+    return el;
+  }
+
+  function setSegmentValue(group, value) {
+    if (!group) return;
+    const buttons = Array.from(group.querySelectorAll('.page-processing-segment'));
+    group.style.setProperty('--seg-count', buttons.length);
+    buttons.forEach((button, index) => {
+      const on = button.dataset.value === String(value);
+      button.classList.toggle('on', on);
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (on) group.style.setProperty('--seg-index', index);
+    });
+  }
+
+  function bindSegments(group, onChange) {
+    group?.addEventListener('click', e => {
+      const button = e.target.closest('.page-processing-segment');
+      if (!button || !group.contains(button) || operationInProgress) return;
+      onChange(button.dataset.value);
+    });
+  }
+
+  const COLOR_NAME_KEYS = ['text.colorBlack', 'text.colorGray', 'text.colorBlue', 'text.colorRed'];
+  function renderColorSwatches(container, selected, onPick) {
+    if (!container) return;
+    if (!container.children.length) {
+      const well = document.createElement('input');
+      well.type = 'color';
+      well.className = 'color-well-input';
+      well.tabIndex = -1;
+      well.setAttribute('aria-hidden', 'true');
+      well.addEventListener('input', () => {
+        if (!operationInProgress) container._onPick?.(well.value.toLowerCase());
+      });
+      TEXT_COLORS.forEach((color, index) => {
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'color-swatch';
+        swatch.setAttribute('role', 'radio');
+        swatch.dataset.color = color;
+        swatch.dataset.colorIndex = String(index);
+        swatch.style.setProperty('--swatch', color);
+        swatch.addEventListener('click', () => {
+          if (!operationInProgress) container._onPick?.(color);
+        });
+        container.appendChild(swatch);
+      });
+      const custom = document.createElement('button');
+      custom.type = 'button';
+      custom.className = 'color-swatch color-swatch-custom';
+      custom.setAttribute('role', 'radio');
+      custom.addEventListener('click', () => {
+        if (operationInProgress) return;
+        well.value = container._selected || TEXT_COLORS[0];
+        try {
+          if (well.showPicker) well.showPicker();
+          else well.click();
+        } catch {
+          well.click();
+        }
+      });
+      container.append(custom, well);
+    }
+    container._onPick = onPick;
+    container._selected = selected;
+    const customColor = !TEXT_COLORS.includes(selected);
+    container.querySelectorAll('.color-swatch').forEach(swatch => {
+      const isCustom = swatch.classList.contains('color-swatch-custom');
+      const on = isCustom ? customColor : swatch.dataset.color === selected;
+      swatch.setAttribute('aria-checked', on ? 'true' : 'false');
+      swatch.tabIndex = 0;
+      if (isCustom) {
+        swatch.style.setProperty('--custom', customColor ? selected : 'transparent');
+        swatch.setAttribute('aria-label', t('text.colorCustom'));
+      } else {
+        swatch.setAttribute('aria-label', t(COLOR_NAME_KEYS[Number(swatch.dataset.colorIndex)]));
+      }
+    });
+  }
+
+  function renderFontOptions() {
+    const container = $('textFontOptions');
+    if (!container) return;
+    if (!container.children.length) {
+      Object.keys(TEXT_FONTS).forEach(key => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'font-option';
+        option.setAttribute('role', 'radio');
+        option.dataset.font = key;
+        option.style.fontFamily = textFont(key).family;
+        option.style.fontWeight = String(textFont(key).weight);
+        option.addEventListener('click', async () => {
+          if (operationInProgress) return;
+          textState.font = key;
+          syncTextControls();
+          await ensureTextFont(key);
+          updateSelectedTextStamp({ font: key });
+          syncTextControls();
+        });
+        container.appendChild(option);
+      });
+    }
+    container.querySelectorAll('.font-option').forEach(option => {
+      const on = option.dataset.font === textState.font;
+      option.textContent = t('text.font.' + option.dataset.font);
+      option.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+
+  function setRangeValue(slider, value) {
+    if (!slider || String(slider.value) === String(value)) return;
+    setSliderValue(slider, value);
+  }
+
+  function syncTextControls() {
+    if (!textModeSegments) return;
+    const hasPdf = !!state.pdfDoc;
+    const selected = selectedTextStamp();
+    const numbers = textState.pageNumbers;
+    const mark = textState.watermark;
+    if (mark.text == null) mark.text = t('text.watermarkDefault');
+    setSegmentValue(textModeSegments, textState.mode);
+    document.querySelectorAll('[data-text-panel]').forEach(panel => {
+      panel.hidden = panel.dataset.textPanel !== textState.mode;
+    });
+
+    setRangeValue(textSizeSlider, textState.size);
+    textSizeValue.textContent = textState.size + ' pt';
+    renderColorSwatches(textColorSwatches, textState.color, color => {
+      textState.color = color;
+      updateSelectedTextStamp({ color });
+      syncTextControls();
+    });
+    renderFontOptions();
+    textAddBtn.disabled = operationInProgress || !hasPdf || !textDraftInput.value.trim();
+    textRemoveBtn.disabled = operationInProgress || !selected;
+    const placed = textStampCount();
+    textSummary.textContent = !hasPdf
+      ? t('text.summaryNoPdf')
+      : selected
+        ? t('text.summaryEditing')
+        : placed
+          ? t('text.summaryPlaced', { count: placed })
+          : t('text.summaryEmpty');
+
+    setTogglePressed(pageNumbersToggle, numbers.enabled);
+    setSegmentValue(numbersVertical, numbers.vertical);
+    setSegmentValue(numbersAlign, numbers.align);
+    setSegmentValue(numbersFormat, numbers.format);
+    setSegmentValue(numbersSize, numbers.size);
+    const pageFormatButton = numbersFormat?.querySelector('[data-value="page"]');
+    if (pageFormatButton) pageFormatButton.textContent = t('text.pageFormat', { n: 1 });
+    if (document.activeElement !== numbersStartInput) numbersStartInput.value = String(numbers.start);
+
+    setTogglePressed(watermarkToggle, mark.enabled);
+    if (document.activeElement !== watermarkInput) watermarkInput.value = mark.text;
+    setRangeValue(watermarkSizeSlider, mark.size);
+    watermarkSizeValue.textContent = mark.size + ' pt';
+    setRangeValue(watermarkOpacitySlider, mark.opacity);
+    watermarkOpacityValue.textContent = mark.opacity + '%';
+    setSegmentValue(watermarkLayout, mark.layout);
+    renderColorSwatches(watermarkColorSwatches, mark.color, color => {
+      mark.color = color;
+      refreshTextDecorations();
+    });
+  }
+
+  function refreshTextDecorations() {
+    syncTextControls();
+    updateSignatureOverlay();
+    downloadBtn.disabled = activeToolExportDisabled();
+  }
+
+  bindSegments(textModeSegments, mode => {
+    textState.mode = mode;
+    syncTextControls();
+    syncMobileDockMetrics();
+  });
+  textDraftInput?.addEventListener('input', () => {
+    const stamp = selectedTextStamp();
+    if (stamp && stamp.pageIndex === currentSourceIndex() && textDraftInput.value.trim()) {
+      updateSelectedTextStamp({ text: textDraftInput.value.replace(/\s+$/, '') });
+    }
+    syncTextControls();
+  });
+  textSizeSlider?.addEventListener('input', () => {
+    textState.size = Math.round(Number(textSizeSlider.value)) || 18;
+    updateSelectedTextStamp({ size: textState.size });
+    syncTextControls();
+  });
+  textAddBtn?.addEventListener('click', addTextStampToPage);
+  textRemoveBtn?.addEventListener('click', () => deleteSelectedSignatureStamp());
+  pageNumbersToggle?.addEventListener('click', () => {
+    if (operationInProgress) return;
+    textState.pageNumbers.enabled = !textState.pageNumbers.enabled;
+    refreshTextDecorations();
+  });
+  bindSegments(numbersVertical, value => { textState.pageNumbers.vertical = value; refreshTextDecorations(); });
+  bindSegments(numbersAlign, value => { textState.pageNumbers.align = value; refreshTextDecorations(); });
+  bindSegments(numbersFormat, value => { textState.pageNumbers.format = value; refreshTextDecorations(); });
+  bindSegments(numbersSize, value => { textState.pageNumbers.size = value; refreshTextDecorations(); });
+  numbersStartInput?.addEventListener('input', () => {
+    const value = Math.floor(Number(numbersStartInput.value));
+    if (numbersStartInput.value === '' || !Number.isFinite(value)) return;
+    textState.pageNumbers.start = Math.max(0, Math.min(9999, value));
+    refreshTextDecorations();
+  });
+  numbersStartInput?.addEventListener('blur', () => syncTextControls());
+  watermarkToggle?.addEventListener('click', () => {
+    if (operationInProgress) return;
+    textState.watermark.enabled = !textState.watermark.enabled;
+    refreshTextDecorations();
+  });
+  watermarkInput?.addEventListener('input', () => {
+    textState.watermark.text = watermarkInput.value;
+    refreshTextDecorations();
+  });
+  watermarkSizeSlider?.addEventListener('input', () => {
+    textState.watermark.size = Math.round(Number(watermarkSizeSlider.value)) || 64;
+    refreshTextDecorations();
+  });
+  watermarkOpacitySlider?.addEventListener('input', () => {
+    textState.watermark.opacity = Math.round(Number(watermarkOpacitySlider.value)) || 20;
+    refreshTextDecorations();
+  });
+  bindSegments(watermarkLayout, value => { textState.watermark.layout = value; refreshTextDecorations(); });
+
+  // ── PDF placement ──
+  // Maps a point given as fractions of the displayed page (origin top-left) to PDF user
+  // space, honouring the crop box and /Rotate so additions land where they were previewed.
+  function pdfPageGeometry(page) {
+    const box = page.getCropBox();
+    const rotation = ((page.getRotation().angle % 360) + 360) % 360;
+    const quarter = rotation === 90 || rotation === 270;
+    return {
+      x0: box.x,
+      y0: box.y,
+      w: box.width,
+      h: box.height,
+      rotation,
+      dispW: quarter ? box.height : box.width,
+      dispH: quarter ? box.width : box.height,
+    };
+  }
+
+  function displayPointToPdf(g, u, v) {
+    if (g.rotation === 90) return { x: g.x0 + v * g.w, y: g.y0 + u * g.h };
+    if (g.rotation === 180) return { x: g.x0 + g.w - u * g.w, y: g.y0 + v * g.h };
+    if (g.rotation === 270) return { x: g.x0 + g.w - v * g.w, y: g.y0 + g.h - u * g.h };
+    return { x: g.x0 + u * g.w, y: g.y0 + g.h - v * g.h };
+  }
+
+  function drawPlacedImage(pdfLib, page, g, image, item) {
+    const width = item.wPct / 100 * g.dispW;
+    const height = item.hPct / 100 * g.dispH;
+    const center = displayPointToPdf(g, item.cxPct / 100, item.cyPct / 100);
+    const angle = g.rotation + (item.angle || 0);
+    const radians = angle * Math.PI / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    page.drawImage(image, {
+      x: center.x - (width / 2 * cos - height / 2 * sin),
+      y: center.y - (width / 2 * sin + height / 2 * cos),
+      width,
+      height,
+      rotate: pdfLib.degrees(angle),
+      opacity: item.opacity ?? 1,
+    });
+  }
+
+  // Signatures, placed text, page numbers and the watermark all export together, so Sign
+  // and Text produce the same file from what the preview shows.
+  async function createAnnotatedPdfArtifact(pageOrder, fileBase, context) {
+    const pdfLib = await ensurePdfLib();
+    if (!pageOrder.length) throw new Error(t('errors.noPagesExport'));
+    const settings = context.settings;
+    const included = new Set(pageOrder);
+    const stamps = settings.signatureStamps.filter(stamp => included.has(stamp.pageIndex));
+    if (!stamps.length && !settings.pageNumbers.enabled && !watermarkActive(settings)) {
+      throw new Error(t(context.toolId === 'sign' ? 'errors.signaturePageMissing' : 'errors.noText'));
+    }
+    const src = await pdfLib.PDFDocument.load(await readOriginalPdfBytes());
+    const out = await pdfLib.PDFDocument.create();
+    const embedded = new Map();
+    const embed = dataUrl => {
+      if (!embedded.has(dataUrl)) embedded.set(dataUrl, out.embedPng(pngDataUrlToBytes(dataUrl)));
+      return embedded.get(dataUrl);
+    };
+    const count = pageOrder.length;
+    for (let i = 0; i < count; i++) {
+      setLoader(true, t('progress.exportingPage', { page: i + 1, count }), currentPageProgress(i, count));
+      const sourceIndex = pageOrder[i];
+      const [copied] = await out.copyPages(src, [sourceIndex]);
+      const geometry = pdfPageGeometry(copied);
+      const page = { w: geometry.dispW, h: geometry.dispH };
+      for (const item of pageDecorationsFor(i, count, page, settings)) {
+        drawPlacedImage(pdfLib, copied, geometry, await embed(item.image.dataUrl), item);
+      }
+      for (const stamp of stamps.filter(item => item.pageIndex === sourceIndex)) {
+        drawPlacedImage(pdfLib, copied, geometry, await embed(stamp.dataUrl), {
+          cxPct: stamp.xPct + stamp.wPct / 2,
+          cyPct: stamp.yPct + stamp.hPct / 2,
+          wPct: stamp.wPct,
+          hPct: stamp.hPct,
+        });
+      }
+      out.addPage(copied);
+      await yieldToMainThread();
+    }
+    return createPdfArtifact(await out.save(), fileBase, {
+      source: 'pdf-lib',
+      rasterized: false,
+      preservesOriginalQuality: true,
+      signed: stamps.some(stamp => stamp.kind !== 'text'),
+    });
+  }
+
+  // ── Image tool ──
+  const IMAGE_NAME_PATTERN = /\.(jpe?g|png|gif|webp|bmp|avif|heic|heif|tiff?)$/i;
+  const DROP_ICON_IMAGE = '<svg viewBox="0 0 24 24" focusable="false"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 4.6-4.4a1.5 1.5 0 0 1 2.1 0L14 15.8l1.9-1.8a1.5 1.5 0 0 1 2.1 0l2.5 2.4"/></svg>';
+
+  function isImageFile(file) {
+    return (file.type || '').startsWith('image/') || IMAGE_NAME_PATTERN.test(file.name || '');
+  }
+
+  function imageCollecting() {
+    return activeTool === 'image' && imageState.mode === 'toPdf';
+  }
+
+  function decodeImageEntry(entry) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = entry.url;
+    entry.ready = img.decode().then(() => {
+      entry.width = img.naturalWidth;
+      entry.height = img.naturalHeight;
+      entry.element = img;
+    }, () => {
+      entry.broken = true;
+    }).finally(() => {
+      if (activeTool === 'image') syncImageTool();
+      downloadBtn.disabled = activeToolExportDisabled();
+    });
+  }
+
+  function addImageFiles(fileList) {
+    if (operationInProgress) return;
+    clearError();
+    const files = Array.from(fileList).filter(isImageFile);
+    if (!files.length) {
+      showError(t('errors.chooseImages'));
+      return;
+    }
+    for (const file of files) {
+      const entry = { id: imageState.nextId++, file, url: URL.createObjectURL(file), width: 0, height: 0, broken: false };
+      imageState.files.push(entry);
+      decodeImageEntry(entry);
+    }
+    syncImageTool();
+    updatePageState();
+  }
+
+  function removeImageEntry(index) {
+    if (operationInProgress) return;
+    const [entry] = imageState.files.splice(index, 1);
+    if (entry) URL.revokeObjectURL(entry.url);
+    syncImageTool();
+    updatePageState();
+  }
+
+  function moveImageEntry(index, delta) {
+    if (operationInProgress) return;
+    const next = index + delta;
+    if (next < 0 || next >= imageState.files.length) return;
+    const [entry] = imageState.files.splice(index, 1);
+    imageState.files.splice(next, 0, entry);
+    syncImageTool();
+  }
+
+  function clearImageEntries() {
+    if (operationInProgress) return;
+    imageState.files.forEach(entry => URL.revokeObjectURL(entry.url));
+    imageState.files = [];
+    syncImageTool();
+    updatePageState();
+  }
+
+  // Page box for one image, in points. "Fit" keeps the image's own proportions with the
+  // long side at A4 length (smaller images keep their 96 dpi size); A4 and Letter centre
+  // the image with a margin and follow its orientation.
+  function imagePageLayout(width, height, pageSize) {
+    if (pageSize === 'fit') {
+      const scale = Math.min(0.75, 841.89 / Math.max(width, height));
+      const w = width * scale;
+      const h = height * scale;
+      return { pageW: w, pageH: h, x: 0, y: 0, w, h };
+    }
+    const base = pageSize === 'a4' ? [595.28, 841.89] : [612, 792];
+    const landscape = width > height;
+    const pageW = landscape ? base[1] : base[0];
+    const pageH = landscape ? base[0] : base[1];
+    const margin = 24;
+    const scale = Math.min((pageW - margin * 2) / width, (pageH - margin * 2) / height);
+    const w = width * scale;
+    const h = height * scale;
+    return { pageW, pageH, x: (pageW - w) / 2, y: (pageH - h) / 2, w, h };
+  }
+
+  function jpegOrientation(bytes) {
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return 0;
+    let offset = 2;
+    while (offset + 4 < bytes.length && bytes[offset] === 0xff) {
+      const marker = bytes[offset + 1];
+      const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+      if (marker === 0xe1 && bytes[offset + 4] === 0x45 && bytes[offset + 5] === 0x78) {
+        const tiff = offset + 10;
+        const little = bytes[tiff] === 0x49;
+        const read16 = at => little ? bytes[at] | (bytes[at + 1] << 8) : (bytes[at] << 8) | bytes[at + 1];
+        const read32 = at => little
+          ? (bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16) | (bytes[at + 3] << 24)) >>> 0
+          : ((bytes[at] << 24) | (bytes[at + 1] << 16) | (bytes[at + 2] << 8) | bytes[at + 3]) >>> 0;
+        const ifd = tiff + read32(tiff + 4);
+        const entries = read16(ifd);
+        for (let i = 0; i < entries; i++) {
+          const entry = ifd + 2 + i * 12;
+          if (read16(entry) === 0x0112) return read16(entry + 8);
+        }
+        return 0;
+      }
+      if (marker === 0xda) return 0;
+      offset += 2 + length;
+    }
+    return 0;
+  }
+
+  // JPEGs and PNGs go into the PDF untouched; anything else, or a JPEG that relies on an
+  // EXIF rotation, is decoded by the browser (upright) and re-encoded as a JPEG.
+  async function embedImageEntry(doc, entry) {
+    await entry.ready;
+    if (entry.broken) throw new Error(t('errors.imageUnreadable', { name: entry.file.name }));
+    const bytes = new Uint8Array(await entry.file.arrayBuffer());
+    const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8;
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    try {
+      if (isJpeg && jpegOrientation(bytes) <= 1) return await doc.embedJpg(bytes);
+      if (isPng) return await doc.embedPng(bytes);
+    } catch (err) {
+      console.warn('Embedding original image failed; re-encoding', err);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = entry.width;
+    canvas.height = entry.height;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(entry.element, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    canvas.width = 0;
+    canvas.height = 0;
+    if (!blob) throw new Error(t('errors.imageUnreadable', { name: entry.file.name }));
+    return doc.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+  }
+
+  async function createImagesPdfArtifact(context) {
+    const pdfLib = await ensurePdfLib();
+    const entries = imageState.files.filter(entry => !entry.broken);
+    if (!entries.length) throw new Error(t('errors.chooseImages'));
+    const doc = await pdfLib.PDFDocument.create();
+    const count = entries.length;
+    for (let i = 0; i < count; i++) {
+      setLoader(true, t('progress.addingImage', { page: i + 1, count }), currentPageProgress(i, count));
+      const image = await embedImageEntry(doc, entries[i]);
+      const layout = imagePageLayout(entries[i].width || image.width, entries[i].height || image.height, imageState.pageSize);
+      doc.addPage([layout.pageW, layout.pageH]).drawImage(image, { x: layout.x, y: layout.y, width: layout.w, height: layout.h });
+      await yieldToMainThread();
+    }
+    return createPdfArtifact(await doc.save(), context.fileBase, {
+      source: 'pdf-lib',
+      rasterized: false,
+      preservesOriginalQuality: true,
+    });
+  }
+
+  const CRC32_TABLE = (() => {
+    const table = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function crc32(bytes) {
+    let c = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) c = CRC32_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  // A minimal "stored" ZIP: PNG and JPEG data is already compressed, so the archive only
+  // needs headers and checksums.
+  async function createZipBlob(files) {
+    const encoder = new TextEncoder();
+    const now = new Date();
+    const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const parts = [];
+    const central = [];
+    let offset = 0;
+    for (const file of files) {
+      const data = new Uint8Array(await file.blob.arrayBuffer());
+      const name = encoder.encode(file.name);
+      const crc = crc32(data);
+      const local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(6, 0x0800, true);
+      local.setUint16(8, 0, true);
+      local.setUint16(10, dosTime, true);
+      local.setUint16(12, dosDate, true);
+      local.setUint32(14, crc, true);
+      local.setUint32(18, data.length, true);
+      local.setUint32(22, data.length, true);
+      local.setUint16(26, name.length, true);
+      local.setUint16(28, 0, true);
+      parts.push(local.buffer, name, data);
+      const entry = new DataView(new ArrayBuffer(46));
+      entry.setUint32(0, 0x02014b50, true);
+      entry.setUint16(4, 20, true);
+      entry.setUint16(6, 20, true);
+      entry.setUint16(8, 0x0800, true);
+      entry.setUint16(10, 0, true);
+      entry.setUint16(12, dosTime, true);
+      entry.setUint16(14, dosDate, true);
+      entry.setUint32(16, crc, true);
+      entry.setUint32(20, data.length, true);
+      entry.setUint32(24, data.length, true);
+      entry.setUint16(28, name.length, true);
+      entry.setUint32(42, offset, true);
+      central.push(entry.buffer, name);
+      offset += 30 + name.length + data.length;
+    }
+    const centralSize = central.reduce((sum, part) => sum + part.byteLength, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, files.length, true);
+    end.setUint16(10, files.length, true);
+    end.setUint32(12, centralSize, true);
+    end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  async function exportPdfPagesAsImages(pageOrder) {
+    const jpeg = imageState.format === 'jpeg';
+    const mimeType = jpeg ? 'image/jpeg' : 'image/png';
+    const extension = jpeg ? 'jpg' : 'png';
+    const base = outputBaseName();
+    const files = [];
+    const canvas = document.createElement('canvas');
+    const count = pageOrder.length;
+    for (let i = 0; i < count; i++) {
+      setLoader(true, t('progress.savingImage', { page: i + 1, count }), currentPageProgress(i, count));
+      const sourceIndex = pageOrder[i];
+      const page = await state.pdfDoc.getPage(sourceIndex + 1);
+      const baseVp = page.getViewport({ scale: 1 });
+      let scale = imageState.dpi / 72;
+      if (MOBILE_PERFORMANCE_MODE) scale = capScaleToPixelBudget(baseVp, scale, MOBILE_RASTER_EXPORT_MAX_PIXELS);
+      const viewport = page.getViewport({ scale });
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const rendered = await runPdfPageRender(page, { canvasContext: ctx, viewport });
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      if (!rendered) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, mimeType, 0.92));
+      if (!blob) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
+      const pageNumber = state.pageOrder.indexOf(sourceIndex) + 1;
+      files.push({ name: base + '_page_' + padPage(pageNumber) + '.' + extension, blob });
+      await yieldToMainThread();
+    }
+    canvas.width = 0;
+    canvas.height = 0;
+    if (files.length === 1) {
+      downloadBlob(files[0].blob, files[0].name);
+      return;
+    }
+    setLoader(true, t('progress.zipping'), 100);
+    downloadBlob(await createZipBlob(files), exportBaseNameForTool('image') + '.zip');
+  }
+
+  async function runImageToolExport() {
+    if (operationInProgress) return;
+    clearError();
+    let exportOrder = [];
+    if (imageState.mode === 'toPdf') {
+      if (!imageState.files.length) return;
+      if (advancedPasswordToggle.checked && !advancedPasswordValue()) {
+        showError(t('errors.password'));
+        advancedPasswordInput.focus();
+        return;
+      }
+    } else {
+      if (!state.pdfDoc || activePageCount() === 0) return;
+      try {
+        exportOrder = selectedExportPageOrder();
+      } catch (err) {
+        showError(err.message || err);
+        advancedRangeInput.focus();
+        return;
+      }
+      if (!exportOrder.length) return;
+    }
+    operationInProgress = true;
+    downloadBtn.disabled = true;
+    syncImageTool();
+    setLoader(true, t(imageState.mode === 'toPdf' ? 'progress.creatingPdf' : 'progress.exportingPages'), 0);
+    try {
+      if (imageState.mode === 'toPdf') {
+        const first = imageState.files.find(entry => !entry.broken) || imageState.files[0];
+        const fileBase = cleanDownloadBase(first.file.name.replace(/\.[^.]+$/, ''), 'images');
+        const context = createExportContext('image', [], fileBase, { useCurrentOnly: false });
+        await runExportPipeline(context, createImagesPdfArtifact);
+      } else {
+        await exportPdfPagesAsImages(exportOrder);
+      }
+      setLoader(false);
+    } catch (err) {
+      console.error(err);
+      showError(t('errors.exportFailed', { error: err.message || err }));
+      setLoader(false);
+    } finally {
+      operationInProgress = false;
+      updatePageState();
+      syncImageTool();
+    }
+  }
+
+  function renderImageList() {
+    if (!imageList) return;
+    imageList.innerHTML = '';
+    imageState.files.forEach((entry, index) => {
+      const row = document.createElement('div');
+      row.className = 'merge-file-row image-file-row';
+      const thumb = document.createElement('img');
+      thumb.className = 'image-file-thumb';
+      thumb.alt = '';
+      thumb.src = entry.url;
+      const info = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'merge-file-name';
+      name.textContent = entry.file.name;
+      const meta = document.createElement('div');
+      meta.className = 'merge-file-meta';
+      meta.textContent = entry.broken
+        ? t('image.unreadable')
+        : fmtBytes(entry.file.size) + (entry.width ? ' · ' + entry.width + ' × ' + entry.height : '');
+      info.append(name, meta);
+      const actions = document.createElement('div');
+      actions.className = 'merge-file-actions';
+      const button = (html, label, disabled, onClick) => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.innerHTML = html;
+        el.disabled = operationInProgress || disabled;
+        el.setAttribute('aria-label', label);
+        el.addEventListener('click', onClick);
+        return el;
+      };
+      actions.append(
+        button('<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">↑</span>', t('merge.moveUp', { name: entry.file.name }), index === 0, () => moveImageEntry(index, -1)),
+        button('<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">↓</span>', t('merge.moveDown', { name: entry.file.name }), index === imageState.files.length - 1, () => moveImageEntry(index, 1)),
+        button(X_ICON, t('merge.remove', { name: entry.file.name }), false, () => removeImageEntry(index)),
+      );
+      row.append(thumb, info, actions);
+      imageList.appendChild(row);
+    });
+  }
+
+  function renderImagePages() {
+    if (!imagePages) return;
+    imagePages.innerHTML = '';
+    if (!imageState.files.length) {
+      const empty = document.createElement('div');
+      empty.className = 'image-pages-empty';
+      const glyph = document.createElement('div');
+      glyph.className = 'image-pages-glyph';
+      glyph.innerHTML = DROP_ICON_IMAGE;
+      const title = document.createElement('div');
+      title.className = 'big';
+      title.textContent = t('image.pagesEmpty');
+      const sub = document.createElement('div');
+      sub.className = 'small';
+      sub.textContent = t('image.pagesEmptySub');
+      const choose = document.createElement('button');
+      choose.type = 'button';
+      choose.className = 'image-pages-choose';
+      choose.textContent = t('drop.addImages');
+      choose.addEventListener('click', () => fileInput.click());
+      empty.append(glyph, title, sub, choose);
+      imagePages.appendChild(empty);
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'image-pages-grid';
+    imageState.files.forEach((entry, index) => {
+      const card = document.createElement('div');
+      card.className = 'image-page-card';
+      const page = document.createElement('div');
+      page.className = 'image-page';
+      if (entry.width) {
+        const layout = imagePageLayout(entry.width, entry.height, imageState.pageSize);
+        page.style.aspectRatio = layout.pageW + ' / ' + layout.pageH;
+        const img = document.createElement('img');
+        img.alt = '';
+        img.src = entry.url;
+        img.style.left = (layout.x / layout.pageW * 100) + '%';
+        img.style.top = ((layout.pageH - layout.y - layout.h) / layout.pageH * 100) + '%';
+        img.style.width = (layout.w / layout.pageW * 100) + '%';
+        img.style.height = (layout.h / layout.pageH * 100) + '%';
+        page.appendChild(img);
+      } else if (entry.broken) {
+        page.classList.add('is-broken');
+        page.textContent = t('image.unreadable');
+      }
+      const label = document.createElement('div');
+      label.className = 'image-page-number';
+      label.textContent = String(index + 1);
+      card.append(page, label);
+      grid.appendChild(card);
+    });
+    imagePages.appendChild(grid);
+  }
+
+  function syncImageTool() {
+    if (!imageModeSegments) return;
+    setSegmentValue(imageModeSegments, imageState.mode);
+    setSegmentValue(imagePageSize, imageState.pageSize);
+    setSegmentValue(imageFormat, imageState.format);
+    setSegmentValue(imageDpi, String(imageState.dpi));
+    document.querySelectorAll('[data-image-panel]').forEach(panel => {
+      panel.hidden = panel.dataset.imagePanel !== imageState.mode;
+    });
+    const count = imageState.files.length;
+    imageSummary.textContent = count ? t('image.summaryCount', { count }) : t('image.summaryEmpty');
+    pdfToImageSummary.textContent = state.pdfDoc ? t('image.fromSummary') : t('image.fromSummaryNoPdf');
+    imageClearBtn.disabled = operationInProgress || !count;
+    document.body.classList.toggle('image-collecting', imageCollecting());
+    renderImageList();
+    if (imageCollecting()) renderImagePages();
+  }
+
+  function setImageMode(mode) {
+    if (imageState.mode === mode) return;
+    imageState.mode = mode;
+    applyToolLocale();
+    updateSourceDropMode();
+    syncImageTool();
+    updatePageState();
+    if (mode === 'fromPdf' && state.pdfDoc) requestPreviewRender(false);
+  }
+
+  bindSegments(imageModeSegments, setImageMode);
+  bindSegments(imagePageSize, value => { imageState.pageSize = value; syncImageTool(); });
+  bindSegments(imageFormat, value => { imageState.format = value; syncImageTool(); });
+  bindSegments(imageDpi, value => { imageState.dpi = Number(value) || 150; syncImageTool(); });
+  imageClearBtn?.addEventListener('click', clearImageEntries);
 
   async function ensureThumbnail(sourceIndex, quality = 'low') {
     const existing = state.pages[sourceIndex];
@@ -5244,6 +6943,7 @@
   }
 
   async function drawPreview() {
+    if (imageCollecting()) return;
     const sourceIndex = currentSourceIndex();
     if (sourceIndex == null) {
       canvasWrap.style.display = 'none';
@@ -6967,59 +8667,6 @@
     return bytes;
   }
 
-  async function createSignedPdfArtifact(pageOrder, fileBase, context) {
-    const pdfLib = await ensurePdfLib();
-    if (!pageOrder.length) throw new Error(t('errors.noPagesExport'));
-    if (!context.settings.signatureStamps.length) throw new Error(t('errors.noSignature'));
-    const includedPages = new Set(pageOrder);
-    const exportStamps = context.settings.signatureStamps.filter(stamp => includedPages.has(stamp.pageIndex));
-    if (!exportStamps.length) {
-      throw new Error(t('errors.signaturePageMissing'));
-    }
-
-    const src = await pdfLib.PDFDocument.load(await readOriginalPdfBytes());
-    const out = await pdfLib.PDFDocument.create();
-    const imageCache = new Map();
-    async function signatureImageFor(dataUrl) {
-      if (!imageCache.has(dataUrl)) {
-        imageCache.set(dataUrl, out.embedPng(pngDataUrlToBytes(dataUrl)));
-      }
-      return imageCache.get(dataUrl);
-    }
-    const count = pageOrder.length;
-
-    for (let i = 0; i < count; i++) {
-      const sourceIndex = pageOrder[i];
-      const [copied] = await out.copyPages(src, [sourceIndex]);
-      const pageStamps = exportStamps.filter(stamp => stamp.pageIndex === sourceIndex);
-      for (const stamp of pageStamps) {
-        const signatureImage = await signatureImageFor(stamp.dataUrl);
-        const width = copied.getWidth();
-        const height = copied.getHeight();
-        const drawWidth = width * stamp.wPct / 100;
-        const drawHeight = height * stamp.hPct / 100;
-        const x = width * stamp.xPct / 100;
-        const y = height - (height * stamp.yPct / 100) - drawHeight;
-        copied.drawImage(signatureImage, {
-          x,
-          y,
-          width: drawWidth,
-          height: drawHeight,
-        });
-      }
-      out.addPage(copied);
-      await new Promise(r => setTimeout(r, 0));
-    }
-
-    const bytes = await out.save();
-    return createPdfArtifact(bytes, fileBase, {
-      source: 'pdf-lib',
-      rasterized: false,
-      preservesOriginalQuality: true,
-      signed: true,
-    });
-  }
-
   async function exportEditedPdf(pageOrder = state.pageOrder, fileBase = outputBaseName() + TOOLS.edit.suffix) {
     const context = createExportContext('edit', pageOrder, fileBase);
     await runExportPipeline(context, () => createEditedPdfArtifact(pageOrder, fileBase, context));
@@ -7506,6 +9153,13 @@
   $('mobileSignDelete').addEventListener('click', deleteSelectedSignatureStamp);
   signatureDragSource.addEventListener('pointerdown', beginSignatureDragFromSource);
   signatureOverlay.addEventListener('pointerdown', beginSignatureOverlayDrag);
+  canvasWrap.addEventListener('pointerdown', e => {
+    if (!isStampTool() || signatureState.selectedId == null || e.target.closest('.signature-stamp')) return;
+    signatureState.selectedId = null;
+    syncSignatureControls();
+    syncTextControls();
+    updateSignatureOverlay();
+  });
 
   function toggleFineRotationQuality() {
     if (operationInProgress) return;
@@ -7559,7 +9213,7 @@
       undoPageChange();
       return;
     }
-    if ((e.key === 'Delete' || e.key === 'Backspace') && activeTool === 'sign' && !editingText) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && isStampTool() && !editingText) {
       if (deleteSelectedSignatureStamp()) {
         e.preventDefault();
         return;
@@ -7728,6 +9382,10 @@
       await mergeSelectedPdfs();
       return;
     }
+    if (activeTool === 'image') {
+      await runImageToolExport();
+      return;
+    }
     if (!state.pdfDoc || activePageCount() === 0) return;
     if (advancedPasswordToggle.checked && canPasswordProtectExport() && !advancedPasswordValue()) {
       showError(t('errors.password'));
@@ -7757,9 +9415,9 @@
       } else if (activeTool === 'edit') {
         setLoader(true, t('progress.exportingPageEdits'), 15);
         await runExportPipeline(context, () => createEditedPdfArtifact(exportOrder, context.fileBase, context));
-      } else if (activeTool === 'sign') {
-        setLoader(true, t('progress.exportingSignedPdf'), 20);
-        await runExportPipeline(context, () => createSignedPdfArtifact(exportOrder, context.fileBase, context));
+      } else if (isStampTool()) {
+        setLoader(true, t(activeTool === 'sign' ? 'progress.exportingSignedPdf' : 'progress.exportingPages'), 20);
+        await runExportPipeline(context, () => createAnnotatedPdfArtifact(exportOrder, context.fileBase, context));
       } else if (activeTool === 'compress') {
         setLoader(true, t('progress.compressingPdf'), 10);
         await runExportPipeline(context, createCompressedPdfArtifact);
@@ -8001,7 +9659,7 @@
 
   // ctrl/cmd + scroll (or trackpad pinch) = continuous zoom
   previewStage.addEventListener('wheel', e => {
-    const canZoomTool = activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress' || activeTool === 'sign' || isRasterTool(activeTool) || activeTool === 'edit';
+    const canZoomTool = activeTool === 'preview' || activeTool === 'merge' || activeTool === 'compress' || isStampTool() || (activeTool === 'image' && !imageCollecting()) || isRasterTool(activeTool) || activeTool === 'edit';
     const overPdf = e.target.closest('.preview-canvas-wrap, .page-editor-canvas-wrap');
     if (!state.pdfDoc || !canZoomTool || !overPdf || (!e.ctrlKey && !e.metaKey)) return;
     e.preventDefault();

@@ -20850,12 +20850,26 @@
       downloadSub: "stamp the signature onto the PDF",
       suffix: "_signed"
     },
+    text: {
+      lede: "Add text, page numbers, or a watermark to your PDF.",
+      meta: "Type text and drag it into place<br/>Number every page automatically<br/>Mark pages with a watermark",
+      downloadLabel: "Export PDF",
+      downloadSub: "add text to the original pages",
+      suffix: "_text"
+    },
     merge: {
       lede: "Combine multiple PDFs into one document.",
       meta: "Add as many PDFs as you need<br/>Arrange them in the right order<br/>Review the combined pages before export",
       downloadLabel: "Merge PDFs",
       downloadSub: "combine selected files into organize",
       suffix: "_merged"
+    },
+    image: {
+      lede: "Turn images into a PDF, or save PDF pages as images.",
+      meta: "Combine photos and screenshots into one PDF<br/>Save pages as PNG or JPEG<br/>Several pages download as a ZIP file",
+      downloadLabel: "Create PDF",
+      downloadSub: "one page per image",
+      suffix: "_images"
     },
     compress: {
       lede: "Make a PDF smaller with a choice of quality levels.",
@@ -21099,6 +21113,37 @@
   var signatureDragLabel = $2("signatureDragLabel");
   var signSummary = $2("signSummary");
   var signatureOverlay = $2("signatureOverlay");
+  var textModeSegments = $2("textModeSegments");
+  var textDraftInput = $2("textDraftInput");
+  var textSizeSlider = $2("textSizeSlider");
+  var textSizeValue = $2("textSizeValue");
+  var textColorSwatches = $2("textColorSwatches");
+  var textAddBtn = $2("textAddBtn");
+  var textRemoveBtn = $2("textRemoveBtn");
+  var textSummary = $2("textSummary");
+  var pageNumbersToggle = $2("pageNumbersToggle");
+  var numbersVertical = $2("numbersVertical");
+  var numbersAlign = $2("numbersAlign");
+  var numbersFormat = $2("numbersFormat");
+  var numbersSize = $2("numbersSize");
+  var numbersStartInput = $2("numbersStartInput");
+  var watermarkToggle = $2("watermarkToggle");
+  var watermarkInput = $2("watermarkInput");
+  var watermarkSizeSlider = $2("watermarkSizeSlider");
+  var watermarkSizeValue = $2("watermarkSizeValue");
+  var watermarkOpacitySlider = $2("watermarkOpacitySlider");
+  var watermarkOpacityValue = $2("watermarkOpacityValue");
+  var watermarkLayout = $2("watermarkLayout");
+  var watermarkColorSwatches = $2("watermarkColorSwatches");
+  var imageModeSegments = $2("imageModeSegments");
+  var imageSummary = $2("imageSummary");
+  var imageList = $2("imageList");
+  var imagePageSize = $2("imagePageSize");
+  var imageClearBtn = $2("imageClearBtn");
+  var pdfToImageSummary = $2("pdfToImageSummary");
+  var imageFormat = $2("imageFormat");
+  var imageDpi = $2("imageDpi");
+  var imagePages = $2("imagePages");
   var previewTitle = $2("previewTitle");
   var previewTools = $2("previewTools");
   var mobileControlsSheet = $2("mobileControlsSheet");
@@ -21134,6 +21179,23 @@
     padPointerId: null,
     lastPadPoint: null,
     drag: null
+  };
+  var TEXT_COLORS = ["#1d1d1f", "#6e6e73", "#0071e3", "#d70015"];
+  var textState = {
+    mode: "text",
+    size: 18,
+    color: TEXT_COLORS[0],
+    font: "sans",
+    pageNumbers: { enabled: false, vertical: "bottom", align: "center", format: "n", size: "m", start: 1 },
+    watermark: { enabled: false, text: null, size: 64, opacity: 20, layout: "diagonal", color: TEXT_COLORS[1] }
+  };
+  var imageState = {
+    mode: "toPdf",
+    files: [],
+    nextId: 1,
+    pageSize: "fit",
+    format: "png",
+    dpi: 150
   };
   var errorHideTimer = null;
   var toolTabs = Array.from(document.querySelectorAll(".tool-tab"));
@@ -21201,6 +21263,12 @@
     setElementHtml($2("masterLede"), toolText(activeTool, "lede"));
     $2("masterMeta").dataset.tooltip = toolTipText(meta);
     $2("masterMeta").setAttribute("aria-label", toolTipText(meta));
+    if (activeTool === "image") {
+      const toPdf = imageState.mode === "toPdf";
+      setElementHtml(downloadLabel, t2(toPdf ? "image.createPdf" : "image.exportImages"));
+      setElementHtml(downloadSub, t2(toPdf ? "image.createPdfSub" : "image.exportImagesSub"));
+      return;
+    }
     setElementHtml(downloadLabel, toolText(activeTool, "downloadLabel"));
     setElementHtml(downloadSub, toolText(activeTool, "downloadSub"));
   }
@@ -21217,6 +21285,7 @@
     syncFineQualityToggle();
     syncToneLabels();
     updateMergeState();
+    syncImageTool();
     updatePageState();
     syncEditControls();
     updatePreviewMode();
@@ -21512,7 +21581,7 @@
     const enabled = usesMobilePreviewWorkspace();
     if (!enabled) mobileControlsOpen = false;
     document.body.classList.toggle("mobile-preview-workspace", enabled);
-    document.body.classList.toggle("mobile-signing", enabled && activeTool === "sign");
+    document.body.classList.toggle("mobile-signing", enabled && isStampTool());
     document.documentElement.classList.toggle("mobile-workspace", enabled);
     document.body.classList.toggle("mobile-controls-open", enabled && mobileControlsOpen);
     if (mobileControlsToggle) {
@@ -21656,7 +21725,9 @@
     requestAnimationFrame(centerActiveToolTab);
     syncPreviewStageHeight();
     if (id === "sign") syncSignatureControls();
-    if (state.pdfDoc && id !== "organize" && id !== "edit") {
+    if (id === "text") syncTextControls();
+    syncImageTool();
+    if (state.pdfDoc && id !== "organize" && id !== "edit" && !imageCollecting()) {
       const enteringRasterTool = isRasterTool(id) && !isRasterTool(previousTool);
       if (!MOBILE_PERFORMANCE_MODE && enteringRasterTool) scheduleRasterToolEntryRender(id);
       else requestPreviewRender(isRasterTool(id));
@@ -21694,14 +21765,24 @@
     } else if (!isRasterTool(activeTool)) {
       previewCanvas._processedImage = null;
     }
+    const collectingImages = imageCollecting();
     previewStage.classList.toggle("organizing", organizing);
     previewStage.classList.toggle("editing", editing);
-    previewTools.classList.toggle("preview-tools-hidden", !isPhoneViewport() && (organizing || editing));
-    previewTools.querySelector(".zoom-bar").hidden = isPhoneViewport() && (organizing || editing);
-    previewTitle.innerHTML = organizing ? t2("preview.titleOrganize") : editing ? t2("preview.titleEdit") : activeTool === "sign" ? t2("preview.titleSign") : activeTool === "preview" ? t2("preview.titleOriginal") : activeTool === "compress" ? t2("preview.titleCompress") : t2("preview.titleProcessed");
+    previewStage.classList.toggle("image-collecting", collectingImages);
+    previewTools.classList.toggle("preview-tools-hidden", !isPhoneViewport() && (organizing || editing || collectingImages));
+    previewTools.querySelector(".zoom-bar").hidden = isPhoneViewport() && (organizing || editing) || collectingImages;
+    previewTitle.innerHTML = collectingImages ? t2("preview.titleImages") : organizing ? t2("preview.titleOrganize") : editing ? t2("preview.titleEdit") : activeTool === "sign" ? t2("preview.titleSign") : activeTool === "preview" ? t2("preview.titleOriginal") : activeTool === "compress" ? t2("preview.titleCompress") : t2("preview.titleProcessed");
     organizer.style.display = organizing ? "block" : "none";
     pageEditor.style.display = editing ? "flex" : "none";
     if (!editing) cropOverlay.hidden = true;
+    imagePages.hidden = !collectingImages;
+    if (collectingImages) {
+      emptyState.style.display = "none";
+      canvasWrap.style.display = "none";
+      renderImagePages();
+      updateSignatureOverlay();
+      return;
+    }
     if (organizing) {
       emptyState.style.display = "none";
       canvasWrap.style.display = "none";
@@ -21725,16 +21806,25 @@
   function updateSourceDropMode() {
     syncDocumentName();
     const merging = activeTool === "merge";
+    const collectingImages = imageCollecting();
     const hasCurrentPdf = !!state.pdfBytes || !!state.sourceFile || !!state.pdfDoc;
-    const collapseDrop = hasCurrentPdf && !merging;
-    fileInput.multiple = merging;
+    const collapseDrop = hasCurrentPdf && !merging && !collectingImages;
+    fileInput.multiple = merging || collectingImages;
+    fileInput.accept = collectingImages ? "image/*" : "application/pdf";
     dropZone.classList.toggle("is-collapsed", collapseDrop);
     dropZone.setAttribute("aria-hidden", collapseDrop ? "true" : "false");
     dropZone.tabIndex = collapseDrop ? -1 : 0;
-    dropGlyph.innerHTML = merging ? DROP_ICON_MULTI : DROP_ICON_SINGLE;
-    dropLabel.textContent = merging ? t2("drop.uploadPdfs") : t2("drop.uploadPdf");
-    dropSub.textContent = merging ? t2("drop.multiSub") : t2("drop.singleSub");
-    dropZone.setAttribute("aria-label", merging ? t2("drop.multiAria") : t2("drop.singleAria"));
+    if (collectingImages) {
+      dropGlyph.innerHTML = DROP_ICON_IMAGE;
+      dropLabel.textContent = t2("drop.addImages");
+      dropSub.textContent = t2("drop.imagesSub");
+      dropZone.setAttribute("aria-label", t2("drop.addImages"));
+    } else {
+      dropGlyph.innerHTML = merging ? DROP_ICON_MULTI : DROP_ICON_SINGLE;
+      dropLabel.textContent = merging ? t2("drop.uploadPdfs") : t2("drop.uploadPdf");
+      dropSub.textContent = merging ? t2("drop.multiSub") : t2("drop.singleSub");
+      dropZone.setAttribute("aria-label", merging ? t2("drop.multiAria") : t2("drop.singleAria"));
+    }
     fileRemoveBtn.disabled = !hasCurrentPdf;
     fileRemoveBtn.hidden = !hasCurrentPdf;
     fileRemoveBtn.setAttribute("aria-label", t2("file.removeAria", { name: state.fileName || "PDF" }));
@@ -21949,7 +22039,9 @@
         compressMode: state.compressMode,
         fineRotationDpi: fineRotationExportDpi(),
         pageEdits: state.pageEdits.map((edit) => clonePageEdit(edit)),
-        signatureStamps: signatureState.stamps.map((stamp) => ({ ...stamp }))
+        signatureStamps: signatureState.stamps.map((stamp) => ({ ...stamp })),
+        pageNumbers: { ...textState.pageNumbers },
+        watermark: { ...textState.watermark }
       }
     };
   }
@@ -23757,6 +23849,567 @@
     LOCALES[locale]["pages.next"] = label;
   });
   Object.entries({
+    en: {
+      "tool.text.label": "Text",
+      "tool.text.lede": "Add text, page numbers, or a watermark to your PDF.",
+      "tool.text.meta": "Type text and drag it into place<br/>Number every page automatically<br/>Mark pages with a watermark",
+      "tool.text.downloadLabel": "Export PDF",
+      "tool.text.downloadSub": "add text to the original pages",
+      "tool.image.label": "Image",
+      "tool.image.lede": "Turn images into a PDF, or save PDF pages as images.",
+      "tool.image.meta": "Combine photos and screenshots into one PDF<br/>Save pages as PNG or JPEG<br/>Several pages download as a ZIP file",
+      "sections.text": "Text",
+      "sections.image": "Image",
+      "text.modeAria": "Text type",
+      "text.modeText": "Text",
+      "text.modeNumbers": "Page numbers",
+      "text.modeWatermark": "Watermark",
+      "text.placeholder": "Type your text",
+      "text.size": "Size",
+      "text.color": "Color",
+      "text.colorBlack": "Black",
+      "text.colorGray": "Gray",
+      "text.colorBlue": "Blue",
+      "text.colorRed": "Red",
+      "text.add": "Add to page",
+      "text.remove": "Remove selected",
+      "text.summaryEmpty": "Type something, add it to the page, then drag it into place.",
+      "text.summaryNoPdf": "Upload a PDF to add text.",
+      "text.summaryEditing": "Editing the selected text. Click the page outside it to start new text.",
+      "text.summaryPlaced": "Text added: {count}. Select text on the page to edit it.",
+      "text.showNumbers": "Show page numbers",
+      "text.position": "Position",
+      "text.top": "Top",
+      "text.bottom": "Bottom",
+      "text.left": "Left",
+      "text.center": "Center",
+      "text.right": "Right",
+      "text.style": "Style",
+      "text.pageFormat": "Page {n}",
+      "text.small": "Small",
+      "text.medium": "Medium",
+      "text.large": "Large",
+      "text.startAt": "Start at",
+      "text.showWatermark": "Show watermark",
+      "text.watermarkPlaceholder": "Watermark text",
+      "text.watermarkDefault": "Confidential",
+      "text.opacity": "Opacity",
+      "text.angle": "Angle",
+      "text.diagonal": "Diagonal",
+      "text.horizontal": "Horizontal",
+      "image.modeAria": "Conversion",
+      "image.toPdf": "Images to PDF",
+      "image.fromPdf": "PDF to images",
+      "image.pageSize": "Page size",
+      "image.fit": "Fit image",
+      "image.letter": "Letter",
+      "image.format": "Format",
+      "image.quality": "Resolution",
+      "image.summaryEmpty": "Add photos or screenshots. Each image becomes one page.",
+      "image.summaryCount": "Images added: {count}. Each becomes a page; use the arrows to reorder.",
+      "image.fromSummary": "Save pages as images. Several pages download together as a ZIP file.",
+      "image.fromSummaryNoPdf": "Upload a PDF to save its pages as images.",
+      "image.createPdf": "Create PDF",
+      "image.createPdfSub": "one page per image",
+      "image.exportImages": "Export Images",
+      "image.exportImagesSub": "one image per page",
+      "image.unreadable": "Can't read this image",
+      "image.pagesEmpty": "Your pages will appear here",
+      "image.pagesEmptySub": "Each image becomes one page",
+      "drop.addImages": "Add images",
+      "drop.imagesSub": "Choose images or drag them here",
+      "preview.titleImages": "Pages",
+      "progress.addingImage": "Adding image {page} of {count}",
+      "progress.creatingPdf": "Creating PDF",
+      "progress.savingImage": "Saving page {page} of {count}",
+      "progress.zipping": "Packing images",
+      "errors.chooseImages": "Choose JPG, PNG, or other image files.",
+      "errors.imageUnreadable": "Couldn't read {name}. Try a JPG or PNG.",
+      "errors.noText": "Add text, page numbers, or a watermark first."
+    },
+    "zh-Hans": {
+      "tool.text.label": "\u6587\u5B57",
+      "tool.text.lede": "\u4E3A PDF \u6DFB\u52A0\u6587\u5B57\u3001\u9875\u7801\u6216\u6C34\u5370\u3002",
+      "tool.text.meta": "\u8F93\u5165\u6587\u5B57\u5E76\u62D6\u5230\u5408\u9002\u4F4D\u7F6E<br/>\u81EA\u52A8\u4E3A\u6BCF\u9875\u7F16\u53F7<br/>\u4E3A\u9875\u9762\u6DFB\u52A0\u6C34\u5370",
+      "tool.text.downloadLabel": "\u5BFC\u51FA PDF",
+      "tool.text.downloadSub": "\u5728\u539F\u59CB\u9875\u9762\u4E0A\u6DFB\u52A0\u6587\u5B57",
+      "tool.image.label": "\u56FE\u7247",
+      "tool.image.lede": "\u628A\u56FE\u7247\u8F6C\u6210 PDF\uFF0C\u6216\u628A PDF \u9875\u9762\u5B58\u4E3A\u56FE\u7247\u3002",
+      "tool.image.meta": "\u5C06\u7167\u7247\u548C\u622A\u56FE\u5408\u6210\u4E00\u4E2A PDF<br/>\u5C06\u9875\u9762\u5B58\u4E3A PNG \u6216 JPEG<br/>\u591A\u9875\u4F1A\u6253\u5305\u4E3A ZIP \u4E0B\u8F7D",
+      "sections.text": "\u6587\u5B57",
+      "sections.image": "\u56FE\u7247",
+      "text.modeAria": "\u6587\u5B57\u7C7B\u578B",
+      "text.modeText": "\u6587\u5B57",
+      "text.modeNumbers": "\u9875\u7801",
+      "text.modeWatermark": "\u6C34\u5370",
+      "text.placeholder": "\u8F93\u5165\u6587\u5B57",
+      "text.size": "\u5927\u5C0F",
+      "text.color": "\u989C\u8272",
+      "text.colorBlack": "\u9ED1\u8272",
+      "text.colorGray": "\u7070\u8272",
+      "text.colorBlue": "\u84DD\u8272",
+      "text.colorRed": "\u7EA2\u8272",
+      "text.add": "\u6DFB\u52A0\u5230\u9875\u9762",
+      "text.remove": "\u5220\u9664\u6240\u9009",
+      "text.summaryEmpty": "\u8F93\u5165\u6587\u5B57\uFF0C\u6DFB\u52A0\u5230\u9875\u9762\u540E\u62D6\u5230\u5408\u9002\u4F4D\u7F6E\u3002",
+      "text.summaryNoPdf": "\u4E0A\u4F20 PDF \u540E\u5373\u53EF\u6DFB\u52A0\u6587\u5B57\u3002",
+      "text.summaryEditing": "\u6B63\u5728\u7F16\u8F91\u6240\u9009\u6587\u5B57\u3002\u70B9\u6309\u9875\u9762\u7A7A\u767D\u5904\u53EF\u5F00\u59CB\u65B0\u7684\u6587\u5B57\u3002",
+      "text.summaryPlaced": "\u5DF2\u6DFB\u52A0\u6587\u5B57\uFF1A{count}\u3002\u9009\u4E2D\u9875\u9762\u4E0A\u7684\u6587\u5B57\u5373\u53EF\u7F16\u8F91\u3002",
+      "text.showNumbers": "\u663E\u793A\u9875\u7801",
+      "text.position": "\u4F4D\u7F6E",
+      "text.top": "\u9876\u90E8",
+      "text.bottom": "\u5E95\u90E8",
+      "text.left": "\u5DE6",
+      "text.center": "\u5C45\u4E2D",
+      "text.right": "\u53F3",
+      "text.style": "\u6837\u5F0F",
+      "text.pageFormat": "\u7B2C {n} \u9875",
+      "text.small": "\u5C0F",
+      "text.medium": "\u4E2D",
+      "text.large": "\u5927",
+      "text.startAt": "\u8D77\u59CB\u9875\u7801",
+      "text.showWatermark": "\u663E\u793A\u6C34\u5370",
+      "text.watermarkPlaceholder": "\u6C34\u5370\u6587\u5B57",
+      "text.watermarkDefault": "\u673A\u5BC6",
+      "text.opacity": "\u4E0D\u900F\u660E\u5EA6",
+      "text.angle": "\u89D2\u5EA6",
+      "text.diagonal": "\u5BF9\u89D2",
+      "text.horizontal": "\u6C34\u5E73",
+      "image.modeAria": "\u8F6C\u6362\u65B9\u5F0F",
+      "image.toPdf": "\u56FE\u7247\u8F6C PDF",
+      "image.fromPdf": "PDF \u8F6C\u56FE\u7247",
+      "image.pageSize": "\u9875\u9762\u5927\u5C0F",
+      "image.fit": "\u9002\u5408\u56FE\u7247",
+      "image.letter": "Letter",
+      "image.format": "\u683C\u5F0F",
+      "image.quality": "\u5206\u8FA8\u7387",
+      "image.summaryEmpty": "\u6DFB\u52A0\u7167\u7247\u6216\u622A\u56FE\uFF0C\u6BCF\u5F20\u56FE\u7247\u6210\u4E3A\u4E00\u9875\u3002",
+      "image.summaryCount": "\u5DF2\u6DFB\u52A0\u56FE\u7247\uFF1A{count}\u3002\u6BCF\u5F20\u4E00\u9875\uFF0C\u53EF\u7528\u7BAD\u5934\u8C03\u6574\u987A\u5E8F\u3002",
+      "image.fromSummary": "\u5C06\u9875\u9762\u5B58\u4E3A\u56FE\u7247\u3002\u591A\u9875\u4F1A\u4E00\u8D77\u6253\u5305\u4E3A ZIP \u6587\u4EF6\u3002",
+      "image.fromSummaryNoPdf": "\u4E0A\u4F20 PDF \u540E\u5373\u53EF\u5C06\u9875\u9762\u5B58\u4E3A\u56FE\u7247\u3002",
+      "image.createPdf": "\u521B\u5EFA PDF",
+      "image.createPdfSub": "\u6BCF\u5F20\u56FE\u7247\u4E00\u9875",
+      "image.exportImages": "\u5BFC\u51FA\u56FE\u7247",
+      "image.exportImagesSub": "\u6BCF\u9875\u4E00\u5F20\u56FE\u7247",
+      "image.unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u6B64\u56FE\u7247",
+      "image.pagesEmpty": "\u9875\u9762\u4F1A\u663E\u793A\u5728\u8FD9\u91CC",
+      "image.pagesEmptySub": "\u6BCF\u5F20\u56FE\u7247\u6210\u4E3A\u4E00\u9875",
+      "drop.addImages": "\u6DFB\u52A0\u56FE\u7247",
+      "drop.imagesSub": "\u9009\u62E9\u56FE\u7247\u6216\u62D6\u5230\u8FD9\u91CC",
+      "preview.titleImages": "\u9875\u9762",
+      "progress.addingImage": "\u6B63\u5728\u6DFB\u52A0\u7B2C {page}/{count} \u5F20\u56FE\u7247",
+      "progress.creatingPdf": "\u6B63\u5728\u521B\u5EFA PDF",
+      "progress.savingImage": "\u6B63\u5728\u4FDD\u5B58\u7B2C {page}/{count} \u9875",
+      "progress.zipping": "\u6B63\u5728\u6253\u5305\u56FE\u7247",
+      "errors.chooseImages": "\u8BF7\u9009\u62E9 JPG\u3001PNG \u6216\u5176\u4ED6\u56FE\u7247\u6587\u4EF6\u3002",
+      "errors.imageUnreadable": "\u65E0\u6CD5\u8BFB\u53D6 {name}\u3002\u8BF7\u5C1D\u8BD5 JPG \u6216 PNG\u3002",
+      "errors.noText": "\u8BF7\u5148\u6DFB\u52A0\u6587\u5B57\u3001\u9875\u7801\u6216\u6C34\u5370\u3002"
+    },
+    "zh-Hant-TW": {
+      "tool.text.label": "\u6587\u5B57",
+      "tool.text.lede": "\u70BA PDF \u52A0\u5165\u6587\u5B57\u3001\u9801\u78BC\u6216\u6D6E\u6C34\u5370\u3002",
+      "tool.text.meta": "\u8F38\u5165\u6587\u5B57\u4E26\u62D6\u66F3\u5230\u5408\u9069\u4F4D\u7F6E<br/>\u81EA\u52D5\u70BA\u6BCF\u9801\u7DE8\u865F<br/>\u70BA\u9801\u9762\u52A0\u4E0A\u6D6E\u6C34\u5370",
+      "tool.text.downloadLabel": "\u532F\u51FA PDF",
+      "tool.text.downloadSub": "\u5728\u539F\u59CB\u9801\u9762\u4E0A\u52A0\u5165\u6587\u5B57",
+      "tool.image.label": "\u5716\u7247",
+      "tool.image.lede": "\u628A\u5716\u7247\u8F49\u6210 PDF\uFF0C\u6216\u628A PDF \u9801\u9762\u5B58\u6210\u5716\u7247\u3002",
+      "tool.image.meta": "\u5C07\u7167\u7247\u548C\u622A\u5716\u5408\u6210\u4E00\u4EFD PDF<br/>\u5C07\u9801\u9762\u5B58\u6210 PNG \u6216 JPEG<br/>\u591A\u9801\u6703\u6253\u5305\u6210 ZIP \u4E0B\u8F09",
+      "sections.text": "\u6587\u5B57",
+      "sections.image": "\u5716\u7247",
+      "text.modeAria": "\u6587\u5B57\u985E\u578B",
+      "text.modeText": "\u6587\u5B57",
+      "text.modeNumbers": "\u9801\u78BC",
+      "text.modeWatermark": "\u6D6E\u6C34\u5370",
+      "text.placeholder": "\u8F38\u5165\u6587\u5B57",
+      "text.size": "\u5927\u5C0F",
+      "text.color": "\u984F\u8272",
+      "text.colorBlack": "\u9ED1\u8272",
+      "text.colorGray": "\u7070\u8272",
+      "text.colorBlue": "\u85CD\u8272",
+      "text.colorRed": "\u7D05\u8272",
+      "text.add": "\u52A0\u5230\u9801\u9762",
+      "text.remove": "\u522A\u9664\u6240\u9078",
+      "text.summaryEmpty": "\u8F38\u5165\u6587\u5B57\uFF0C\u52A0\u5230\u9801\u9762\u5F8C\u62D6\u66F3\u5230\u5408\u9069\u4F4D\u7F6E\u3002",
+      "text.summaryNoPdf": "\u4E0A\u50B3 PDF \u5F8C\u5373\u53EF\u52A0\u5165\u6587\u5B57\u3002",
+      "text.summaryEditing": "\u6B63\u5728\u7DE8\u8F2F\u6240\u9078\u6587\u5B57\u3002\u9EDE\u4E00\u4E0B\u9801\u9762\u7A7A\u767D\u8655\u5373\u53EF\u958B\u59CB\u65B0\u7684\u6587\u5B57\u3002",
+      "text.summaryPlaced": "\u5DF2\u52A0\u5165\u6587\u5B57\uFF1A{count}\u3002\u9078\u53D6\u9801\u9762\u4E0A\u7684\u6587\u5B57\u5373\u53EF\u7DE8\u8F2F\u3002",
+      "text.showNumbers": "\u986F\u793A\u9801\u78BC",
+      "text.position": "\u4F4D\u7F6E",
+      "text.top": "\u9802\u7AEF",
+      "text.bottom": "\u5E95\u7AEF",
+      "text.left": "\u5DE6",
+      "text.center": "\u7F6E\u4E2D",
+      "text.right": "\u53F3",
+      "text.style": "\u6A23\u5F0F",
+      "text.pageFormat": "\u7B2C {n} \u9801",
+      "text.small": "\u5C0F",
+      "text.medium": "\u4E2D",
+      "text.large": "\u5927",
+      "text.startAt": "\u8D77\u59CB\u9801\u78BC",
+      "text.showWatermark": "\u986F\u793A\u6D6E\u6C34\u5370",
+      "text.watermarkPlaceholder": "\u6D6E\u6C34\u5370\u6587\u5B57",
+      "text.watermarkDefault": "\u6A5F\u5BC6",
+      "text.opacity": "\u4E0D\u900F\u660E\u5EA6",
+      "text.angle": "\u89D2\u5EA6",
+      "text.diagonal": "\u5C0D\u89D2",
+      "text.horizontal": "\u6C34\u5E73",
+      "image.modeAria": "\u8F49\u63DB\u65B9\u5F0F",
+      "image.toPdf": "\u5716\u7247\u8F49 PDF",
+      "image.fromPdf": "PDF \u8F49\u5716\u7247",
+      "image.pageSize": "\u9801\u9762\u5927\u5C0F",
+      "image.fit": "\u7B26\u5408\u5716\u7247",
+      "image.letter": "Letter",
+      "image.format": "\u683C\u5F0F",
+      "image.quality": "\u89E3\u6790\u5EA6",
+      "image.summaryEmpty": "\u52A0\u5165\u7167\u7247\u6216\u622A\u5716\uFF0C\u6BCF\u5F35\u5716\u7247\u6210\u70BA\u4E00\u9801\u3002",
+      "image.summaryCount": "\u5DF2\u52A0\u5165\u5716\u7247\uFF1A{count}\u3002\u6BCF\u5F35\u4E00\u9801\uFF0C\u53EF\u7528\u7BAD\u982D\u8ABF\u6574\u9806\u5E8F\u3002",
+      "image.fromSummary": "\u5C07\u9801\u9762\u5B58\u6210\u5716\u7247\u3002\u591A\u9801\u6703\u4E00\u8D77\u6253\u5305\u6210 ZIP \u6A94\u3002",
+      "image.fromSummaryNoPdf": "\u4E0A\u50B3 PDF \u5F8C\u5373\u53EF\u5C07\u9801\u9762\u5B58\u6210\u5716\u7247\u3002",
+      "image.createPdf": "\u5EFA\u7ACB PDF",
+      "image.createPdfSub": "\u6BCF\u5F35\u5716\u7247\u4E00\u9801",
+      "image.exportImages": "\u532F\u51FA\u5716\u7247",
+      "image.exportImagesSub": "\u6BCF\u9801\u4E00\u5F35\u5716\u7247",
+      "image.unreadable": "\u7121\u6CD5\u8B80\u53D6\u9019\u5F35\u5716\u7247",
+      "image.pagesEmpty": "\u9801\u9762\u6703\u986F\u793A\u5728\u9019\u88E1",
+      "image.pagesEmptySub": "\u6BCF\u5F35\u5716\u7247\u6210\u70BA\u4E00\u9801",
+      "drop.addImages": "\u52A0\u5165\u5716\u7247",
+      "drop.imagesSub": "\u9078\u64C7\u5716\u7247\u6216\u62D6\u66F3\u5230\u9019\u88E1",
+      "preview.titleImages": "\u9801\u9762",
+      "progress.addingImage": "\u6B63\u5728\u52A0\u5165\u7B2C {page}/{count} \u5F35\u5716\u7247",
+      "progress.creatingPdf": "\u6B63\u5728\u5EFA\u7ACB PDF",
+      "progress.savingImage": "\u6B63\u5728\u5132\u5B58\u7B2C {page}/{count} \u9801",
+      "progress.zipping": "\u6B63\u5728\u6253\u5305\u5716\u7247",
+      "errors.chooseImages": "\u8ACB\u9078\u64C7 JPG\u3001PNG \u6216\u5176\u4ED6\u5716\u7247\u6A94\u3002",
+      "errors.imageUnreadable": "\u7121\u6CD5\u8B80\u53D6 {name}\u3002\u8ACB\u6539\u7528 JPG \u6216 PNG\u3002",
+      "errors.noText": "\u8ACB\u5148\u52A0\u5165\u6587\u5B57\u3001\u9801\u78BC\u6216\u6D6E\u6C34\u5370\u3002"
+    },
+    ko: {
+      "tool.text.label": "\uD14D\uC2A4\uD2B8",
+      "tool.text.lede": "PDF\uC5D0 \uD14D\uC2A4\uD2B8, \uD398\uC774\uC9C0 \uBC88\uD638, \uC6CC\uD130\uB9C8\uD06C\uB97C \uCD94\uAC00\uD558\uC138\uC694.",
+      "tool.text.meta": "\uD14D\uC2A4\uD2B8\uB97C \uC785\uB825\uD558\uACE0 \uC6D0\uD558\uB294 \uACF3\uC73C\uB85C \uB4DC\uB798\uADF8<br/>\uBAA8\uB4E0 \uD398\uC774\uC9C0\uC5D0 \uC790\uB3D9\uC73C\uB85C \uBC88\uD638 \uB9E4\uAE30\uAE30<br/>\uD398\uC774\uC9C0\uC5D0 \uC6CC\uD130\uB9C8\uD06C \uB123\uAE30",
+      "tool.text.downloadLabel": "PDF \uB0B4\uBCF4\uB0B4\uAE30",
+      "tool.text.downloadSub": "\uC6D0\uBCF8 \uD398\uC774\uC9C0\uC5D0 \uD14D\uC2A4\uD2B8 \uCD94\uAC00",
+      "tool.image.label": "\uC774\uBBF8\uC9C0",
+      "tool.image.lede": "\uC774\uBBF8\uC9C0\uB97C PDF\uB85C \uB9CC\uB4E4\uAC70\uB098 PDF \uD398\uC774\uC9C0\uB97C \uC774\uBBF8\uC9C0\uB85C \uC800\uC7A5\uD558\uC138\uC694.",
+      "tool.image.meta": "\uC0AC\uC9C4\uACFC \uC2A4\uD06C\uB9B0\uC0F7\uC744 PDF \uD558\uB098\uB85C \uD569\uCE58\uAE30<br/>\uD398\uC774\uC9C0\uB97C PNG \uB610\uB294 JPEG\uB85C \uC800\uC7A5<br/>\uC5EC\uB7EC \uD398\uC774\uC9C0\uB294 ZIP \uD30C\uC77C\uB85C \uB2E4\uC6B4\uB85C\uB4DC",
+      "sections.text": "\uD14D\uC2A4\uD2B8",
+      "sections.image": "\uC774\uBBF8\uC9C0",
+      "text.modeAria": "\uD14D\uC2A4\uD2B8 \uC885\uB958",
+      "text.modeText": "\uD14D\uC2A4\uD2B8",
+      "text.modeNumbers": "\uD398\uC774\uC9C0 \uBC88\uD638",
+      "text.modeWatermark": "\uC6CC\uD130\uB9C8\uD06C",
+      "text.placeholder": "\uD14D\uC2A4\uD2B8 \uC785\uB825",
+      "text.size": "\uD06C\uAE30",
+      "text.color": "\uC0C9\uC0C1",
+      "text.colorBlack": "\uAC80\uC815",
+      "text.colorGray": "\uD68C\uC0C9",
+      "text.colorBlue": "\uD30C\uB791",
+      "text.colorRed": "\uBE68\uAC15",
+      "text.add": "\uD398\uC774\uC9C0\uC5D0 \uCD94\uAC00",
+      "text.remove": "\uC120\uD0DD \uD56D\uBAA9 \uC0AD\uC81C",
+      "text.summaryEmpty": "\uD14D\uC2A4\uD2B8\uB97C \uC785\uB825\uD574 \uD398\uC774\uC9C0\uC5D0 \uCD94\uAC00\uD55C \uB2E4\uC74C \uC6D0\uD558\uB294 \uACF3\uC73C\uB85C \uB4DC\uB798\uADF8\uD558\uC138\uC694.",
+      "text.summaryNoPdf": "PDF\uB97C \uC5C5\uB85C\uB4DC\uD558\uBA74 \uD14D\uC2A4\uD2B8\uB97C \uCD94\uAC00\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+      "text.summaryEditing": "\uC120\uD0DD\uD55C \uD14D\uC2A4\uD2B8\uB97C \uD3B8\uC9D1\uD558\uB294 \uC911\uC785\uB2C8\uB2E4. \uC0C8 \uD14D\uC2A4\uD2B8\uB97C \uC2DC\uC791\uD558\uB824\uBA74 \uD398\uC774\uC9C0\uC758 \uBE48 \uACF3\uC744 \uB204\uB974\uC138\uC694.",
+      "text.summaryPlaced": "\uCD94\uAC00\uD55C \uD14D\uC2A4\uD2B8: {count}\uAC1C. \uD398\uC774\uC9C0\uC758 \uD14D\uC2A4\uD2B8\uB97C \uC120\uD0DD\uD558\uBA74 \uD3B8\uC9D1\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+      "text.showNumbers": "\uD398\uC774\uC9C0 \uBC88\uD638 \uD45C\uC2DC",
+      "text.position": "\uC704\uCE58",
+      "text.top": "\uC704",
+      "text.bottom": "\uC544\uB798",
+      "text.left": "\uC67C\uCABD",
+      "text.center": "\uAC00\uC6B4\uB370",
+      "text.right": "\uC624\uB978\uCABD",
+      "text.style": "\uC2A4\uD0C0\uC77C",
+      "text.pageFormat": "{n}\uD398\uC774\uC9C0",
+      "text.small": "\uC791\uAC8C",
+      "text.medium": "\uBCF4\uD1B5",
+      "text.large": "\uD06C\uAC8C",
+      "text.startAt": "\uC2DC\uC791 \uBC88\uD638",
+      "text.showWatermark": "\uC6CC\uD130\uB9C8\uD06C \uD45C\uC2DC",
+      "text.watermarkPlaceholder": "\uC6CC\uD130\uB9C8\uD06C \uD14D\uC2A4\uD2B8",
+      "text.watermarkDefault": "\uB300\uC678\uBE44",
+      "text.opacity": "\uBD88\uD22C\uBA85\uB3C4",
+      "text.angle": "\uAC01\uB3C4",
+      "text.diagonal": "\uB300\uAC01\uC120",
+      "text.horizontal": "\uAC00\uB85C",
+      "image.modeAria": "\uBCC0\uD658 \uBC29\uC2DD",
+      "image.toPdf": "\uC774\uBBF8\uC9C0 \u2192 PDF",
+      "image.fromPdf": "PDF \u2192 \uC774\uBBF8\uC9C0",
+      "image.pageSize": "\uD398\uC774\uC9C0 \uD06C\uAE30",
+      "image.fit": "\uC774\uBBF8\uC9C0\uC5D0 \uB9DE\uCDA4",
+      "image.letter": "Letter",
+      "image.format": "\uD615\uC2DD",
+      "image.quality": "\uD574\uC0C1\uB3C4",
+      "image.summaryEmpty": "\uC0AC\uC9C4\uC774\uB098 \uC2A4\uD06C\uB9B0\uC0F7\uC744 \uCD94\uAC00\uD558\uC138\uC694. \uC774\uBBF8\uC9C0\uB9C8\uB2E4 \uD55C \uD398\uC774\uC9C0\uAC00 \uB429\uB2C8\uB2E4.",
+      "image.summaryCount": "\uCD94\uAC00\uD55C \uC774\uBBF8\uC9C0: {count}\uAC1C. \uC774\uBBF8\uC9C0\uB9C8\uB2E4 \uD55C \uD398\uC774\uC9C0\uC774\uBA70 \uD654\uC0B4\uD45C\uB85C \uC21C\uC11C\uB97C \uBC14\uAFC0 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+      "image.fromSummary": "\uD398\uC774\uC9C0\uB97C \uC774\uBBF8\uC9C0\uB85C \uC800\uC7A5\uD569\uB2C8\uB2E4. \uC5EC\uB7EC \uD398\uC774\uC9C0\uB294 ZIP \uD30C\uC77C \uD558\uB098\uB85C \uB2E4\uC6B4\uB85C\uB4DC\uB429\uB2C8\uB2E4.",
+      "image.fromSummaryNoPdf": "PDF\uB97C \uC5C5\uB85C\uB4DC\uD558\uBA74 \uD398\uC774\uC9C0\uB97C \uC774\uBBF8\uC9C0\uB85C \uC800\uC7A5\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+      "image.createPdf": "PDF \uB9CC\uB4E4\uAE30",
+      "image.createPdfSub": "\uC774\uBBF8\uC9C0\uB9C8\uB2E4 \uD55C \uD398\uC774\uC9C0",
+      "image.exportImages": "\uC774\uBBF8\uC9C0 \uB0B4\uBCF4\uB0B4\uAE30",
+      "image.exportImagesSub": "\uD398\uC774\uC9C0\uB9C8\uB2E4 \uC774\uBBF8\uC9C0 \uD55C \uC7A5",
+      "image.unreadable": "\uC774 \uC774\uBBF8\uC9C0\uB97C \uC77D\uC744 \uC218 \uC5C6\uC74C",
+      "image.pagesEmpty": "\uD398\uC774\uC9C0\uAC00 \uC5EC\uAE30\uC5D0 \uD45C\uC2DC\uB429\uB2C8\uB2E4",
+      "image.pagesEmptySub": "\uC774\uBBF8\uC9C0\uB9C8\uB2E4 \uD55C \uD398\uC774\uC9C0\uAC00 \uB429\uB2C8\uB2E4",
+      "drop.addImages": "\uC774\uBBF8\uC9C0 \uCD94\uAC00",
+      "drop.imagesSub": "\uC774\uBBF8\uC9C0\uB97C \uC120\uD0DD\uD558\uAC70\uB098 \uC5EC\uAE30\uB85C \uB04C\uC5B4\uC624\uC138\uC694",
+      "preview.titleImages": "\uD398\uC774\uC9C0",
+      "progress.addingImage": "\uC774\uBBF8\uC9C0 \uCD94\uAC00 \uC911 {page}/{count}",
+      "progress.creatingPdf": "PDF \uB9CC\uB4DC\uB294 \uC911",
+      "progress.savingImage": "\uD398\uC774\uC9C0 \uC800\uC7A5 \uC911 {page}/{count}",
+      "progress.zipping": "\uC774\uBBF8\uC9C0 \uBB36\uB294 \uC911",
+      "errors.chooseImages": "JPG, PNG \uB610\uB294 \uB2E4\uB978 \uC774\uBBF8\uC9C0 \uD30C\uC77C\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
+      "errors.imageUnreadable": "{name}\uC744(\uB97C) \uC77D\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. JPG \uB610\uB294 PNG\uB97C \uC0AC\uC6A9\uD574 \uBCF4\uC138\uC694.",
+      "errors.noText": "\uBA3C\uC800 \uD14D\uC2A4\uD2B8, \uD398\uC774\uC9C0 \uBC88\uD638 \uB610\uB294 \uC6CC\uD130\uB9C8\uD06C\uB97C \uCD94\uAC00\uD558\uC138\uC694."
+    },
+    ja: {
+      "tool.text.label": "\u30C6\u30AD\u30B9\u30C8",
+      "tool.text.lede": "PDF \u306B\u30C6\u30AD\u30B9\u30C8\u3001\u30DA\u30FC\u30B8\u756A\u53F7\u3001\u900F\u304B\u3057\u3092\u8FFD\u52A0\u3057\u307E\u3059\u3002",
+      "tool.text.meta": "\u30C6\u30AD\u30B9\u30C8\u3092\u5165\u529B\u3057\u3066\u597D\u304D\u306A\u4F4D\u7F6E\u3078\u30C9\u30E9\u30C3\u30B0<br/>\u5168\u30DA\u30FC\u30B8\u306B\u81EA\u52D5\u3067\u756A\u53F7\u3092\u4ED8\u3051\u308B<br/>\u30DA\u30FC\u30B8\u306B\u900F\u304B\u3057\u3092\u5165\u308C\u308B",
+      "tool.text.downloadLabel": "PDF \u3092\u66F8\u304D\u51FA\u3059",
+      "tool.text.downloadSub": "\u5143\u306E\u30DA\u30FC\u30B8\u306B\u30C6\u30AD\u30B9\u30C8\u3092\u8FFD\u52A0",
+      "tool.image.label": "\u753B\u50CF",
+      "tool.image.lede": "\u753B\u50CF\u3092 PDF \u306B\u3057\u305F\u308A\u3001PDF \u306E\u30DA\u30FC\u30B8\u3092\u753B\u50CF\u3068\u3057\u3066\u4FDD\u5B58\u3057\u305F\u308A\u3067\u304D\u307E\u3059\u3002",
+      "tool.image.meta": "\u5199\u771F\u3084\u30B9\u30AF\u30EA\u30FC\u30F3\u30B7\u30E7\u30C3\u30C8\u3092 1 \u3064\u306E PDF \u306B<br/>\u30DA\u30FC\u30B8\u3092 PNG \u307E\u305F\u306F JPEG \u3067\u4FDD\u5B58<br/>\u8907\u6570\u30DA\u30FC\u30B8\u306F ZIP \u3067\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9",
+      "sections.text": "\u30C6\u30AD\u30B9\u30C8",
+      "sections.image": "\u753B\u50CF",
+      "text.modeAria": "\u30C6\u30AD\u30B9\u30C8\u306E\u7A2E\u985E",
+      "text.modeText": "\u30C6\u30AD\u30B9\u30C8",
+      "text.modeNumbers": "\u30DA\u30FC\u30B8\u756A\u53F7",
+      "text.modeWatermark": "\u900F\u304B\u3057",
+      "text.placeholder": "\u30C6\u30AD\u30B9\u30C8\u3092\u5165\u529B",
+      "text.size": "\u30B5\u30A4\u30BA",
+      "text.color": "\u8272",
+      "text.colorBlack": "\u9ED2",
+      "text.colorGray": "\u30B0\u30EC\u30FC",
+      "text.colorBlue": "\u9752",
+      "text.colorRed": "\u8D64",
+      "text.add": "\u30DA\u30FC\u30B8\u306B\u8FFD\u52A0",
+      "text.remove": "\u9078\u629E\u9805\u76EE\u3092\u524A\u9664",
+      "text.summaryEmpty": "\u30C6\u30AD\u30B9\u30C8\u3092\u5165\u529B\u3057\u3066\u30DA\u30FC\u30B8\u306B\u8FFD\u52A0\u3057\u3001\u597D\u304D\u306A\u4F4D\u7F6E\u3078\u30C9\u30E9\u30C3\u30B0\u3057\u307E\u3059\u3002",
+      "text.summaryNoPdf": "PDF \u3092\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9\u3059\u308B\u3068\u30C6\u30AD\u30B9\u30C8\u3092\u8FFD\u52A0\u3067\u304D\u307E\u3059\u3002",
+      "text.summaryEditing": "\u9078\u629E\u3057\u305F\u30C6\u30AD\u30B9\u30C8\u3092\u7DE8\u96C6\u4E2D\u3067\u3059\u3002\u65B0\u3057\u3044\u30C6\u30AD\u30B9\u30C8\u3092\u59CB\u3081\u308B\u306B\u306F\u30DA\u30FC\u30B8\u306E\u7A7A\u3044\u3066\u3044\u308B\u6240\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u307E\u3059\u3002",
+      "text.summaryPlaced": "\u8FFD\u52A0\u3057\u305F\u30C6\u30AD\u30B9\u30C8\uFF1A{count}\u3002\u30DA\u30FC\u30B8\u4E0A\u306E\u30C6\u30AD\u30B9\u30C8\u3092\u9078\u3076\u3068\u7DE8\u96C6\u3067\u304D\u307E\u3059\u3002",
+      "text.showNumbers": "\u30DA\u30FC\u30B8\u756A\u53F7\u3092\u8868\u793A",
+      "text.position": "\u4F4D\u7F6E",
+      "text.top": "\u4E0A",
+      "text.bottom": "\u4E0B",
+      "text.left": "\u5DE6",
+      "text.center": "\u4E2D\u592E",
+      "text.right": "\u53F3",
+      "text.style": "\u30B9\u30BF\u30A4\u30EB",
+      "text.pageFormat": "{n} \u30DA\u30FC\u30B8",
+      "text.small": "\u5C0F",
+      "text.medium": "\u4E2D",
+      "text.large": "\u5927",
+      "text.startAt": "\u958B\u59CB\u756A\u53F7",
+      "text.showWatermark": "\u900F\u304B\u3057\u3092\u8868\u793A",
+      "text.watermarkPlaceholder": "\u900F\u304B\u3057\u306E\u30C6\u30AD\u30B9\u30C8",
+      "text.watermarkDefault": "\u793E\u5916\u79D8",
+      "text.opacity": "\u4E0D\u900F\u660E\u5EA6",
+      "text.angle": "\u89D2\u5EA6",
+      "text.diagonal": "\u659C\u3081",
+      "text.horizontal": "\u6C34\u5E73",
+      "image.modeAria": "\u5909\u63DB\u65B9\u6CD5",
+      "image.toPdf": "\u753B\u50CF\u3092 PDF \u306B",
+      "image.fromPdf": "PDF \u3092\u753B\u50CF\u306B",
+      "image.pageSize": "\u30DA\u30FC\u30B8\u30B5\u30A4\u30BA",
+      "image.fit": "\u753B\u50CF\u306B\u5408\u308F\u305B\u308B",
+      "image.letter": "Letter",
+      "image.format": "\u5F62\u5F0F",
+      "image.quality": "\u89E3\u50CF\u5EA6",
+      "image.summaryEmpty": "\u5199\u771F\u3084\u30B9\u30AF\u30EA\u30FC\u30F3\u30B7\u30E7\u30C3\u30C8\u3092\u8FFD\u52A0\u3057\u307E\u3059\u3002\u753B\u50CF 1 \u679A\u304C 1 \u30DA\u30FC\u30B8\u306B\u306A\u308A\u307E\u3059\u3002",
+      "image.summaryCount": "\u8FFD\u52A0\u3057\u305F\u753B\u50CF\uFF1A{count}\u30021 \u679A\u305A\u3064 1 \u30DA\u30FC\u30B8\u306B\u306A\u308A\u3001\u77E2\u5370\u3067\u9806\u756A\u3092\u5909\u3048\u3089\u308C\u307E\u3059\u3002",
+      "image.fromSummary": "\u30DA\u30FC\u30B8\u3092\u753B\u50CF\u3068\u3057\u3066\u4FDD\u5B58\u3057\u307E\u3059\u3002\u8907\u6570\u30DA\u30FC\u30B8\u306F 1 \u3064\u306E ZIP \u30D5\u30A1\u30A4\u30EB\u3067\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3055\u308C\u307E\u3059\u3002",
+      "image.fromSummaryNoPdf": "PDF \u3092\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9\u3059\u308B\u3068\u30DA\u30FC\u30B8\u3092\u753B\u50CF\u3068\u3057\u3066\u4FDD\u5B58\u3067\u304D\u307E\u3059\u3002",
+      "image.createPdf": "PDF \u3092\u4F5C\u6210",
+      "image.createPdfSub": "\u753B\u50CF 1 \u679A\u306B\u3064\u304D 1 \u30DA\u30FC\u30B8",
+      "image.exportImages": "\u753B\u50CF\u3092\u66F8\u304D\u51FA\u3059",
+      "image.exportImagesSub": "1 \u30DA\u30FC\u30B8\u306B\u3064\u304D\u753B\u50CF 1 \u679A",
+      "image.unreadable": "\u3053\u306E\u753B\u50CF\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093",
+      "image.pagesEmpty": "\u3053\u3053\u306B\u30DA\u30FC\u30B8\u304C\u8868\u793A\u3055\u308C\u307E\u3059",
+      "image.pagesEmptySub": "\u753B\u50CF 1 \u679A\u304C 1 \u30DA\u30FC\u30B8\u306B\u306A\u308A\u307E\u3059",
+      "drop.addImages": "\u753B\u50CF\u3092\u8FFD\u52A0",
+      "drop.imagesSub": "\u753B\u50CF\u3092\u9078\u629E\u3059\u308B\u304B\u3001\u3053\u3053\u306B\u30C9\u30E9\u30C3\u30B0",
+      "preview.titleImages": "\u30DA\u30FC\u30B8",
+      "progress.addingImage": "\u753B\u50CF\u3092\u8FFD\u52A0\u4E2D {page}/{count}",
+      "progress.creatingPdf": "PDF \u3092\u4F5C\u6210\u4E2D",
+      "progress.savingImage": "\u30DA\u30FC\u30B8\u3092\u4FDD\u5B58\u4E2D {page}/{count}",
+      "progress.zipping": "\u753B\u50CF\u3092\u307E\u3068\u3081\u3066\u3044\u307E\u3059",
+      "errors.chooseImages": "JPG\u3001PNG \u306A\u3069\u306E\u753B\u50CF\u30D5\u30A1\u30A4\u30EB\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002",
+      "errors.imageUnreadable": "{name} \u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F\u3002JPG \u307E\u305F\u306F PNG \u3092\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002",
+      "errors.noText": "\u5148\u306B\u30C6\u30AD\u30B9\u30C8\u3001\u30DA\u30FC\u30B8\u756A\u53F7\u3001\u307E\u305F\u306F\u900F\u304B\u3057\u3092\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    },
+    es: {
+      "tool.text.label": "Texto",
+      "tool.text.lede": "A\xF1ade texto, n\xFAmeros de p\xE1gina o una marca de agua a tu PDF.",
+      "tool.text.meta": "Escribe texto y arr\xE1stralo a su sitio<br/>Numera todas las p\xE1ginas autom\xE1ticamente<br/>Marca las p\xE1ginas con una marca de agua",
+      "tool.text.downloadLabel": "Exportar PDF",
+      "tool.text.downloadSub": "a\xF1ade texto a las p\xE1ginas originales",
+      "tool.image.label": "Imagen",
+      "tool.image.lede": "Convierte im\xE1genes en un PDF o guarda p\xE1ginas de un PDF como im\xE1genes.",
+      "tool.image.meta": "Junta fotos y capturas en un solo PDF<br/>Guarda p\xE1ginas como PNG o JPEG<br/>Varias p\xE1ginas se descargan en un ZIP",
+      "sections.text": "Texto",
+      "sections.image": "Imagen",
+      "text.modeAria": "Tipo de texto",
+      "text.modeText": "Texto",
+      "text.modeNumbers": "N\xFAmeros",
+      "text.modeWatermark": "Marca de agua",
+      "text.placeholder": "Escribe tu texto",
+      "text.size": "Tama\xF1o",
+      "text.color": "Color",
+      "text.colorBlack": "Negro",
+      "text.colorGray": "Gris",
+      "text.colorBlue": "Azul",
+      "text.colorRed": "Rojo",
+      "text.add": "A\xF1adir a la p\xE1gina",
+      "text.remove": "Eliminar selecci\xF3n",
+      "text.summaryEmpty": "Escribe algo, a\xF1\xE1delo a la p\xE1gina y arr\xE1stralo a su sitio.",
+      "text.summaryNoPdf": "Sube un PDF para a\xF1adir texto.",
+      "text.summaryEditing": "Editando el texto seleccionado. Haz clic fuera de \xE9l en la p\xE1gina para empezar un texto nuevo.",
+      "text.summaryPlaced": "Textos a\xF1adidos: {count}. Selecciona un texto en la p\xE1gina para editarlo.",
+      "text.showNumbers": "Mostrar n\xFAmeros de p\xE1gina",
+      "text.position": "Posici\xF3n",
+      "text.top": "Arriba",
+      "text.bottom": "Abajo",
+      "text.left": "Izquierda",
+      "text.center": "Centro",
+      "text.right": "Derecha",
+      "text.style": "Estilo",
+      "text.pageFormat": "P\xE1gina {n}",
+      "text.small": "Peque\xF1o",
+      "text.medium": "Mediano",
+      "text.large": "Grande",
+      "text.startAt": "Empezar en",
+      "text.showWatermark": "Mostrar marca de agua",
+      "text.watermarkPlaceholder": "Texto de la marca de agua",
+      "text.watermarkDefault": "Confidencial",
+      "text.opacity": "Opacidad",
+      "text.angle": "\xC1ngulo",
+      "text.diagonal": "Diagonal",
+      "text.horizontal": "Horizontal",
+      "image.modeAria": "Conversi\xF3n",
+      "image.toPdf": "Im\xE1genes a PDF",
+      "image.fromPdf": "PDF a im\xE1genes",
+      "image.pageSize": "Tama\xF1o de p\xE1gina",
+      "image.fit": "Ajustar a la imagen",
+      "image.letter": "Carta",
+      "image.format": "Formato",
+      "image.quality": "Resoluci\xF3n",
+      "image.summaryEmpty": "A\xF1ade fotos o capturas. Cada imagen se convierte en una p\xE1gina.",
+      "image.summaryCount": "Im\xE1genes a\xF1adidas: {count}. Cada una es una p\xE1gina; usa las flechas para reordenar.",
+      "image.fromSummary": "Guarda las p\xE1ginas como im\xE1genes. Varias p\xE1ginas se descargan juntas en un archivo ZIP.",
+      "image.fromSummaryNoPdf": "Sube un PDF para guardar sus p\xE1ginas como im\xE1genes.",
+      "image.createPdf": "Crear PDF",
+      "image.createPdfSub": "una p\xE1gina por imagen",
+      "image.exportImages": "Exportar im\xE1genes",
+      "image.exportImagesSub": "una imagen por p\xE1gina",
+      "image.unreadable": "No se puede leer esta imagen",
+      "image.pagesEmpty": "Tus p\xE1ginas aparecer\xE1n aqu\xED",
+      "image.pagesEmptySub": "Cada imagen se convierte en una p\xE1gina",
+      "drop.addImages": "A\xF1adir im\xE1genes",
+      "drop.imagesSub": "Elige im\xE1genes o arr\xE1stralas aqu\xED",
+      "preview.titleImages": "P\xE1ginas",
+      "progress.addingImage": "A\xF1adiendo imagen {page} de {count}",
+      "progress.creatingPdf": "Creando PDF",
+      "progress.savingImage": "Guardando p\xE1gina {page} de {count}",
+      "progress.zipping": "Empaquetando im\xE1genes",
+      "errors.chooseImages": "Elige archivos JPG, PNG u otras im\xE1genes.",
+      "errors.imageUnreadable": "No se pudo leer {name}. Prueba con un JPG o PNG.",
+      "errors.noText": "Primero a\xF1ade texto, n\xFAmeros de p\xE1gina o una marca de agua."
+    },
+    fr: {
+      "tool.text.label": "Texte",
+      "tool.text.lede": "Ajoutez du texte, des num\xE9ros de page ou un filigrane \xE0 votre PDF.",
+      "tool.text.meta": "Saisissez du texte et faites-le glisser en place<br/>Num\xE9rotez toutes les pages automatiquement<br/>Marquez les pages d\u2019un filigrane",
+      "tool.text.downloadLabel": "Exporter le PDF",
+      "tool.text.downloadSub": "ajoute du texte aux pages d\u2019origine",
+      "tool.image.label": "Image",
+      "tool.image.lede": "Transformez des images en PDF ou enregistrez des pages PDF en images.",
+      "tool.image.meta": "R\xE9unissez photos et captures dans un seul PDF<br/>Enregistrez les pages en PNG ou JPEG<br/>Plusieurs pages se t\xE9l\xE9chargent dans un ZIP",
+      "sections.text": "Texte",
+      "sections.image": "Image",
+      "text.modeAria": "Type de texte",
+      "text.modeText": "Texte",
+      "text.modeNumbers": "Num\xE9ros",
+      "text.modeWatermark": "Filigrane",
+      "text.placeholder": "Saisissez votre texte",
+      "text.size": "Taille",
+      "text.color": "Couleur",
+      "text.colorBlack": "Noir",
+      "text.colorGray": "Gris",
+      "text.colorBlue": "Bleu",
+      "text.colorRed": "Rouge",
+      "text.add": "Ajouter \xE0 la page",
+      "text.remove": "Supprimer la s\xE9lection",
+      "text.summaryEmpty": "Saisissez du texte, ajoutez-le \xE0 la page, puis faites-le glisser en place.",
+      "text.summaryNoPdf": "Importez un PDF pour ajouter du texte.",
+      "text.summaryEditing": "Modification du texte s\xE9lectionn\xE9. Cliquez sur la page en dehors pour commencer un nouveau texte.",
+      "text.summaryPlaced": "Textes ajout\xE9s : {count}. S\xE9lectionnez un texte sur la page pour le modifier.",
+      "text.showNumbers": "Afficher les num\xE9ros de page",
+      "text.position": "Position",
+      "text.top": "Haut",
+      "text.bottom": "Bas",
+      "text.left": "Gauche",
+      "text.center": "Centre",
+      "text.right": "Droite",
+      "text.style": "Style",
+      "text.pageFormat": "Page {n}",
+      "text.small": "Petit",
+      "text.medium": "Moyen",
+      "text.large": "Grand",
+      "text.startAt": "Commencer \xE0",
+      "text.showWatermark": "Afficher le filigrane",
+      "text.watermarkPlaceholder": "Texte du filigrane",
+      "text.watermarkDefault": "Confidentiel",
+      "text.opacity": "Opacit\xE9",
+      "text.angle": "Angle",
+      "text.diagonal": "Diagonale",
+      "text.horizontal": "Horizontal",
+      "image.modeAria": "Conversion",
+      "image.toPdf": "Images en PDF",
+      "image.fromPdf": "PDF en images",
+      "image.pageSize": "Format de page",
+      "image.fit": "Ajuster \xE0 l\u2019image",
+      "image.letter": "Lettre US",
+      "image.format": "Format",
+      "image.quality": "R\xE9solution",
+      "image.summaryEmpty": "Ajoutez des photos ou des captures. Chaque image devient une page.",
+      "image.summaryCount": "Images ajout\xE9es : {count}. Chacune devient une page ; utilisez les fl\xE8ches pour r\xE9ordonner.",
+      "image.fromSummary": "Enregistrez les pages en images. Plusieurs pages se t\xE9l\xE9chargent ensemble dans un fichier ZIP.",
+      "image.fromSummaryNoPdf": "Importez un PDF pour enregistrer ses pages en images.",
+      "image.createPdf": "Cr\xE9er le PDF",
+      "image.createPdfSub": "une page par image",
+      "image.exportImages": "Exporter les images",
+      "image.exportImagesSub": "une image par page",
+      "image.unreadable": "Impossible de lire cette image",
+      "image.pagesEmpty": "Vos pages appara\xEEtront ici",
+      "image.pagesEmptySub": "Chaque image devient une page",
+      "drop.addImages": "Ajouter des images",
+      "drop.imagesSub": "Choisissez des images ou d\xE9posez-les ici",
+      "preview.titleImages": "Pages",
+      "progress.addingImage": "Ajout de l\u2019image {page} sur {count}",
+      "progress.creatingPdf": "Cr\xE9ation du PDF",
+      "progress.savingImage": "Enregistrement de la page {page} sur {count}",
+      "progress.zipping": "Regroupement des images",
+      "errors.chooseImages": "Choisissez des fichiers JPG, PNG ou d\u2019autres images.",
+      "errors.imageUnreadable": "Impossible de lire {name}. Essayez un JPG ou un PNG.",
+      "errors.noText": "Ajoutez d\u2019abord du texte, des num\xE9ros de page ou un filigrane."
+    }
+  }).forEach(([locale, strings]) => Object.assign(LOCALES[locale], strings));
+  Object.entries({
+    en: ["Font", "Custom color", "Default", "Serif", "Rounded", "Mono", "Handwritten", "Script"],
+    "zh-Hans": ["\u5B57\u4F53", "\u81EA\u5B9A\u4E49\u989C\u8272", "\u9ED8\u8BA4", "\u886C\u7EBF", "\u5706\u4F53", "\u7B49\u5BBD", "\u624B\u5199", "\u82B1\u4F53"],
+    "zh-Hant-TW": ["\u5B57\u9AD4", "\u81EA\u8A02\u984F\u8272", "\u9810\u8A2D", "\u896F\u7DDA", "\u5713\u9AD4", "\u7B49\u5BEC", "\u624B\u5BEB", "\u82B1\u9AD4"],
+    ko: ["\uAE00\uAF34", "\uC0AC\uC6A9\uC790 \uC9C0\uC815 \uC0C9\uC0C1", "\uAE30\uBCF8", "\uC138\uB9AC\uD504", "\uB465\uADFC\uCCB4", "\uACE0\uC815\uD3ED", "\uC190\uAE00\uC528", "\uD544\uAE30\uCCB4"],
+    ja: ["\u30D5\u30A9\u30F3\u30C8", "\u30AB\u30B9\u30BF\u30E0\u30AB\u30E9\u30FC", "\u6A19\u6E96", "\u30BB\u30EA\u30D5", "\u4E38\u30B4\u30B7\u30C3\u30AF", "\u7B49\u5E45", "\u624B\u66F8\u304D", "\u7B46\u8A18\u4F53"],
+    es: ["Fuente", "Color personalizado", "Predeterminada", "Con serifa", "Redondeada", "Monoespaciada", "Manuscrita", "Caligr\xE1fica"],
+    fr: ["Police", "Couleur personnalis\xE9e", "Par d\xE9faut", "Serif", "Arrondie", "Chasse fixe", "Manuscrite", "Calligraphi\xE9e"]
+  }).forEach(([locale, values]) => {
+    ["text.font", "text.colorCustom", "text.font.sans", "text.font.serif", "text.font.rounded", "text.font.mono", "text.font.handwritten", "text.font.script"].forEach((key, index) => {
+      LOCALES[locale][key] = values[index];
+    });
+  });
+  Object.entries({
     en: ["Use signature", "Drag to position", "Make signature smaller", "Make signature larger", "Use signature to place it on this page."],
     "zh-Hans": ["\u4F7F\u7528\u7B7E\u540D", "\u62D6\u52A8\u4EE5\u8C03\u6574\u4F4D\u7F6E", "\u7F29\u5C0F\u7B7E\u540D", "\u653E\u5927\u7B7E\u540D", "\u70B9\u51FB\u201C\u4F7F\u7528\u7B7E\u540D\u201D\u5C06\u5176\u653E\u5230\u5F53\u524D\u9875\u9762\u3002"],
     "zh-Hant-TW": ["\u4F7F\u7528\u7C3D\u540D", "\u62D6\u66F3\u4EE5\u8ABF\u6574\u4F4D\u7F6E", "\u7E2E\u5C0F\u7C3D\u540D", "\u653E\u5927\u7C3D\u540D", "\u9EDE\u9078\u300C\u4F7F\u7528\u7C3D\u540D\u300D\u5C07\u5176\u653E\u5230\u76EE\u524D\u9801\u9762\u3002"],
@@ -23866,6 +24519,7 @@
     return base;
   }
   function canPasswordProtectExport(toolId = activeTool) {
+    if (toolId === "image") return imageState.mode === "toPdf";
     return toolId !== "preview" && toolId !== "merge";
   }
   function advancedPasswordValue() {
@@ -23876,8 +24530,9 @@
     const applies = activeTool !== "preview" && activeTool !== "merge";
     const passwordAvailable = applies && canPasswordProtectExport();
     advancedOptions.classList.toggle("hidden", !applies);
-    const rangeAvailable = applies && hasPages;
-    advancedCurrentOnly.disabled = !applies || !hasPages || advancedRangeToggle.checked;
+    const rangeAvailable = applies && hasPages && !imageCollecting();
+    if (!rangeAvailable) advancedCurrentOnly.checked = false;
+    advancedCurrentOnly.disabled = !rangeAvailable || advancedRangeToggle.checked;
     advancedRangeToggle.disabled = !rangeAvailable || advancedCurrentOnly.checked;
     advancedRangeRow.classList.toggle("is-disabled", !rangeAvailable || advancedCurrentOnly.checked);
     advancedRangeInput.disabled = !rangeAvailable || !advancedRangeToggle.checked;
@@ -24160,7 +24815,8 @@
     curPageEl.textContent = state.pdfDoc && count ? padPage(state.curPage) : "\u2014";
     prevBtn.disabled = operationInProgress || !state.pdfDoc || state.curPage <= 1;
     nextBtn.disabled = operationInProgress || !state.pdfDoc || state.curPage >= count;
-    downloadBtn.disabled = operationInProgress || (activeTool === "preview" ? true : activeTool === "merge" ? state.mergeFiles.length === 0 : activeTool === "sign" ? !signatureCanExport() : !state.pdfDoc || count === 0);
+    downloadBtn.disabled = activeToolExportDisabled();
+    if (pdfToImageSummary) pdfToImageSummary.textContent = state.pdfDoc ? t2("image.fromSummary") : t2("image.fromSummaryNoPdf");
     resetPagesBtn.disabled = !state.pdfDoc || !isOrderChanged();
     organizeHint.textContent = state.pdfDoc ? state.splitPoints.length ? t2("organize.splits", { count: state.splitPoints.length }) : t2("organize.pages", { count }) : t2("hint.ready");
     organizeSummary.textContent = state.pdfDoc ? state.splitPoints.length ? t2("organize.summarySplit", { parts: state.splitPoints.length + 1 }) : t2("organize.summaryPages", { count, total: state.numPages }) : t2("organize.summaryEmpty");
@@ -24170,12 +24826,20 @@
     syncRasterControls();
     syncCompressControls();
     syncSignatureControls();
+    syncTextControls();
     updateSignatureOverlay();
     updatePreviewMode();
     if (activeTool === "edit") {
       syncEditControls();
       requestEditedPreviewRender();
     }
+  }
+  function activeToolExportDisabled() {
+    if (operationInProgress || activeTool === "preview") return true;
+    if (activeTool === "merge") return state.mergeFiles.length === 0;
+    if (isStampTool()) return !signatureCanExport();
+    if (imageCollecting()) return !imageState.files.some((entry) => !entry.broken);
+    return !state.pdfDoc || activePageCount() === 0;
   }
   function setLoader(on, label, pct) {
     loader.classList.toggle("on", on);
@@ -24498,11 +25162,13 @@
     dropZone.classList.remove("drag");
     if (!e2.dataTransfer.files.length) return;
     if (activeTool === "merge") addMergeFiles(e2.dataTransfer.files);
+    else if (imageCollecting()) addImageFiles(e2.dataTransfer.files);
     else handleFile(e2.dataTransfer.files[0]);
   });
   fileInput.addEventListener("change", (e2) => {
     if (!e2.target.files.length) return;
     if (activeTool === "merge") addMergeFiles(e2.target.files);
+    else if (imageCollecting()) addImageFiles(e2.target.files);
     else handleFile(e2.target.files[0]);
     fileInput.value = "";
   });
@@ -24586,7 +25252,7 @@
     state.splitPoints = [];
     state.splitNames = [];
     updatePageState();
-    const lazyOpen = state.largePdfSafeMode || isRasterTool(activeTool) || activeTool === "preview" || activeTool === "organize" || activeTool === "edit" || activeTool === "sign" || activeTool === "compress";
+    const lazyOpen = state.largePdfSafeMode || isRasterTool(activeTool) || activeTool === "preview" || activeTool === "organize" || activeTool === "edit" || isStampTool() || activeTool === "image" || activeTool === "compress";
     if (lazyOpen) {
       setLoader(true, state.largePdfSafeMode ? t2("progress.openingLargePdf") : t2("progress.openingPdf"), 45);
       await ensurePageMeta(0);
@@ -24677,7 +25343,7 @@
     return MOBILE_PERFORMANCE_MODE ? capScaleToPixelBudget(baseVp, Math.min(1.65, requestedScale), RASTER_PREVIEW_MAX_PIXELS) : requestedScale;
   }
   function isOriginalPreviewTool(id = activeTool) {
-    return id === "preview" || id === "merge" || id === "sign" || id === "compress" && state.compressMode === "original";
+    return id === "preview" || id === "merge" || id === "sign" || id === "text" || id === "image" && imageState.mode === "fromPdf" || id === "compress" && state.compressMode === "original";
   }
   function getOriginalPreviewScale(baseVp, targetCssWidth) {
     const basePixels = Math.max(1, baseVp.width * baseVp.height);
@@ -25049,18 +25715,20 @@
     return signatureState.stamps.find((stamp) => stamp.id === id) || null;
   }
   function signatureCanExport(pageOrder = state.pageOrder) {
-    return !!state.pdfDoc && activeSignatureStamps(pageOrder).length > 0;
+    if (!state.pdfDoc) return false;
+    return activeSignatureStamps(pageOrder).length > 0 || textState.pageNumbers.enabled || watermarkActive();
   }
   function syncSignatureControls() {
     if (!signaturePad) return;
     const hasPdf = !!state.pdfDoc;
     const hasInk = !!signatureState.dataUrl;
-    const placedCount = activeSignatureStamps().length;
+    const placedCount = activeSignatureStamps().filter((stamp) => stamp.kind !== "text").length;
     const selected = !!getSignatureStamp(signatureState.selectedId);
     const mobileSigning = isPhoneViewport() && activeTool === "sign";
+    const mobileStamping = isPhoneViewport() && isStampTool();
     const currentSelection = getSignatureStamp(signatureState.selectedId)?.pageIndex === currentSourceIndex();
     $2("mobileSignUse").disabled = !hasInk || !hasPdf || operationInProgress;
-    $2("mobileSignActions").hidden = !mobileSigning || !currentSelection;
+    $2("mobileSignActions").hidden = !mobileStamping || !currentSelection;
     if (mobileSigning) mobileControlsLabel.textContent = t2("sign.drawSignature");
     signHint.textContent = hasInk ? t2("sign.ready") : t2("sign.drawSignature");
     signatureClearBtn.disabled = !hasInk;
@@ -25094,7 +25762,7 @@
     if (!stamp || operationInProgress || stamp.pageIndex !== currentSourceIndex()) return;
     const centerX = stamp.xPct + stamp.wPct / 2;
     const centerY = stamp.yPct + stamp.hPct / 2;
-    const minScale = Math.max(5 / stamp.wPct, 2 / stamp.hPct);
+    const minScale = stamp.kind === "text" ? Math.max(1 / stamp.wPct, 0.5 / stamp.hPct) : Math.max(5 / stamp.wPct, 2 / stamp.hPct);
     const maxScale = Math.min(95 / stamp.wPct, 95 / stamp.hPct);
     const scale = Math.max(minScale, Math.min(maxScale, factor));
     stamp.wPct *= scale;
@@ -25102,6 +25770,14 @@
     stamp.xPct = centerX - stamp.wPct / 2;
     stamp.yPct = centerY - stamp.hPct / 2;
     clampSignatureStamp(stamp);
+    if (stamp.kind === "text") {
+      stamp.size = Math.max(4, Math.min(400, Math.round(stamp.size * scale)));
+      refreshTextStamp(stamp);
+      stamp.xPct = centerX - stamp.wPct / 2;
+      stamp.yPct = centerY - stamp.hPct / 2;
+      clampSignatureStamp(stamp);
+      loadTextStampIntoControls(stamp);
+    }
     updateSignatureOverlay();
   }
   function defaultSignaturePlacement(rect, dataUrl = signatureState.dataUrl, ratio = signatureState.ratio) {
@@ -25119,8 +25795,9 @@
     };
   }
   function clampSignatureStamp(stamp) {
-    stamp.wPct = Math.max(5, Math.min(100, stamp.wPct));
-    stamp.hPct = Math.max(2, Math.min(100, stamp.hPct));
+    const text = stamp.kind === "text";
+    stamp.wPct = Math.max(text ? 1 : 5, Math.min(100, stamp.wPct));
+    stamp.hPct = Math.max(text ? 0.5 : 2, Math.min(100, stamp.hPct));
     stamp.xPct = Math.max(0, Math.min(100 - stamp.wPct, stamp.xPct));
     stamp.yPct = Math.max(0, Math.min(100 - stamp.hPct, stamp.yPct));
     return stamp;
@@ -25144,7 +25821,7 @@
     clampSignatureStamp(stamp);
     syncSignatureControls();
     updateSignatureOverlay();
-    downloadBtn.disabled = !signatureCanExport();
+    downloadBtn.disabled = activeToolExportDisabled();
     return true;
   }
   function resizeSignatureStampFromPointer(e2, drag) {
@@ -25179,12 +25856,13 @@
     clampSignatureStamp(stamp);
     syncSignatureControls();
     updateSignatureOverlay();
-    downloadBtn.disabled = !signatureCanExport();
+    downloadBtn.disabled = activeToolExportDisabled();
     return true;
   }
   function createSignatureStampElement(stamp) {
     const el = document.createElement("div");
     el.className = "signature-stamp";
+    if (stamp.kind === "text") el.classList.add("text-stamp");
     if (stamp.id === signatureState.selectedId) el.classList.add("selected");
     if (signatureState.drag?.id === stamp.id) el.classList.add("dragging");
     el.dataset.signatureId = String(stamp.id);
@@ -25204,12 +25882,21 @@
     });
     return el;
   }
+  function isStampTool(id = activeTool) {
+    return id === "sign" || id === "text";
+  }
   function updateSignatureOverlay() {
     if (!signatureOverlay) return;
-    const visible = activeTool === "sign" && !!state.pdfDoc && canvasWrap.style.display !== "none";
+    const visible = isStampTool() && !!state.pdfDoc && canvasWrap.style.display !== "none";
     signatureOverlay.hidden = !visible;
     signatureOverlay.innerHTML = "";
     if (!visible) return;
+    const sourceIndex = currentSourceIndex();
+    if (sourceIndex != null) {
+      pageDecorationsFor(state.curPage - 1, activePageCount(), pageSizePt(sourceIndex)).forEach((item) => {
+        signatureOverlay.appendChild(createDecorationElement(item));
+      });
+    }
     currentPageSignatureStamps().forEach((stamp) => {
       signatureOverlay.appendChild(createSignatureStampElement(stamp));
     });
@@ -25240,7 +25927,7 @@
       return;
     }
     const rect = previewCanvas.getBoundingClientRect();
-    const overPage = activeTool === "sign" && state.pdfDoc && rect.width && rect.height && e2.clientX >= rect.left && e2.clientX <= rect.right && e2.clientY >= rect.top && e2.clientY <= rect.bottom;
+    const overPage = isStampTool() && state.pdfDoc && rect.width && rect.height && e2.clientX >= rect.left && e2.clientX <= rect.right && e2.clientY >= rect.top && e2.clientY <= rect.bottom;
     if (overPage || drag.id) {
       setSignatureStampFromPoint(e2.clientX, e2.clientY, drag);
       if (drag.ghost) drag.ghost.style.display = "none";
@@ -25253,6 +25940,13 @@
   function endSignatureDrag(e2) {
     if (!signatureState.drag) return;
     moveSignatureDrag(e2);
+    const drag = signatureState.drag;
+    const resized = drag.mode === "resize" ? getSignatureStamp(drag.id) : null;
+    if (resized?.kind === "text" && drag.startStamp?.hPct) {
+      resized.size = Math.max(4, Math.min(400, Math.round(resized.size * resized.hPct / drag.startStamp.hPct)));
+      refreshTextStamp(resized);
+      loadTextStampIntoControls(resized);
+    }
     signatureDragSource.classList.remove("dragging");
     if (signatureState.drag.ghost) signatureState.drag.ghost.remove();
     window.removeEventListener("pointermove", moveSignatureDrag);
@@ -25281,7 +25975,7 @@
     moveSignatureDrag(e2);
   }
   function beginSignatureOverlayDrag(e2) {
-    if (activeTool !== "sign" || e2.pointerType === "mouse" && e2.button !== 0) return;
+    if (!isStampTool() || e2.pointerType === "mouse" && e2.button !== 0) return;
     const stampEl = e2.target.closest(".signature-stamp");
     if (!stampEl || !signatureOverlay.contains(stampEl)) return;
     const stamp = getSignatureStamp(Number(stampEl.dataset.signatureId));
@@ -25289,6 +25983,8 @@
     e2.preventDefault();
     e2.stopPropagation();
     signatureState.selectedId = stamp.id;
+    if (stamp.kind === "text") loadTextStampIntoControls(stamp);
+    else syncTextControls();
     const handleEl = e2.target.closest("[data-signature-handle]");
     if (handleEl && stampEl.contains(handleEl)) {
       signatureState.drag = {
@@ -25314,6 +26010,938 @@
     window.addEventListener("pointerup", endSignatureDrag);
     window.addEventListener("pointercancel", endSignatureDrag);
   }
+  var TEXT_RENDER_SCALE = 4;
+  var TEXT_RENDER_MAX_SIDE = 6e3;
+  var PAGE_NUMBER_SIZES = { s: 9, m: 11, l: 14 };
+  var PAGE_NUMBER_MARGIN = 28;
+  var DEFAULT_PAGE_PT = { w: 612, h: 792 };
+  var textImageCache = /* @__PURE__ */ new Map();
+  function textFontFamily() {
+    return getComputedStyle(document.documentElement).getPropertyValue("--font-ui").trim() || "sans-serif";
+  }
+  var TEXT_FONTS = {
+    sans: { family: null, weight: 500 },
+    serif: { family: '"Source Serif 4", Georgia, "Times New Roman", serif', weight: 500 },
+    rounded: { family: 'Nunito, "SF Pro Rounded", system-ui, sans-serif', weight: 600 },
+    mono: { family: '"Roboto Mono", Menlo, Consolas, monospace', weight: 500 },
+    handwritten: { family: 'Caveat, "Segoe Print", cursive', weight: 600 },
+    script: { family: '"Dancing Script", "Brush Script MT", cursive', weight: 600 }
+  };
+  function textFont(key) {
+    const font = TEXT_FONTS[key] || TEXT_FONTS.sans;
+    return { weight: font.weight, family: font.family || textFontFamily() };
+  }
+  async function ensureTextFont(key) {
+    const font = textFont(key);
+    try {
+      await document.fonts?.load(font.weight + " 32px " + font.family);
+    } catch (err) {
+      console.warn("Font did not load", key, err);
+    }
+  }
+  function renderTextImage(text, sizePt, color, weight = 500, family = textFontFamily()) {
+    const key = [text, sizePt, color, weight, family].join("\0");
+    if (textImageCache.has(key)) return textImageCache.get(key);
+    const lines = String(text).split("\n");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const fontAt = (px) => weight + " " + px + "px " + family;
+    ctx.font = fontAt(sizePt);
+    const widthPt = Math.max(1, ...lines.map((line) => ctx.measureText(line || " ").width));
+    const padPt = sizePt * 0.12;
+    const lineHeightPt = sizePt * 1.25;
+    const boxW = widthPt + padPt * 2;
+    const boxH = lineHeightPt * lines.length + padPt * 2;
+    const scale = Math.min(TEXT_RENDER_SCALE, TEXT_RENDER_MAX_SIDE / Math.max(boxW, boxH));
+    canvas.width = Math.max(1, Math.ceil(boxW * scale));
+    canvas.height = Math.max(1, Math.ceil(boxH * scale));
+    ctx.font = fontAt(sizePt * scale);
+    ctx.fillStyle = color;
+    ctx.textBaseline = "middle";
+    lines.forEach((line, index) => {
+      ctx.fillText(line, padPt * scale, (padPt + lineHeightPt * (index + 0.5)) * scale);
+    });
+    const image = {
+      dataUrl: canvas.toDataURL("image/png"),
+      wPt: canvas.width / scale,
+      hPt: canvas.height / scale
+    };
+    image.ratio = image.wPt / image.hPt;
+    canvas.width = 0;
+    canvas.height = 0;
+    if (textImageCache.size > 240) textImageCache.clear();
+    textImageCache.set(key, image);
+    return image;
+  }
+  function pageSizePt(sourceIndex) {
+    const pd = state.pages[sourceIndex];
+    return pd?.w && pd.scale ? { w: pd.w / pd.scale, h: pd.h / pd.scale } : DEFAULT_PAGE_PT;
+  }
+  function watermarkActive(settings = textState) {
+    return !!settings.watermark.enabled && !!String(settings.watermark.text || "").trim();
+  }
+  function textStampCount(pageOrder = state.pageOrder) {
+    return activeSignatureStamps(pageOrder).filter((stamp) => stamp.kind === "text").length;
+  }
+  function selectedTextStamp() {
+    const stamp = getSignatureStamp(signatureState.selectedId);
+    return stamp?.kind === "text" ? stamp : null;
+  }
+  function refreshTextStamp(stamp) {
+    const page = pageSizePt(stamp.pageIndex);
+    const font = textFont(stamp.font);
+    const image = renderTextImage(stamp.text, stamp.size, stamp.color, font.weight, font.family);
+    stamp.dataUrl = image.dataUrl;
+    stamp.ratio = image.ratio;
+    stamp.wPct = image.wPt / page.w * 100;
+    stamp.hPct = image.hPt / page.h * 100;
+    if (stamp.wPct > 96) {
+      const fit = 96 / stamp.wPct;
+      stamp.wPct *= fit;
+      stamp.hPct *= fit;
+    }
+    clampSignatureStamp(stamp);
+  }
+  async function addTextStampToPage() {
+    const text = textDraftInput.value.replace(/\s+$/, "");
+    if (operationInProgress || !state.pdfDoc || !text.trim() || activeTool !== "text") return;
+    const sourceIndex = currentSourceIndex();
+    if (sourceIndex == null) return;
+    await ensureTextFont(textState.font);
+    const stamp = {
+      id: signatureState.nextId++,
+      kind: "text",
+      pageIndex: sourceIndex,
+      text,
+      size: textState.size,
+      color: textState.color,
+      font: textState.font,
+      xPct: 0,
+      yPct: 0,
+      wPct: 0,
+      hPct: 0
+    };
+    refreshTextStamp(stamp);
+    stamp.xPct = 50 - stamp.wPct / 2;
+    stamp.yPct = 50 - stamp.hPct / 2;
+    clampSignatureStamp(stamp);
+    signatureState.stamps.push(stamp);
+    signatureState.selectedId = stamp.id;
+    if (isPhoneViewport()) setMobileControlsOpen(false, { restoreFocus: true });
+    updatePageState();
+  }
+  function loadTextStampIntoControls(stamp) {
+    if (!stamp || stamp.kind !== "text") return;
+    textDraftInput.value = stamp.text;
+    textState.size = stamp.size;
+    textState.color = stamp.color;
+    textState.font = stamp.font || "sans";
+    syncTextControls();
+  }
+  function updateSelectedTextStamp(changes) {
+    const stamp = selectedTextStamp();
+    if (!stamp || operationInProgress) return;
+    Object.assign(stamp, changes);
+    refreshTextStamp(stamp);
+    updateSignatureOverlay();
+  }
+  function pageDecorationsFor(outputIndex, outputCount, page, settings = textState) {
+    const items = [];
+    const mark = settings.watermark;
+    if (watermarkActive(settings)) {
+      const image = renderTextImage(String(mark.text).trim(), mark.size, mark.color, 600);
+      const diagonal = mark.layout === "diagonal";
+      const angle = diagonal ? Math.atan2(page.h, page.w) * 180 / Math.PI : 0;
+      const room = diagonal ? Math.hypot(page.w, page.h) * 0.85 : page.w * 0.9;
+      const fit = Math.min(1, room / image.wPt);
+      items.push({
+        image,
+        cxPct: 50,
+        cyPct: 50,
+        wPct: image.wPt * fit / page.w * 100,
+        hPct: image.hPt * fit / page.h * 100,
+        angle,
+        opacity: mark.opacity / 100
+      });
+    }
+    const numbers = settings.pageNumbers;
+    if (numbers.enabled) {
+      const start = Math.max(0, Math.floor(Number(numbers.start) || 0));
+      const n2 = start + outputIndex;
+      const label = numbers.format === "page" ? t2("text.pageFormat", { n: n2 }) : numbers.format === "of" ? n2 + " / " + (start + outputCount - 1) : String(n2);
+      const image = renderTextImage(label, PAGE_NUMBER_SIZES[numbers.size] || PAGE_NUMBER_SIZES.m, "#3a3a3c");
+      const margin = Math.min(PAGE_NUMBER_MARGIN, page.w * 0.08, page.h * 0.08);
+      const cx = numbers.align === "left" ? margin + image.wPt / 2 : numbers.align === "right" ? page.w - margin - image.wPt / 2 : page.w / 2;
+      const cy = numbers.vertical === "top" ? margin + image.hPt / 2 : page.h - margin - image.hPt / 2;
+      items.push({
+        image,
+        cxPct: cx / page.w * 100,
+        cyPct: cy / page.h * 100,
+        wPct: image.wPt / page.w * 100,
+        hPct: image.hPt / page.h * 100,
+        angle: 0,
+        opacity: 1
+      });
+    }
+    return items;
+  }
+  function createDecorationElement(item) {
+    const el = document.createElement("div");
+    el.className = "page-decoration";
+    el.style.left = item.cxPct - item.wPct / 2 + "%";
+    el.style.top = item.cyPct - item.hPct / 2 + "%";
+    el.style.width = item.wPct + "%";
+    el.style.height = item.hPct + "%";
+    el.style.opacity = String(item.opacity);
+    if (item.angle) el.style.transform = "rotate(" + -item.angle + "deg)";
+    const img = document.createElement("img");
+    img.alt = "";
+    img.src = item.image.dataUrl;
+    el.appendChild(img);
+    return el;
+  }
+  function setSegmentValue(group, value) {
+    if (!group) return;
+    const buttons = Array.from(group.querySelectorAll(".page-processing-segment"));
+    group.style.setProperty("--seg-count", buttons.length);
+    buttons.forEach((button, index) => {
+      const on = button.dataset.value === String(value);
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+      if (on) group.style.setProperty("--seg-index", index);
+    });
+  }
+  function bindSegments(group, onChange) {
+    group?.addEventListener("click", (e2) => {
+      const button = e2.target.closest(".page-processing-segment");
+      if (!button || !group.contains(button) || operationInProgress) return;
+      onChange(button.dataset.value);
+    });
+  }
+  var COLOR_NAME_KEYS = ["text.colorBlack", "text.colorGray", "text.colorBlue", "text.colorRed"];
+  function renderColorSwatches(container, selected, onPick) {
+    if (!container) return;
+    if (!container.children.length) {
+      const well = document.createElement("input");
+      well.type = "color";
+      well.className = "color-well-input";
+      well.tabIndex = -1;
+      well.setAttribute("aria-hidden", "true");
+      well.addEventListener("input", () => {
+        if (!operationInProgress) container._onPick?.(well.value.toLowerCase());
+      });
+      TEXT_COLORS.forEach((color, index) => {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "color-swatch";
+        swatch.setAttribute("role", "radio");
+        swatch.dataset.color = color;
+        swatch.dataset.colorIndex = String(index);
+        swatch.style.setProperty("--swatch", color);
+        swatch.addEventListener("click", () => {
+          if (!operationInProgress) container._onPick?.(color);
+        });
+        container.appendChild(swatch);
+      });
+      const custom = document.createElement("button");
+      custom.type = "button";
+      custom.className = "color-swatch color-swatch-custom";
+      custom.setAttribute("role", "radio");
+      custom.addEventListener("click", () => {
+        if (operationInProgress) return;
+        well.value = container._selected || TEXT_COLORS[0];
+        try {
+          if (well.showPicker) well.showPicker();
+          else well.click();
+        } catch {
+          well.click();
+        }
+      });
+      container.append(custom, well);
+    }
+    container._onPick = onPick;
+    container._selected = selected;
+    const customColor = !TEXT_COLORS.includes(selected);
+    container.querySelectorAll(".color-swatch").forEach((swatch) => {
+      const isCustom = swatch.classList.contains("color-swatch-custom");
+      const on = isCustom ? customColor : swatch.dataset.color === selected;
+      swatch.setAttribute("aria-checked", on ? "true" : "false");
+      swatch.tabIndex = 0;
+      if (isCustom) {
+        swatch.style.setProperty("--custom", customColor ? selected : "transparent");
+        swatch.setAttribute("aria-label", t2("text.colorCustom"));
+      } else {
+        swatch.setAttribute("aria-label", t2(COLOR_NAME_KEYS[Number(swatch.dataset.colorIndex)]));
+      }
+    });
+  }
+  function renderFontOptions() {
+    const container = $2("textFontOptions");
+    if (!container) return;
+    if (!container.children.length) {
+      Object.keys(TEXT_FONTS).forEach((key) => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "font-option";
+        option.setAttribute("role", "radio");
+        option.dataset.font = key;
+        option.style.fontFamily = textFont(key).family;
+        option.style.fontWeight = String(textFont(key).weight);
+        option.addEventListener("click", async () => {
+          if (operationInProgress) return;
+          textState.font = key;
+          syncTextControls();
+          await ensureTextFont(key);
+          updateSelectedTextStamp({ font: key });
+          syncTextControls();
+        });
+        container.appendChild(option);
+      });
+    }
+    container.querySelectorAll(".font-option").forEach((option) => {
+      const on = option.dataset.font === textState.font;
+      option.textContent = t2("text.font." + option.dataset.font);
+      option.setAttribute("aria-checked", on ? "true" : "false");
+    });
+  }
+  function setRangeValue(slider, value) {
+    if (!slider || String(slider.value) === String(value)) return;
+    setSliderValue(slider, value);
+  }
+  function syncTextControls() {
+    if (!textModeSegments) return;
+    const hasPdf = !!state.pdfDoc;
+    const selected = selectedTextStamp();
+    const numbers = textState.pageNumbers;
+    const mark = textState.watermark;
+    if (mark.text == null) mark.text = t2("text.watermarkDefault");
+    setSegmentValue(textModeSegments, textState.mode);
+    document.querySelectorAll("[data-text-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.textPanel !== textState.mode;
+    });
+    setRangeValue(textSizeSlider, textState.size);
+    textSizeValue.textContent = textState.size + " pt";
+    renderColorSwatches(textColorSwatches, textState.color, (color) => {
+      textState.color = color;
+      updateSelectedTextStamp({ color });
+      syncTextControls();
+    });
+    renderFontOptions();
+    textAddBtn.disabled = operationInProgress || !hasPdf || !textDraftInput.value.trim();
+    textRemoveBtn.disabled = operationInProgress || !selected;
+    const placed = textStampCount();
+    textSummary.textContent = !hasPdf ? t2("text.summaryNoPdf") : selected ? t2("text.summaryEditing") : placed ? t2("text.summaryPlaced", { count: placed }) : t2("text.summaryEmpty");
+    setTogglePressed(pageNumbersToggle, numbers.enabled);
+    setSegmentValue(numbersVertical, numbers.vertical);
+    setSegmentValue(numbersAlign, numbers.align);
+    setSegmentValue(numbersFormat, numbers.format);
+    setSegmentValue(numbersSize, numbers.size);
+    const pageFormatButton = numbersFormat?.querySelector('[data-value="page"]');
+    if (pageFormatButton) pageFormatButton.textContent = t2("text.pageFormat", { n: 1 });
+    if (document.activeElement !== numbersStartInput) numbersStartInput.value = String(numbers.start);
+    setTogglePressed(watermarkToggle, mark.enabled);
+    if (document.activeElement !== watermarkInput) watermarkInput.value = mark.text;
+    setRangeValue(watermarkSizeSlider, mark.size);
+    watermarkSizeValue.textContent = mark.size + " pt";
+    setRangeValue(watermarkOpacitySlider, mark.opacity);
+    watermarkOpacityValue.textContent = mark.opacity + "%";
+    setSegmentValue(watermarkLayout, mark.layout);
+    renderColorSwatches(watermarkColorSwatches, mark.color, (color) => {
+      mark.color = color;
+      refreshTextDecorations();
+    });
+  }
+  function refreshTextDecorations() {
+    syncTextControls();
+    updateSignatureOverlay();
+    downloadBtn.disabled = activeToolExportDisabled();
+  }
+  bindSegments(textModeSegments, (mode) => {
+    textState.mode = mode;
+    syncTextControls();
+    syncMobileDockMetrics();
+  });
+  textDraftInput?.addEventListener("input", () => {
+    const stamp = selectedTextStamp();
+    if (stamp && stamp.pageIndex === currentSourceIndex() && textDraftInput.value.trim()) {
+      updateSelectedTextStamp({ text: textDraftInput.value.replace(/\s+$/, "") });
+    }
+    syncTextControls();
+  });
+  textSizeSlider?.addEventListener("input", () => {
+    textState.size = Math.round(Number(textSizeSlider.value)) || 18;
+    updateSelectedTextStamp({ size: textState.size });
+    syncTextControls();
+  });
+  textAddBtn?.addEventListener("click", addTextStampToPage);
+  textRemoveBtn?.addEventListener("click", () => deleteSelectedSignatureStamp());
+  pageNumbersToggle?.addEventListener("click", () => {
+    if (operationInProgress) return;
+    textState.pageNumbers.enabled = !textState.pageNumbers.enabled;
+    refreshTextDecorations();
+  });
+  bindSegments(numbersVertical, (value) => {
+    textState.pageNumbers.vertical = value;
+    refreshTextDecorations();
+  });
+  bindSegments(numbersAlign, (value) => {
+    textState.pageNumbers.align = value;
+    refreshTextDecorations();
+  });
+  bindSegments(numbersFormat, (value) => {
+    textState.pageNumbers.format = value;
+    refreshTextDecorations();
+  });
+  bindSegments(numbersSize, (value) => {
+    textState.pageNumbers.size = value;
+    refreshTextDecorations();
+  });
+  numbersStartInput?.addEventListener("input", () => {
+    const value = Math.floor(Number(numbersStartInput.value));
+    if (numbersStartInput.value === "" || !Number.isFinite(value)) return;
+    textState.pageNumbers.start = Math.max(0, Math.min(9999, value));
+    refreshTextDecorations();
+  });
+  numbersStartInput?.addEventListener("blur", () => syncTextControls());
+  watermarkToggle?.addEventListener("click", () => {
+    if (operationInProgress) return;
+    textState.watermark.enabled = !textState.watermark.enabled;
+    refreshTextDecorations();
+  });
+  watermarkInput?.addEventListener("input", () => {
+    textState.watermark.text = watermarkInput.value;
+    refreshTextDecorations();
+  });
+  watermarkSizeSlider?.addEventListener("input", () => {
+    textState.watermark.size = Math.round(Number(watermarkSizeSlider.value)) || 64;
+    refreshTextDecorations();
+  });
+  watermarkOpacitySlider?.addEventListener("input", () => {
+    textState.watermark.opacity = Math.round(Number(watermarkOpacitySlider.value)) || 20;
+    refreshTextDecorations();
+  });
+  bindSegments(watermarkLayout, (value) => {
+    textState.watermark.layout = value;
+    refreshTextDecorations();
+  });
+  function pdfPageGeometry(page) {
+    const box = page.getCropBox();
+    const rotation = (page.getRotation().angle % 360 + 360) % 360;
+    const quarter = rotation === 90 || rotation === 270;
+    return {
+      x0: box.x,
+      y0: box.y,
+      w: box.width,
+      h: box.height,
+      rotation,
+      dispW: quarter ? box.height : box.width,
+      dispH: quarter ? box.width : box.height
+    };
+  }
+  function displayPointToPdf(g2, u2, v2) {
+    if (g2.rotation === 90) return { x: g2.x0 + v2 * g2.w, y: g2.y0 + u2 * g2.h };
+    if (g2.rotation === 180) return { x: g2.x0 + g2.w - u2 * g2.w, y: g2.y0 + v2 * g2.h };
+    if (g2.rotation === 270) return { x: g2.x0 + g2.w - v2 * g2.w, y: g2.y0 + g2.h - u2 * g2.h };
+    return { x: g2.x0 + u2 * g2.w, y: g2.y0 + g2.h - v2 * g2.h };
+  }
+  function drawPlacedImage(pdfLib, page, g2, image, item) {
+    const width = item.wPct / 100 * g2.dispW;
+    const height = item.hPct / 100 * g2.dispH;
+    const center = displayPointToPdf(g2, item.cxPct / 100, item.cyPct / 100);
+    const angle = g2.rotation + (item.angle || 0);
+    const radians = angle * Math.PI / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    page.drawImage(image, {
+      x: center.x - (width / 2 * cos - height / 2 * sin),
+      y: center.y - (width / 2 * sin + height / 2 * cos),
+      width,
+      height,
+      rotate: pdfLib.degrees(angle),
+      opacity: item.opacity ?? 1
+    });
+  }
+  async function createAnnotatedPdfArtifact(pageOrder, fileBase, context) {
+    const pdfLib = await ensurePdfLib();
+    if (!pageOrder.length) throw new Error(t2("errors.noPagesExport"));
+    const settings = context.settings;
+    const included = new Set(pageOrder);
+    const stamps = settings.signatureStamps.filter((stamp) => included.has(stamp.pageIndex));
+    if (!stamps.length && !settings.pageNumbers.enabled && !watermarkActive(settings)) {
+      throw new Error(t2(context.toolId === "sign" ? "errors.signaturePageMissing" : "errors.noText"));
+    }
+    const src = await pdfLib.PDFDocument.load(await readOriginalPdfBytes());
+    const out = await pdfLib.PDFDocument.create();
+    const embedded = /* @__PURE__ */ new Map();
+    const embed = (dataUrl) => {
+      if (!embedded.has(dataUrl)) embedded.set(dataUrl, out.embedPng(pngDataUrlToBytes(dataUrl)));
+      return embedded.get(dataUrl);
+    };
+    const count = pageOrder.length;
+    for (let i2 = 0; i2 < count; i2++) {
+      setLoader(true, t2("progress.exportingPage", { page: i2 + 1, count }), currentPageProgress(i2, count));
+      const sourceIndex = pageOrder[i2];
+      const [copied] = await out.copyPages(src, [sourceIndex]);
+      const geometry = pdfPageGeometry(copied);
+      const page = { w: geometry.dispW, h: geometry.dispH };
+      for (const item of pageDecorationsFor(i2, count, page, settings)) {
+        drawPlacedImage(pdfLib, copied, geometry, await embed(item.image.dataUrl), item);
+      }
+      for (const stamp of stamps.filter((item) => item.pageIndex === sourceIndex)) {
+        drawPlacedImage(pdfLib, copied, geometry, await embed(stamp.dataUrl), {
+          cxPct: stamp.xPct + stamp.wPct / 2,
+          cyPct: stamp.yPct + stamp.hPct / 2,
+          wPct: stamp.wPct,
+          hPct: stamp.hPct
+        });
+      }
+      out.addPage(copied);
+      await yieldToMainThread();
+    }
+    return createPdfArtifact(await out.save(), fileBase, {
+      source: "pdf-lib",
+      rasterized: false,
+      preservesOriginalQuality: true,
+      signed: stamps.some((stamp) => stamp.kind !== "text")
+    });
+  }
+  var IMAGE_NAME_PATTERN = /\.(jpe?g|png|gif|webp|bmp|avif|heic|heif|tiff?)$/i;
+  var DROP_ICON_IMAGE = '<svg viewBox="0 0 24 24" focusable="false"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 4.6-4.4a1.5 1.5 0 0 1 2.1 0L14 15.8l1.9-1.8a1.5 1.5 0 0 1 2.1 0l2.5 2.4"/></svg>';
+  function isImageFile(file) {
+    return (file.type || "").startsWith("image/") || IMAGE_NAME_PATTERN.test(file.name || "");
+  }
+  function imageCollecting() {
+    return activeTool === "image" && imageState.mode === "toPdf";
+  }
+  function decodeImageEntry(entry) {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = entry.url;
+    entry.ready = img.decode().then(() => {
+      entry.width = img.naturalWidth;
+      entry.height = img.naturalHeight;
+      entry.element = img;
+    }, () => {
+      entry.broken = true;
+    }).finally(() => {
+      if (activeTool === "image") syncImageTool();
+      downloadBtn.disabled = activeToolExportDisabled();
+    });
+  }
+  function addImageFiles(fileList) {
+    if (operationInProgress) return;
+    clearError();
+    const files = Array.from(fileList).filter(isImageFile);
+    if (!files.length) {
+      showError(t2("errors.chooseImages"));
+      return;
+    }
+    for (const file of files) {
+      const entry = { id: imageState.nextId++, file, url: URL.createObjectURL(file), width: 0, height: 0, broken: false };
+      imageState.files.push(entry);
+      decodeImageEntry(entry);
+    }
+    syncImageTool();
+    updatePageState();
+  }
+  function removeImageEntry(index) {
+    if (operationInProgress) return;
+    const [entry] = imageState.files.splice(index, 1);
+    if (entry) URL.revokeObjectURL(entry.url);
+    syncImageTool();
+    updatePageState();
+  }
+  function moveImageEntry(index, delta) {
+    if (operationInProgress) return;
+    const next = index + delta;
+    if (next < 0 || next >= imageState.files.length) return;
+    const [entry] = imageState.files.splice(index, 1);
+    imageState.files.splice(next, 0, entry);
+    syncImageTool();
+  }
+  function clearImageEntries() {
+    if (operationInProgress) return;
+    imageState.files.forEach((entry) => URL.revokeObjectURL(entry.url));
+    imageState.files = [];
+    syncImageTool();
+    updatePageState();
+  }
+  function imagePageLayout(width, height, pageSize) {
+    if (pageSize === "fit") {
+      const scale2 = Math.min(0.75, 841.89 / Math.max(width, height));
+      const w3 = width * scale2;
+      const h3 = height * scale2;
+      return { pageW: w3, pageH: h3, x: 0, y: 0, w: w3, h: h3 };
+    }
+    const base = pageSize === "a4" ? [595.28, 841.89] : [612, 792];
+    const landscape = width > height;
+    const pageW = landscape ? base[1] : base[0];
+    const pageH = landscape ? base[0] : base[1];
+    const margin = 24;
+    const scale = Math.min((pageW - margin * 2) / width, (pageH - margin * 2) / height);
+    const w2 = width * scale;
+    const h2 = height * scale;
+    return { pageW, pageH, x: (pageW - w2) / 2, y: (pageH - h2) / 2, w: w2, h: h2 };
+  }
+  function jpegOrientation(bytes) {
+    if (bytes[0] !== 255 || bytes[1] !== 216) return 0;
+    let offset = 2;
+    while (offset + 4 < bytes.length && bytes[offset] === 255) {
+      const marker = bytes[offset + 1];
+      const length = bytes[offset + 2] << 8 | bytes[offset + 3];
+      if (marker === 225 && bytes[offset + 4] === 69 && bytes[offset + 5] === 120) {
+        const tiff = offset + 10;
+        const little = bytes[tiff] === 73;
+        const read16 = (at) => little ? bytes[at] | bytes[at + 1] << 8 : bytes[at] << 8 | bytes[at + 1];
+        const read32 = (at) => little ? (bytes[at] | bytes[at + 1] << 8 | bytes[at + 2] << 16 | bytes[at + 3] << 24) >>> 0 : (bytes[at] << 24 | bytes[at + 1] << 16 | bytes[at + 2] << 8 | bytes[at + 3]) >>> 0;
+        const ifd = tiff + read32(tiff + 4);
+        const entries = read16(ifd);
+        for (let i2 = 0; i2 < entries; i2++) {
+          const entry = ifd + 2 + i2 * 12;
+          if (read16(entry) === 274) return read16(entry + 8);
+        }
+        return 0;
+      }
+      if (marker === 218) return 0;
+      offset += 2 + length;
+    }
+    return 0;
+  }
+  async function embedImageEntry(doc, entry) {
+    await entry.ready;
+    if (entry.broken) throw new Error(t2("errors.imageUnreadable", { name: entry.file.name }));
+    const bytes = new Uint8Array(await entry.file.arrayBuffer());
+    const isJpeg = bytes[0] === 255 && bytes[1] === 216;
+    const isPng = bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71;
+    try {
+      if (isJpeg && jpegOrientation(bytes) <= 1) return await doc.embedJpg(bytes);
+      if (isPng) return await doc.embedPng(bytes);
+    } catch (err) {
+      console.warn("Embedding original image failed; re-encoding", err);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = entry.width;
+    canvas.height = entry.height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(entry.element, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+    canvas.width = 0;
+    canvas.height = 0;
+    if (!blob) throw new Error(t2("errors.imageUnreadable", { name: entry.file.name }));
+    return doc.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+  }
+  async function createImagesPdfArtifact(context) {
+    const pdfLib = await ensurePdfLib();
+    const entries = imageState.files.filter((entry) => !entry.broken);
+    if (!entries.length) throw new Error(t2("errors.chooseImages"));
+    const doc = await pdfLib.PDFDocument.create();
+    const count = entries.length;
+    for (let i2 = 0; i2 < count; i2++) {
+      setLoader(true, t2("progress.addingImage", { page: i2 + 1, count }), currentPageProgress(i2, count));
+      const image = await embedImageEntry(doc, entries[i2]);
+      const layout = imagePageLayout(entries[i2].width || image.width, entries[i2].height || image.height, imageState.pageSize);
+      doc.addPage([layout.pageW, layout.pageH]).drawImage(image, { x: layout.x, y: layout.y, width: layout.w, height: layout.h });
+      await yieldToMainThread();
+    }
+    return createPdfArtifact(await doc.save(), context.fileBase, {
+      source: "pdf-lib",
+      rasterized: false,
+      preservesOriginalQuality: true
+    });
+  }
+  var CRC32_TABLE = (() => {
+    const table = new Uint32Array(256);
+    for (let n2 = 0; n2 < 256; n2++) {
+      let c2 = n2;
+      for (let k2 = 0; k2 < 8; k2++) c2 = c2 & 1 ? 3988292384 ^ c2 >>> 1 : c2 >>> 1;
+      table[n2] = c2 >>> 0;
+    }
+    return table;
+  })();
+  function crc32(bytes) {
+    let c2 = 4294967295;
+    for (let i2 = 0; i2 < bytes.length; i2++) c2 = CRC32_TABLE[(c2 ^ bytes[i2]) & 255] ^ c2 >>> 8;
+    return (c2 ^ 4294967295) >>> 0;
+  }
+  async function createZipBlob(files) {
+    const encoder = new TextEncoder();
+    const now = /* @__PURE__ */ new Date();
+    const dosTime = now.getHours() << 11 | now.getMinutes() << 5 | now.getSeconds() >> 1;
+    const dosDate = now.getFullYear() - 1980 << 9 | now.getMonth() + 1 << 5 | now.getDate();
+    const parts = [];
+    const central = [];
+    let offset = 0;
+    for (const file of files) {
+      const data = new Uint8Array(await file.blob.arrayBuffer());
+      const name = encoder.encode(file.name);
+      const crc = crc32(data);
+      const local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 67324752, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(6, 2048, true);
+      local.setUint16(8, 0, true);
+      local.setUint16(10, dosTime, true);
+      local.setUint16(12, dosDate, true);
+      local.setUint32(14, crc, true);
+      local.setUint32(18, data.length, true);
+      local.setUint32(22, data.length, true);
+      local.setUint16(26, name.length, true);
+      local.setUint16(28, 0, true);
+      parts.push(local.buffer, name, data);
+      const entry = new DataView(new ArrayBuffer(46));
+      entry.setUint32(0, 33639248, true);
+      entry.setUint16(4, 20, true);
+      entry.setUint16(6, 20, true);
+      entry.setUint16(8, 2048, true);
+      entry.setUint16(10, 0, true);
+      entry.setUint16(12, dosTime, true);
+      entry.setUint16(14, dosDate, true);
+      entry.setUint32(16, crc, true);
+      entry.setUint32(20, data.length, true);
+      entry.setUint32(24, data.length, true);
+      entry.setUint16(28, name.length, true);
+      entry.setUint32(42, offset, true);
+      central.push(entry.buffer, name);
+      offset += 30 + name.length + data.length;
+    }
+    const centralSize = central.reduce((sum, part) => sum + part.byteLength, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 101010256, true);
+    end.setUint16(8, files.length, true);
+    end.setUint16(10, files.length, true);
+    end.setUint32(12, centralSize, true);
+    end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end.buffer], { type: "application/zip" });
+  }
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a2 = document.createElement("a");
+    a2.href = url;
+    a2.download = filename;
+    document.body.appendChild(a2);
+    a2.click();
+    a2.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2e3);
+  }
+  async function exportPdfPagesAsImages(pageOrder) {
+    const jpeg = imageState.format === "jpeg";
+    const mimeType = jpeg ? "image/jpeg" : "image/png";
+    const extension = jpeg ? "jpg" : "png";
+    const base = outputBaseName();
+    const files = [];
+    const canvas = document.createElement("canvas");
+    const count = pageOrder.length;
+    for (let i2 = 0; i2 < count; i2++) {
+      setLoader(true, t2("progress.savingImage", { page: i2 + 1, count }), currentPageProgress(i2, count));
+      const sourceIndex = pageOrder[i2];
+      const page = await state.pdfDoc.getPage(sourceIndex + 1);
+      const baseVp = page.getViewport({ scale: 1 });
+      let scale = imageState.dpi / 72;
+      if (MOBILE_PERFORMANCE_MODE) scale = capScaleToPixelBudget(baseVp, scale, MOBILE_RASTER_EXPORT_MAX_PIXELS);
+      const viewport = page.getViewport({ scale });
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const rendered = await runPdfPageRender(page, { canvasContext: ctx, viewport });
+      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+      if (!rendered) throw new Error(t2("errors.renderPageFailed", { page: i2 + 1 }));
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, mimeType, 0.92));
+      if (!blob) throw new Error(t2("errors.renderPageFailed", { page: i2 + 1 }));
+      const pageNumber = state.pageOrder.indexOf(sourceIndex) + 1;
+      files.push({ name: base + "_page_" + padPage(pageNumber) + "." + extension, blob });
+      await yieldToMainThread();
+    }
+    canvas.width = 0;
+    canvas.height = 0;
+    if (files.length === 1) {
+      downloadBlob(files[0].blob, files[0].name);
+      return;
+    }
+    setLoader(true, t2("progress.zipping"), 100);
+    downloadBlob(await createZipBlob(files), exportBaseNameForTool("image") + ".zip");
+  }
+  async function runImageToolExport() {
+    if (operationInProgress) return;
+    clearError();
+    let exportOrder = [];
+    if (imageState.mode === "toPdf") {
+      if (!imageState.files.length) return;
+      if (advancedPasswordToggle.checked && !advancedPasswordValue()) {
+        showError(t2("errors.password"));
+        advancedPasswordInput.focus();
+        return;
+      }
+    } else {
+      if (!state.pdfDoc || activePageCount() === 0) return;
+      try {
+        exportOrder = selectedExportPageOrder();
+      } catch (err) {
+        showError(err.message || err);
+        advancedRangeInput.focus();
+        return;
+      }
+      if (!exportOrder.length) return;
+    }
+    operationInProgress = true;
+    downloadBtn.disabled = true;
+    syncImageTool();
+    setLoader(true, t2(imageState.mode === "toPdf" ? "progress.creatingPdf" : "progress.exportingPages"), 0);
+    try {
+      if (imageState.mode === "toPdf") {
+        const first = imageState.files.find((entry) => !entry.broken) || imageState.files[0];
+        const fileBase = cleanDownloadBase(first.file.name.replace(/\.[^.]+$/, ""), "images");
+        const context = createExportContext("image", [], fileBase, { useCurrentOnly: false });
+        await runExportPipeline(context, createImagesPdfArtifact);
+      } else {
+        await exportPdfPagesAsImages(exportOrder);
+      }
+      setLoader(false);
+    } catch (err) {
+      console.error(err);
+      showError(t2("errors.exportFailed", { error: err.message || err }));
+      setLoader(false);
+    } finally {
+      operationInProgress = false;
+      updatePageState();
+      syncImageTool();
+    }
+  }
+  function renderImageList() {
+    if (!imageList) return;
+    imageList.innerHTML = "";
+    imageState.files.forEach((entry, index) => {
+      const row = document.createElement("div");
+      row.className = "merge-file-row image-file-row";
+      const thumb = document.createElement("img");
+      thumb.className = "image-file-thumb";
+      thumb.alt = "";
+      thumb.src = entry.url;
+      const info2 = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "merge-file-name";
+      name.textContent = entry.file.name;
+      const meta = document.createElement("div");
+      meta.className = "merge-file-meta";
+      meta.textContent = entry.broken ? t2("image.unreadable") : fmtBytes(entry.file.size) + (entry.width ? " \xB7 " + entry.width + " \xD7 " + entry.height : "");
+      info2.append(name, meta);
+      const actions = document.createElement("div");
+      actions.className = "merge-file-actions";
+      const button = (html, label, disabled, onClick) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.innerHTML = html;
+        el.disabled = operationInProgress || disabled;
+        el.setAttribute("aria-label", label);
+        el.addEventListener("click", onClick);
+        return el;
+      };
+      actions.append(
+        button('<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">\u2191</span>', t2("merge.moveUp", { name: entry.file.name }), index === 0, () => moveImageEntry(index, -1)),
+        button('<span class="merge-file-action-glyph merge-file-action-arrow" aria-hidden="true">\u2193</span>', t2("merge.moveDown", { name: entry.file.name }), index === imageState.files.length - 1, () => moveImageEntry(index, 1)),
+        button(X_ICON, t2("merge.remove", { name: entry.file.name }), false, () => removeImageEntry(index))
+      );
+      row.append(thumb, info2, actions);
+      imageList.appendChild(row);
+    });
+  }
+  function renderImagePages() {
+    if (!imagePages) return;
+    imagePages.innerHTML = "";
+    if (!imageState.files.length) {
+      const empty = document.createElement("div");
+      empty.className = "image-pages-empty";
+      const glyph = document.createElement("div");
+      glyph.className = "image-pages-glyph";
+      glyph.innerHTML = DROP_ICON_IMAGE;
+      const title = document.createElement("div");
+      title.className = "big";
+      title.textContent = t2("image.pagesEmpty");
+      const sub = document.createElement("div");
+      sub.className = "small";
+      sub.textContent = t2("image.pagesEmptySub");
+      const choose = document.createElement("button");
+      choose.type = "button";
+      choose.className = "image-pages-choose";
+      choose.textContent = t2("drop.addImages");
+      choose.addEventListener("click", () => fileInput.click());
+      empty.append(glyph, title, sub, choose);
+      imagePages.appendChild(empty);
+      return;
+    }
+    const grid = document.createElement("div");
+    grid.className = "image-pages-grid";
+    imageState.files.forEach((entry, index) => {
+      const card = document.createElement("div");
+      card.className = "image-page-card";
+      const page = document.createElement("div");
+      page.className = "image-page";
+      if (entry.width) {
+        const layout = imagePageLayout(entry.width, entry.height, imageState.pageSize);
+        page.style.aspectRatio = layout.pageW + " / " + layout.pageH;
+        const img = document.createElement("img");
+        img.alt = "";
+        img.src = entry.url;
+        img.style.left = layout.x / layout.pageW * 100 + "%";
+        img.style.top = (layout.pageH - layout.y - layout.h) / layout.pageH * 100 + "%";
+        img.style.width = layout.w / layout.pageW * 100 + "%";
+        img.style.height = layout.h / layout.pageH * 100 + "%";
+        page.appendChild(img);
+      } else if (entry.broken) {
+        page.classList.add("is-broken");
+        page.textContent = t2("image.unreadable");
+      }
+      const label = document.createElement("div");
+      label.className = "image-page-number";
+      label.textContent = String(index + 1);
+      card.append(page, label);
+      grid.appendChild(card);
+    });
+    imagePages.appendChild(grid);
+  }
+  function syncImageTool() {
+    if (!imageModeSegments) return;
+    setSegmentValue(imageModeSegments, imageState.mode);
+    setSegmentValue(imagePageSize, imageState.pageSize);
+    setSegmentValue(imageFormat, imageState.format);
+    setSegmentValue(imageDpi, String(imageState.dpi));
+    document.querySelectorAll("[data-image-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.imagePanel !== imageState.mode;
+    });
+    const count = imageState.files.length;
+    imageSummary.textContent = count ? t2("image.summaryCount", { count }) : t2("image.summaryEmpty");
+    pdfToImageSummary.textContent = state.pdfDoc ? t2("image.fromSummary") : t2("image.fromSummaryNoPdf");
+    imageClearBtn.disabled = operationInProgress || !count;
+    document.body.classList.toggle("image-collecting", imageCollecting());
+    renderImageList();
+    if (imageCollecting()) renderImagePages();
+  }
+  function setImageMode(mode) {
+    if (imageState.mode === mode) return;
+    imageState.mode = mode;
+    applyToolLocale();
+    updateSourceDropMode();
+    syncImageTool();
+    updatePageState();
+    if (mode === "fromPdf" && state.pdfDoc) requestPreviewRender(false);
+  }
+  bindSegments(imageModeSegments, setImageMode);
+  bindSegments(imagePageSize, (value) => {
+    imageState.pageSize = value;
+    syncImageTool();
+  });
+  bindSegments(imageFormat, (value) => {
+    imageState.format = value;
+    syncImageTool();
+  });
+  bindSegments(imageDpi, (value) => {
+    imageState.dpi = Number(value) || 150;
+    syncImageTool();
+  });
+  imageClearBtn?.addEventListener("click", clearImageEntries);
   async function ensureThumbnail(sourceIndex, quality = "low") {
     const existing = state.pages[sourceIndex];
     if (existing?.thumbUrl && (quality === "low" || existing.thumbQuality === "high")) {
@@ -25633,6 +27261,7 @@
     }, 120);
   }
   async function drawPreview() {
+    if (imageCollecting()) return;
     const sourceIndex = currentSourceIndex();
     if (sourceIndex == null) {
       canvasWrap.style.display = "none";
@@ -27161,55 +28790,6 @@
     for (let i2 = 0; i2 < binary.length; i2++) bytes[i2] = binary.charCodeAt(i2);
     return bytes;
   }
-  async function createSignedPdfArtifact(pageOrder, fileBase, context) {
-    const pdfLib = await ensurePdfLib();
-    if (!pageOrder.length) throw new Error(t2("errors.noPagesExport"));
-    if (!context.settings.signatureStamps.length) throw new Error(t2("errors.noSignature"));
-    const includedPages = new Set(pageOrder);
-    const exportStamps = context.settings.signatureStamps.filter((stamp) => includedPages.has(stamp.pageIndex));
-    if (!exportStamps.length) {
-      throw new Error(t2("errors.signaturePageMissing"));
-    }
-    const src = await pdfLib.PDFDocument.load(await readOriginalPdfBytes());
-    const out = await pdfLib.PDFDocument.create();
-    const imageCache = /* @__PURE__ */ new Map();
-    async function signatureImageFor(dataUrl) {
-      if (!imageCache.has(dataUrl)) {
-        imageCache.set(dataUrl, out.embedPng(pngDataUrlToBytes(dataUrl)));
-      }
-      return imageCache.get(dataUrl);
-    }
-    const count = pageOrder.length;
-    for (let i2 = 0; i2 < count; i2++) {
-      const sourceIndex = pageOrder[i2];
-      const [copied] = await out.copyPages(src, [sourceIndex]);
-      const pageStamps = exportStamps.filter((stamp) => stamp.pageIndex === sourceIndex);
-      for (const stamp of pageStamps) {
-        const signatureImage = await signatureImageFor(stamp.dataUrl);
-        const width = copied.getWidth();
-        const height = copied.getHeight();
-        const drawWidth = width * stamp.wPct / 100;
-        const drawHeight = height * stamp.hPct / 100;
-        const x2 = width * stamp.xPct / 100;
-        const y2 = height - height * stamp.yPct / 100 - drawHeight;
-        copied.drawImage(signatureImage, {
-          x: x2,
-          y: y2,
-          width: drawWidth,
-          height: drawHeight
-        });
-      }
-      out.addPage(copied);
-      await new Promise((r2) => setTimeout(r2, 0));
-    }
-    const bytes = await out.save();
-    return createPdfArtifact(bytes, fileBase, {
-      source: "pdf-lib",
-      rasterized: false,
-      preservesOriginalQuality: true,
-      signed: true
-    });
-  }
   async function exportSplitPart(partIndex) {
     if (operationInProgress) return;
     const part = splitParts()[partIndex];
@@ -27657,6 +29237,13 @@
   $2("mobileSignDelete").addEventListener("click", deleteSelectedSignatureStamp);
   signatureDragSource.addEventListener("pointerdown", beginSignatureDragFromSource);
   signatureOverlay.addEventListener("pointerdown", beginSignatureOverlayDrag);
+  canvasWrap.addEventListener("pointerdown", (e2) => {
+    if (!isStampTool() || signatureState.selectedId == null || e2.target.closest(".signature-stamp")) return;
+    signatureState.selectedId = null;
+    syncSignatureControls();
+    syncTextControls();
+    updateSignatureOverlay();
+  });
   function toggleFineRotationQuality() {
     if (operationInProgress) return;
     state.fineRotationQuality = state.fineRotationQuality === "ultra" ? "high" : "ultra";
@@ -27703,7 +29290,7 @@
       undoPageChange();
       return;
     }
-    if ((e2.key === "Delete" || e2.key === "Backspace") && activeTool === "sign" && !editingText) {
+    if ((e2.key === "Delete" || e2.key === "Backspace") && isStampTool() && !editingText) {
       if (deleteSelectedSignatureStamp()) {
         e2.preventDefault();
         return;
@@ -27869,6 +29456,10 @@
       await mergeSelectedPdfs();
       return;
     }
+    if (activeTool === "image") {
+      await runImageToolExport();
+      return;
+    }
     if (!state.pdfDoc || activePageCount() === 0) return;
     if (advancedPasswordToggle.checked && canPasswordProtectExport() && !advancedPasswordValue()) {
       showError(t2("errors.password"));
@@ -27898,9 +29489,9 @@
       } else if (activeTool === "edit") {
         setLoader(true, t2("progress.exportingPageEdits"), 15);
         await runExportPipeline(context, () => createEditedPdfArtifact(exportOrder, context.fileBase, context));
-      } else if (activeTool === "sign") {
-        setLoader(true, t2("progress.exportingSignedPdf"), 20);
-        await runExportPipeline(context, () => createSignedPdfArtifact(exportOrder, context.fileBase, context));
+      } else if (isStampTool()) {
+        setLoader(true, t2(activeTool === "sign" ? "progress.exportingSignedPdf" : "progress.exportingPages"), 20);
+        await runExportPipeline(context, () => createAnnotatedPdfArtifact(exportOrder, context.fileBase, context));
       } else if (activeTool === "compress") {
         setLoader(true, t2("progress.compressingPdf"), 10);
         await runExportPipeline(context, createCompressedPdfArtifact);
@@ -28120,7 +29711,7 @@
     input.addEventListener("blur", () => finish(true));
   });
   previewStage.addEventListener("wheel", (e2) => {
-    const canZoomTool = activeTool === "preview" || activeTool === "merge" || activeTool === "compress" || activeTool === "sign" || isRasterTool(activeTool) || activeTool === "edit";
+    const canZoomTool = activeTool === "preview" || activeTool === "merge" || activeTool === "compress" || isStampTool() || activeTool === "image" && !imageCollecting() || isRasterTool(activeTool) || activeTool === "edit";
     const overPdf = e2.target.closest(".preview-canvas-wrap, .page-editor-canvas-wrap");
     if (!state.pdfDoc || !canZoomTool || !overPdf || !e2.ctrlKey && !e2.metaKey) return;
     e2.preventDefault();

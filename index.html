@@ -24,8 +24,8 @@ Ethan Hu -->
 <link rel="icon" href="favicon.svg?v=blue-tile-1" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=raster-fast-1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:wght@500&family=Nunito:wght@600&family=Roboto+Mono:wght@500&family=Caveat:wght@600&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=text-fonts-1">
 </head>
 <body>
 <div class="frame">
@@ -57,8 +57,14 @@ Ethan Hu -->
     <div class="tool-tab" id="tab-sign" data-tool="sign" role="tab" aria-selected="false" aria-controls="tool-sign" tabindex="-1">
       <span data-tool-label="sign">Sign</span>
     </div>
+    <div class="tool-tab" id="tab-text" data-tool="text" role="tab" aria-selected="false" aria-controls="tool-text" tabindex="-1">
+      <span data-tool-label="text">Text</span>
+    </div>
     <div class="tool-tab" id="tab-merge" data-tool="merge" role="tab" aria-selected="false" aria-controls="tool-merge" tabindex="-1">
       <span data-tool-label="merge">Merge</span>
+    </div>
+    <div class="tool-tab" id="tab-image" data-tool="image" role="tab" aria-selected="false" aria-controls="tool-image" tabindex="-1">
+      <span data-tool-label="image">Image</span>
     </div>
     <div class="tool-tab" id="tab-compress" data-tool="compress" role="tab" aria-selected="false" aria-controls="tool-compress" tabindex="-1">
       <span data-tool-label="compress">Compress</span>
@@ -199,6 +205,96 @@ Ethan Hu -->
         </div>
       </div>
 
+      <!-- ═══ TEXT PANEL ═══ -->
+      <div class="tool-panel" id="tool-text" role="tabpanel" aria-labelledby="tab-text" aria-hidden="true">
+        <div style="margin-top:26px">
+          <div class="section-label"><span data-i18n="sections.text">Text</span></div>
+          <div class="page-processing-segments seg seg-3" id="textModeSegments" role="group" data-i18n-aria-label="text.modeAria" aria-label="Text type">
+            <button type="button" class="page-processing-segment on" data-value="text" aria-pressed="true" data-i18n="text.modeText">Text</button>
+            <button type="button" class="page-processing-segment" data-value="numbers" aria-pressed="false" data-i18n="text.modeNumbers">Page numbers</button>
+            <button type="button" class="page-processing-segment" data-value="watermark" aria-pressed="false" data-i18n="text.modeWatermark">Watermark</button>
+          </div>
+
+          <div class="text-mode-panel" data-text-panel="text">
+            <textarea class="advanced-text-input text-input" id="textDraftInput" rows="2" data-i18n-placeholder="text.placeholder" placeholder="Type your text"></textarea>
+            <div class="option-row">
+              <span class="option-label" data-i18n="text.size">Size</span>
+              <b class="option-value" id="textSizeValue">18 pt</b>
+            </div>
+            <div class="slider-control"><input type="range" min="8" max="72" value="18" class="slider" id="textSizeSlider" data-i18n-aria-label="text.size" aria-label="Size"></div>
+            <div class="option-row">
+              <span class="option-label" data-i18n="text.color">Color</span>
+              <div class="color-swatches" id="textColorSwatches" role="radiogroup" data-i18n-aria-label="text.color" aria-label="Color"></div>
+            </div>
+            <div class="option-label option-label-block" data-i18n="text.font">Font</div>
+            <div class="font-options" id="textFontOptions" role="radiogroup" data-i18n-aria-label="text.font" aria-label="Font"></div>
+            <div class="text-actions">
+              <button class="btn-secondary btn-secondary-accent" id="textAddBtn" type="button" data-i18n="text.add" disabled>Add to page</button>
+              <button class="btn-secondary" id="textRemoveBtn" type="button" data-i18n="text.remove" disabled>Remove selected</button>
+            </div>
+            <div class="organize-summary" id="textSummary">Type something, add it to the page, then drag it into place.</div>
+          </div>
+
+          <div class="text-mode-panel" data-text-panel="numbers" hidden>
+            <div class="toggles switch-list">
+              <div class="toggle switch-row" id="pageNumbersToggle" role="switch" tabindex="0" aria-checked="false"><span data-i18n="text.showNumbers">Show page numbers</span><span class="switch" aria-hidden="true"></span></div>
+            </div>
+            <div class="option-label option-label-block" data-i18n="text.position">Position</div>
+            <div class="page-processing-segments seg" id="numbersVertical" role="group" data-i18n-aria-label="text.position" aria-label="Position">
+              <button type="button" class="page-processing-segment" data-value="top" aria-pressed="false" data-i18n="text.top">Top</button>
+              <button type="button" class="page-processing-segment on" data-value="bottom" aria-pressed="true" data-i18n="text.bottom">Bottom</button>
+            </div>
+            <div class="page-processing-segments seg seg-3 seg-stacked" id="numbersAlign" role="group" data-i18n-aria-label="text.position" aria-label="Position">
+              <button type="button" class="page-processing-segment" data-value="left" aria-pressed="false" data-i18n="text.left">Left</button>
+              <button type="button" class="page-processing-segment on" data-value="center" aria-pressed="true" data-i18n="text.center">Center</button>
+              <button type="button" class="page-processing-segment" data-value="right" aria-pressed="false" data-i18n="text.right">Right</button>
+            </div>
+            <div class="option-label option-label-block" data-i18n="text.style">Style</div>
+            <div class="page-processing-segments seg seg-3" id="numbersFormat" role="group" data-i18n-aria-label="text.style" aria-label="Style">
+              <button type="button" class="page-processing-segment on" data-value="n" aria-pressed="true">1</button>
+              <button type="button" class="page-processing-segment" data-value="page" aria-pressed="false" id="numbersFormatPage">Page 1</button>
+              <button type="button" class="page-processing-segment" data-value="of" aria-pressed="false">1 / 9</button>
+            </div>
+            <div class="option-label option-label-block" data-i18n="text.size">Size</div>
+            <div class="page-processing-segments seg seg-3" id="numbersSize" role="group" data-i18n-aria-label="text.size" aria-label="Size">
+              <button type="button" class="page-processing-segment" data-value="s" aria-pressed="false" data-i18n="text.small">Small</button>
+              <button type="button" class="page-processing-segment on" data-value="m" aria-pressed="true" data-i18n="text.medium">Medium</button>
+              <button type="button" class="page-processing-segment" data-value="l" aria-pressed="false" data-i18n="text.large">Large</button>
+            </div>
+            <label class="option-row option-row-input">
+              <span class="option-label" data-i18n="text.startAt">Start at</span>
+              <input class="advanced-text-input number-input" id="numbersStartInput" type="number" inputmode="numeric" min="0" max="9999" value="1">
+            </label>
+          </div>
+
+          <div class="text-mode-panel" data-text-panel="watermark" hidden>
+            <div class="toggles switch-list">
+              <div class="toggle switch-row" id="watermarkToggle" role="switch" tabindex="0" aria-checked="false"><span data-i18n="text.showWatermark">Show watermark</span><span class="switch" aria-hidden="true"></span></div>
+            </div>
+            <input class="advanced-text-input text-input" id="watermarkInput" type="text" maxlength="60" data-i18n-placeholder="text.watermarkPlaceholder" placeholder="Watermark text">
+            <div class="option-row">
+              <span class="option-label" data-i18n="text.size">Size</span>
+              <b class="option-value" id="watermarkSizeValue">64 pt</b>
+            </div>
+            <div class="slider-control"><input type="range" min="24" max="160" value="64" class="slider" id="watermarkSizeSlider" data-i18n-aria-label="text.size" aria-label="Size"></div>
+            <div class="option-row">
+              <span class="option-label" data-i18n="text.opacity">Opacity</span>
+              <b class="option-value" id="watermarkOpacityValue">20%</b>
+            </div>
+            <div class="slider-control"><input type="range" min="5" max="80" value="20" class="slider" id="watermarkOpacitySlider" data-i18n-aria-label="text.opacity" aria-label="Opacity"></div>
+            <div class="option-label option-label-block" data-i18n="text.angle">Angle</div>
+            <div class="page-processing-segments seg" id="watermarkLayout" role="group" data-i18n-aria-label="text.angle" aria-label="Angle">
+              <button type="button" class="page-processing-segment on" data-value="diagonal" aria-pressed="true" data-i18n="text.diagonal">Diagonal</button>
+              <button type="button" class="page-processing-segment" data-value="horizontal" aria-pressed="false" data-i18n="text.horizontal">Horizontal</button>
+            </div>
+            <div class="option-row">
+              <span class="option-label" data-i18n="text.color">Color</span>
+              <div class="color-swatches" id="watermarkColorSwatches" role="radiogroup" data-i18n-aria-label="text.color" aria-label="Color"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ MERGE PANEL ═══ -->
       <div class="tool-panel" id="tool-merge" role="tabpanel" aria-labelledby="tab-merge" aria-hidden="true">
         <div style="margin-top:26px">
@@ -208,6 +304,44 @@ Ethan Hu -->
           <div class="merge-actions">
             <button class="btn-secondary" id="mergeClearBtn" disabled data-i18n="actions.clearList">Clear list</button>
             <button class="btn-secondary btn-secondary-accent" id="mergeRunBtn" disabled data-i18n="actions.mergeIntoOrganize">Merge into Organize</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ IMAGE PANEL ═══ -->
+      <div class="tool-panel" id="tool-image" role="tabpanel" aria-labelledby="tab-image" aria-hidden="true">
+        <div style="margin-top:26px">
+          <div class="section-label"><span data-i18n="sections.image">Image</span></div>
+          <div class="page-processing-segments seg" id="imageModeSegments" role="group" data-i18n-aria-label="image.modeAria" aria-label="Conversion">
+            <button type="button" class="page-processing-segment on" data-value="toPdf" aria-pressed="true" data-i18n="image.toPdf">Images to PDF</button>
+            <button type="button" class="page-processing-segment" data-value="fromPdf" aria-pressed="false" data-i18n="image.fromPdf">PDF to images</button>
+          </div>
+
+          <div class="image-mode-panel" data-image-panel="toPdf">
+            <div class="organize-summary" id="imageSummary">Add photos or screenshots. Each image becomes one page.</div>
+            <div class="merge-list image-list" id="imageList"></div>
+            <div class="option-label option-label-block" data-i18n="image.pageSize">Page size</div>
+            <div class="page-processing-segments seg seg-3" id="imagePageSize" role="group" data-i18n-aria-label="image.pageSize" aria-label="Page size">
+              <button type="button" class="page-processing-segment on" data-value="fit" aria-pressed="true" data-i18n="image.fit">Fit image</button>
+              <button type="button" class="page-processing-segment" data-value="a4" aria-pressed="false">A4</button>
+              <button type="button" class="page-processing-segment" data-value="letter" aria-pressed="false" data-i18n="image.letter">Letter</button>
+            </div>
+            <button class="btn-secondary image-clear" id="imageClearBtn" type="button" data-i18n="actions.clearList" disabled>Clear list</button>
+          </div>
+
+          <div class="image-mode-panel" data-image-panel="fromPdf" hidden>
+            <div class="organize-summary" id="pdfToImageSummary">Save pages as images. Several pages download together as a ZIP file.</div>
+            <div class="option-label option-label-block" data-i18n="image.format">Format</div>
+            <div class="page-processing-segments seg" id="imageFormat" role="group" data-i18n-aria-label="image.format" aria-label="Format">
+              <button type="button" class="page-processing-segment on" data-value="png" aria-pressed="true">PNG</button>
+              <button type="button" class="page-processing-segment" data-value="jpeg" aria-pressed="false">JPEG</button>
+            </div>
+            <div class="option-label option-label-block" data-i18n="image.quality">Resolution</div>
+            <div class="page-processing-segments seg seg-3" id="imageDpi" role="group" data-i18n-aria-label="image.quality" aria-label="Resolution">
+              <button type="button" class="page-processing-segment" data-value="72" aria-pressed="false">72 dpi</button>
+              <button type="button" class="page-processing-segment on" data-value="150" aria-pressed="true">150 dpi</button>
+              <button type="button" class="page-processing-segment" data-value="300" aria-pressed="false">300 dpi</button>
+            </div>
           </div>
         </div>
       </div>
@@ -429,6 +563,7 @@ Ethan Hu -->
           <canvas id="previewCanvas"></canvas>
           <div class="signature-layer" id="signatureOverlay" hidden></div>
         </div>
+        <div class="image-pages" id="imagePages" hidden></div>
         <div class="organizer" id="organizer" style="display:none">
           <div class="organizer-empty" id="organizerEmpty">Upload a PDF to organize pages.</div>
           <div class="organizer-grid" id="organizerGrid"></div>
@@ -534,6 +669,6 @@ Ethan Hu -->
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.bundle.js?v=raster-fast-1"></script>
+<script src="app.bundle.js?v=text-fonts-1"></script>
 </body>
 </html>
