@@ -564,16 +564,16 @@
     const thresholdSettings = effectiveRasterSettings('threshold', sourceIndex);
     const greyscaleSettings = effectiveRasterSettings('greyscale', sourceIndex);
     const thresholdValue = thresholdSettings.threshold;
-    threshSlider.value = String(thresholdValue);
+    setSliderValue(threshSlider, thresholdValue);
     threshNum.textContent = thresholdValue;
     threshPct.textContent = Math.round((thresholdValue / 255) * 100) + '%';
     threshHint.textContent = threshHintText(thresholdValue);
     threshNeedle.style.left = ((thresholdValue / 255) * 100) + '%';
     setTogglePressed(invertToggle, thresholdSettings.invert);
-    brightSlider.value = String(greyscaleSettings.brightness);
+    setSliderValue(brightSlider, greyscaleSettings.brightness);
     brightNum.textContent = greyscaleSettings.brightness > 0 ? '+' + greyscaleSettings.brightness : String(greyscaleSettings.brightness);
     brightTag.textContent = brightnessHintText(greyscaleSettings.brightness);
-    contrastSlider.value = String(greyscaleSettings.contrast);
+    setSliderValue(contrastSlider, greyscaleSettings.contrast);
     contrastNum.textContent = greyscaleSettings.contrast;
     contrastTag.textContent = contrastHintText(greyscaleSettings.contrast);
     setTogglePressed(greyInvertToggle, greyscaleSettings.greyInvert);
@@ -599,7 +599,26 @@
   function setTogglePressed(el, pressed) {
     if (!el) return;
     el.classList.toggle('on', pressed);
-    el.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    el.setAttribute(el.getAttribute('role') === 'switch' ? 'aria-checked' : 'aria-pressed', pressed ? 'true' : 'false');
+  }
+
+  // WebKit has no range-progress pseudo, so the filled part of the track reads this ratio.
+  function syncSliderFill(el) {
+    if (!el) return;
+    const min = +el.min || 0;
+    const max = +el.max || 100;
+    const ratio = max > min ? (+el.value - min) / (max - min) : 0;
+    el.style.setProperty('--fill-ratio', String(Math.max(0, Math.min(1, ratio))));
+  }
+
+  const X_ICON = '<svg class="x-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m6 6 8 8M14 6l-8 8"/></svg>';
+  const DROP_ICON_SINGLE = '<svg viewBox="0 0 24 24" focusable="false"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v3.5A1.5 1.5 0 0 0 15.5 8H19"/><path d="M12 17.5v-6.5M9.25 13.5 12 10.75l2.75 2.75"/></svg>';
+  const DROP_ICON_MULTI = '<svg viewBox="0 0 24 24" focusable="false"><path d="M8.5 5V4.5A1.5 1.5 0 0 1 10 3h5.5L20 7.5v10a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M6.5 6h7L17 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 5 19.5v-12A1.5 1.5 0 0 1 6.5 6z"/><path d="M11 18v-5.5M8.75 14.5 11 12.25l2.25 2.25"/></svg>';
+
+  function setSliderValue(el, value) {
+    if (!el) return;
+    el.value = String(value);
+    syncSliderFill(el);
   }
 
   const THEME_STORAGE_KEY = 'pdf-atelier-theme';
@@ -1068,7 +1087,7 @@
     dropZone.classList.toggle('is-collapsed', collapseDrop);
     dropZone.setAttribute('aria-hidden', collapseDrop ? 'true' : 'false');
     dropZone.tabIndex = collapseDrop ? -1 : 0;
-    dropGlyph.textContent = merging ? '∑' : '¶';
+    dropGlyph.innerHTML = merging ? DROP_ICON_MULTI : DROP_ICON_SINGLE;
     dropLabel.textContent = merging ? t('drop.uploadPdfs') : t('drop.uploadPdf');
     dropSub.textContent = merging ? t('drop.multiSub') : t('drop.singleSub');
     dropZone.setAttribute('aria-label', merging ? t('drop.multiAria') : t('drop.singleAria'));
@@ -1401,8 +1420,8 @@
       'status.error': 'error',
       'drop.uploadPdf': 'Upload PDF',
       'drop.uploadPdfs': 'Upload PDFs',
-      'drop.singleSub': 'PDF · click or drop',
-      'drop.multiSub': 'Multiple PDFs · click or drop',
+      'drop.singleSub': 'Choose a file or drag it here',
+      'drop.multiSub': 'Choose files or drag them here',
       'drop.singleAria': 'Upload a PDF',
       'drop.multiAria': 'Upload one or more PDFs',
       'actions.clear': 'Clear',
@@ -1631,8 +1650,8 @@
       'status.error': '错误',
       'drop.uploadPdf': '选择 PDF',
       'drop.uploadPdfs': '选择多个 PDF',
-      'drop.singleSub': 'PDF · 点击或拖入',
-      'drop.multiSub': '多个 PDF · 点击或拖入',
+      'drop.singleSub': '选择文件或拖到这里',
+      'drop.multiSub': '选择多个文件或拖到这里',
       'drop.singleAria': '选择 PDF',
       'drop.multiAria': '选择一个或多个 PDF',
       'actions.clear': '清除',
@@ -1842,8 +1861,8 @@
       'status.error': '錯誤',
       'drop.uploadPdf': '選擇 PDF',
       'drop.uploadPdfs': '選擇多個 PDF',
-      'drop.singleSub': 'PDF · 點擊或拖入',
-      'drop.multiSub': '多個 PDF · 點擊或拖入',
+      'drop.singleSub': '選擇檔案或拖到這裡',
+      'drop.multiSub': '選擇多個檔案或拖到這裡',
       'drop.singleAria': '選擇 PDF',
       'drop.multiAria': '選擇一個或多個 PDF',
       'actions.clear': '清除',
@@ -2068,8 +2087,8 @@
       'status.error': '오류',
       'drop.uploadPdf': 'PDF 선택',
       'drop.uploadPdfs': 'PDF 여러 개 선택',
-      'drop.singleSub': 'PDF · 클릭하거나 끌어오기',
-      'drop.multiSub': '여러 PDF · 클릭하거나 끌어오기',
+      'drop.singleSub': '파일을 선택하거나 여기로 끌어오세요',
+      'drop.multiSub': '여러 파일을 선택하거나 여기로 끌어오세요',
       'drop.singleAria': 'PDF 선택',
       'drop.multiAria': '하나 이상의 PDF 선택',
       'actions.clear': '지우기',
@@ -2294,8 +2313,8 @@
       'status.error': 'エラー',
       'drop.uploadPdf': 'PDFを選択',
       'drop.uploadPdfs': '複数のPDFを選択',
-      'drop.singleSub': 'PDF · クリックまたはドラッグ',
-      'drop.multiSub': '複数PDF · クリックまたはドラッグ',
+      'drop.singleSub': 'ファイルを選択するか、ここにドラッグ',
+      'drop.multiSub': '複数のファイルを選択するか、ここにドラッグ',
       'drop.singleAria': 'PDFを選択',
       'drop.multiAria': '1つ以上のPDFを選択',
       'actions.clear': 'クリア',
@@ -2519,8 +2538,8 @@
       'status.error': 'error',
       'drop.uploadPdf': 'Subir PDF',
       'drop.uploadPdfs': 'Subir PDFs',
-      'drop.singleSub': 'PDF · clic o arrastra',
-      'drop.multiSub': 'Varios PDF · clic o arrastra',
+      'drop.singleSub': 'Elige un archivo o arrástralo aquí',
+      'drop.multiSub': 'Elige archivos o arrástralos aquí',
       'drop.singleAria': 'Subir un PDF',
       'drop.multiAria': 'Subir uno o más PDF',
       'actions.clear': 'Borrar',
@@ -2744,8 +2763,8 @@
       'status.error': 'erreur',
       'drop.uploadPdf': 'Importer un PDF',
       'drop.uploadPdfs': 'Importer des PDF',
-      'drop.singleSub': 'PDF · cliquer ou déposer',
-      'drop.multiSub': 'Plusieurs PDF · cliquer ou déposer',
+      'drop.singleSub': 'Choisissez un fichier ou déposez-le ici',
+      'drop.multiSub': 'Choisissez des fichiers ou déposez-les ici',
       'drop.singleAria': 'Importer un PDF',
       'drop.multiAria': 'Importer un ou plusieurs PDF',
       'actions.clear': 'Effacer',
@@ -3812,7 +3831,7 @@
       down.addEventListener('click', () => moveMergeFile(index, 1));
       const remove = document.createElement('button');
       remove.type = 'button';
-      remove.innerHTML = '<span class="merge-file-action-glyph" aria-hidden="true">×</span>';
+      remove.innerHTML = X_ICON;
       remove.setAttribute('aria-label', t('merge.remove', { name: file.name }));
       remove.disabled = operationInProgress;
       remove.addEventListener('click', () => removeMergeFile(index));
@@ -3979,7 +3998,11 @@
     setMobileControlsOpen(false);
   });
   activateElementOnKeyboard(dropZone);
-  document.querySelectorAll('.toggle[role="button"]').forEach(activateElementOnKeyboard);
+  document.querySelectorAll('.toggle[role="button"], .toggle[role="switch"]').forEach(activateElementOnKeyboard);
+  document.querySelectorAll('input[type=range].slider').forEach(syncSliderFill);
+  document.addEventListener('input', e => {
+    if (e.target.matches?.('input[type=range].slider')) syncSliderFill(e.target);
+  });
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
   dropZone.addEventListener('drop', e => {
@@ -5566,8 +5589,8 @@
       return;
     }
     const edit = currentPageEdit();
-    editRotateSlider.value = edit.fineRotation;
-    bottomRotateSlider.value = edit.fineRotation;
+    setSliderValue(editRotateSlider, edit.fineRotation);
+    setSliderValue(bottomRotateSlider, edit.fineRotation);
     editRotateNum.textContent = (Math.round(editAngle(edit) * 10) / 10).toFixed(1) + '°';
     bottomRotateNum.textContent = editRotateNum.textContent;
     syncCropLabels(edit);
@@ -6166,7 +6189,7 @@
     remove.type = 'button';
     remove.className = 'page-split-remove';
     remove.setAttribute('aria-label', t('split.removeAria', { num: splitIndex + 1 }));
-    remove.textContent = '×';
+    remove.innerHTML = X_ICON;
     remove.addEventListener('pointerdown', e => e.stopPropagation());
     remove.addEventListener('click', e => {
       e.stopPropagation();
@@ -7206,7 +7229,7 @@
     if (operationInProgress && render) return;
     const v = Math.max(0, Math.min(255, Math.round(+value || 0)));
     editableRasterSettings('threshold').threshold = v;
-    threshSlider.value = String(v);
+    setSliderValue(threshSlider, v);
     threshNum.textContent = v;
     threshPct.textContent = Math.round((v / 255) * 100) + '%';
     threshHint.textContent = threshHintText(v);
@@ -7232,7 +7255,7 @@
     const v = Math.max(-100, Math.min(100, Math.round(+value || 0)));
     const settings = editableRasterSettings('greyscale');
     settings.brightness = v;
-    brightSlider.value = String(v);
+    setSliderValue(brightSlider, v);
     brightNum.textContent = v > 0 ? '+' + v : String(v);
     brightTag.textContent = brightnessHintText(v);
     $('greyHint').textContent = greyHintText(settings);
@@ -7245,7 +7268,7 @@
     const v = Math.max(50, Math.min(200, Math.round(+value || 0)));
     const settings = editableRasterSettings('greyscale');
     settings.contrast = v;
-    contrastSlider.value = String(v);
+    setSliderValue(contrastSlider, v);
     contrastNum.textContent = v;
     contrastTag.textContent = contrastHintText(v);
     $('greyHint').textContent = greyHintText(settings);

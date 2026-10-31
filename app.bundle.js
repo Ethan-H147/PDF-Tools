@@ -21271,16 +21271,16 @@
     const thresholdSettings = effectiveRasterSettings("threshold", sourceIndex);
     const greyscaleSettings = effectiveRasterSettings("greyscale", sourceIndex);
     const thresholdValue = thresholdSettings.threshold;
-    threshSlider.value = String(thresholdValue);
+    setSliderValue(threshSlider, thresholdValue);
     threshNum.textContent = thresholdValue;
     threshPct.textContent = Math.round(thresholdValue / 255 * 100) + "%";
     threshHint.textContent = threshHintText(thresholdValue);
     threshNeedle.style.left = thresholdValue / 255 * 100 + "%";
     setTogglePressed(invertToggle, thresholdSettings.invert);
-    brightSlider.value = String(greyscaleSettings.brightness);
+    setSliderValue(brightSlider, greyscaleSettings.brightness);
     brightNum.textContent = greyscaleSettings.brightness > 0 ? "+" + greyscaleSettings.brightness : String(greyscaleSettings.brightness);
     brightTag.textContent = brightnessHintText(greyscaleSettings.brightness);
-    contrastSlider.value = String(greyscaleSettings.contrast);
+    setSliderValue(contrastSlider, greyscaleSettings.contrast);
     contrastNum.textContent = greyscaleSettings.contrast;
     contrastTag.textContent = contrastHintText(greyscaleSettings.contrast);
     setTogglePressed(greyInvertToggle, greyscaleSettings.greyInvert);
@@ -21303,7 +21303,22 @@
   function setTogglePressed(el, pressed) {
     if (!el) return;
     el.classList.toggle("on", pressed);
-    el.setAttribute("aria-pressed", pressed ? "true" : "false");
+    el.setAttribute(el.getAttribute("role") === "switch" ? "aria-checked" : "aria-pressed", pressed ? "true" : "false");
+  }
+  function syncSliderFill(el) {
+    if (!el) return;
+    const min = +el.min || 0;
+    const max = +el.max || 100;
+    const ratio = max > min ? (+el.value - min) / (max - min) : 0;
+    el.style.setProperty("--fill-ratio", String(Math.max(0, Math.min(1, ratio))));
+  }
+  var X_ICON = '<svg class="x-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m6 6 8 8M14 6l-8 8"/></svg>';
+  var DROP_ICON_SINGLE = '<svg viewBox="0 0 24 24" focusable="false"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v3.5A1.5 1.5 0 0 0 15.5 8H19"/><path d="M12 17.5v-6.5M9.25 13.5 12 10.75l2.75 2.75"/></svg>';
+  var DROP_ICON_MULTI = '<svg viewBox="0 0 24 24" focusable="false"><path d="M8.5 5V4.5A1.5 1.5 0 0 1 10 3h5.5L20 7.5v10a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M6.5 6h7L17 9.5v10a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 5 19.5v-12A1.5 1.5 0 0 1 6.5 6z"/><path d="M11 18v-5.5M8.75 14.5 11 12.25l2.25 2.25"/></svg>';
+  function setSliderValue(el, value) {
+    if (!el) return;
+    el.value = String(value);
+    syncSliderFill(el);
   }
   var THEME_STORAGE_KEY = "pdf-atelier-theme";
   function readSavedTheme() {
@@ -21714,7 +21729,7 @@
     dropZone.classList.toggle("is-collapsed", collapseDrop);
     dropZone.setAttribute("aria-hidden", collapseDrop ? "true" : "false");
     dropZone.tabIndex = collapseDrop ? -1 : 0;
-    dropGlyph.textContent = merging ? "\u2211" : "\xB6";
+    dropGlyph.innerHTML = merging ? DROP_ICON_MULTI : DROP_ICON_SINGLE;
     dropLabel.textContent = merging ? t2("drop.uploadPdfs") : t2("drop.uploadPdf");
     dropSub.textContent = merging ? t2("drop.multiSub") : t2("drop.singleSub");
     dropZone.setAttribute("aria-label", merging ? t2("drop.multiAria") : t2("drop.singleAria"));
@@ -22011,8 +22026,8 @@
       "status.error": "error",
       "drop.uploadPdf": "Upload PDF",
       "drop.uploadPdfs": "Upload PDFs",
-      "drop.singleSub": "PDF \xB7 click or drop",
-      "drop.multiSub": "Multiple PDFs \xB7 click or drop",
+      "drop.singleSub": "Choose a file or drag it here",
+      "drop.multiSub": "Choose files or drag them here",
       "drop.singleAria": "Upload a PDF",
       "drop.multiAria": "Upload one or more PDFs",
       "actions.clear": "Clear",
@@ -22240,8 +22255,8 @@
       "status.error": "\u9519\u8BEF",
       "drop.uploadPdf": "\u9009\u62E9 PDF",
       "drop.uploadPdfs": "\u9009\u62E9\u591A\u4E2A PDF",
-      "drop.singleSub": "PDF \xB7 \u70B9\u51FB\u6216\u62D6\u5165",
-      "drop.multiSub": "\u591A\u4E2A PDF \xB7 \u70B9\u51FB\u6216\u62D6\u5165",
+      "drop.singleSub": "\u9009\u62E9\u6587\u4EF6\u6216\u62D6\u5230\u8FD9\u91CC",
+      "drop.multiSub": "\u9009\u62E9\u591A\u4E2A\u6587\u4EF6\u6216\u62D6\u5230\u8FD9\u91CC",
       "drop.singleAria": "\u9009\u62E9 PDF",
       "drop.multiAria": "\u9009\u62E9\u4E00\u4E2A\u6216\u591A\u4E2A PDF",
       "actions.clear": "\u6E05\u9664",
@@ -22451,8 +22466,8 @@
       "status.error": "\u932F\u8AA4",
       "drop.uploadPdf": "\u9078\u64C7 PDF",
       "drop.uploadPdfs": "\u9078\u64C7\u591A\u500B PDF",
-      "drop.singleSub": "PDF \xB7 \u9EDE\u64CA\u6216\u62D6\u5165",
-      "drop.multiSub": "\u591A\u500B PDF \xB7 \u9EDE\u64CA\u6216\u62D6\u5165",
+      "drop.singleSub": "\u9078\u64C7\u6A94\u6848\u6216\u62D6\u5230\u9019\u88E1",
+      "drop.multiSub": "\u9078\u64C7\u591A\u500B\u6A94\u6848\u6216\u62D6\u5230\u9019\u88E1",
       "drop.singleAria": "\u9078\u64C7 PDF",
       "drop.multiAria": "\u9078\u64C7\u4E00\u500B\u6216\u591A\u500B PDF",
       "actions.clear": "\u6E05\u9664",
@@ -22677,8 +22692,8 @@
       "status.error": "\uC624\uB958",
       "drop.uploadPdf": "PDF \uC120\uD0DD",
       "drop.uploadPdfs": "PDF \uC5EC\uB7EC \uAC1C \uC120\uD0DD",
-      "drop.singleSub": "PDF \xB7 \uD074\uB9AD\uD558\uAC70\uB098 \uB04C\uC5B4\uC624\uAE30",
-      "drop.multiSub": "\uC5EC\uB7EC PDF \xB7 \uD074\uB9AD\uD558\uAC70\uB098 \uB04C\uC5B4\uC624\uAE30",
+      "drop.singleSub": "\uD30C\uC77C\uC744 \uC120\uD0DD\uD558\uAC70\uB098 \uC5EC\uAE30\uB85C \uB04C\uC5B4\uC624\uC138\uC694",
+      "drop.multiSub": "\uC5EC\uB7EC \uD30C\uC77C\uC744 \uC120\uD0DD\uD558\uAC70\uB098 \uC5EC\uAE30\uB85C \uB04C\uC5B4\uC624\uC138\uC694",
       "drop.singleAria": "PDF \uC120\uD0DD",
       "drop.multiAria": "\uD558\uB098 \uC774\uC0C1\uC758 PDF \uC120\uD0DD",
       "actions.clear": "\uC9C0\uC6B0\uAE30",
@@ -22903,8 +22918,8 @@
       "status.error": "\u30A8\u30E9\u30FC",
       "drop.uploadPdf": "PDF\u3092\u9078\u629E",
       "drop.uploadPdfs": "\u8907\u6570\u306EPDF\u3092\u9078\u629E",
-      "drop.singleSub": "PDF \xB7 \u30AF\u30EA\u30C3\u30AF\u307E\u305F\u306F\u30C9\u30E9\u30C3\u30B0",
-      "drop.multiSub": "\u8907\u6570PDF \xB7 \u30AF\u30EA\u30C3\u30AF\u307E\u305F\u306F\u30C9\u30E9\u30C3\u30B0",
+      "drop.singleSub": "\u30D5\u30A1\u30A4\u30EB\u3092\u9078\u629E\u3059\u308B\u304B\u3001\u3053\u3053\u306B\u30C9\u30E9\u30C3\u30B0",
+      "drop.multiSub": "\u8907\u6570\u306E\u30D5\u30A1\u30A4\u30EB\u3092\u9078\u629E\u3059\u308B\u304B\u3001\u3053\u3053\u306B\u30C9\u30E9\u30C3\u30B0",
       "drop.singleAria": "PDF\u3092\u9078\u629E",
       "drop.multiAria": "1\u3064\u4EE5\u4E0A\u306EPDF\u3092\u9078\u629E",
       "actions.clear": "\u30AF\u30EA\u30A2",
@@ -23128,8 +23143,8 @@
       "status.error": "error",
       "drop.uploadPdf": "Subir PDF",
       "drop.uploadPdfs": "Subir PDFs",
-      "drop.singleSub": "PDF \xB7 clic o arrastra",
-      "drop.multiSub": "Varios PDF \xB7 clic o arrastra",
+      "drop.singleSub": "Elige un archivo o arr\xE1stralo aqu\xED",
+      "drop.multiSub": "Elige archivos o arr\xE1stralos aqu\xED",
       "drop.singleAria": "Subir un PDF",
       "drop.multiAria": "Subir uno o m\xE1s PDF",
       "actions.clear": "Borrar",
@@ -23353,8 +23368,8 @@
       "status.error": "erreur",
       "drop.uploadPdf": "Importer un PDF",
       "drop.uploadPdfs": "Importer des PDF",
-      "drop.singleSub": "PDF \xB7 cliquer ou d\xE9poser",
-      "drop.multiSub": "Plusieurs PDF \xB7 cliquer ou d\xE9poser",
+      "drop.singleSub": "Choisissez un fichier ou d\xE9posez-le ici",
+      "drop.multiSub": "Choisissez des fichiers ou d\xE9posez-les ici",
       "drop.singleAria": "Importer un PDF",
       "drop.multiAria": "Importer un ou plusieurs PDF",
       "actions.clear": "Effacer",
@@ -24312,7 +24327,7 @@
       down.addEventListener("click", () => moveMergeFile(index, 1));
       const remove = document.createElement("button");
       remove.type = "button";
-      remove.innerHTML = '<span class="merge-file-action-glyph" aria-hidden="true">\xD7</span>';
+      remove.innerHTML = X_ICON;
       remove.setAttribute("aria-label", t2("merge.remove", { name: file.name }));
       remove.disabled = operationInProgress;
       remove.addEventListener("click", () => removeMergeFile(index));
@@ -24460,7 +24475,11 @@
     setMobileControlsOpen(false);
   });
   activateElementOnKeyboard(dropZone);
-  document.querySelectorAll('.toggle[role="button"]').forEach(activateElementOnKeyboard);
+  document.querySelectorAll('.toggle[role="button"], .toggle[role="switch"]').forEach(activateElementOnKeyboard);
+  document.querySelectorAll("input[type=range].slider").forEach(syncSliderFill);
+  document.addEventListener("input", (e2) => {
+    if (e2.target.matches?.("input[type=range].slider")) syncSliderFill(e2.target);
+  });
   dropZone.addEventListener("dragover", (e2) => {
     e2.preventDefault();
     dropZone.classList.add("drag");
@@ -25917,8 +25936,8 @@
       return;
     }
     const edit = currentPageEdit();
-    editRotateSlider.value = edit.fineRotation;
-    bottomRotateSlider.value = edit.fineRotation;
+    setSliderValue(editRotateSlider, edit.fineRotation);
+    setSliderValue(bottomRotateSlider, edit.fineRotation);
     editRotateNum.textContent = (Math.round(editAngle(edit) * 10) / 10).toFixed(1) + "\xB0";
     bottomRotateNum.textContent = editRotateNum.textContent;
     syncCropLabels(edit);
@@ -26458,7 +26477,7 @@
     remove.type = "button";
     remove.className = "page-split-remove";
     remove.setAttribute("aria-label", t2("split.removeAria", { num: splitIndex + 1 }));
-    remove.textContent = "\xD7";
+    remove.innerHTML = X_ICON;
     remove.addEventListener("pointerdown", (e2) => e2.stopPropagation());
     remove.addEventListener("click", (e2) => {
       e2.stopPropagation();
@@ -27402,7 +27421,7 @@
     if (operationInProgress && render) return;
     const v2 = Math.max(0, Math.min(255, Math.round(+value || 0)));
     editableRasterSettings("threshold").threshold = v2;
-    threshSlider.value = String(v2);
+    setSliderValue(threshSlider, v2);
     threshNum.textContent = v2;
     threshPct.textContent = Math.round(v2 / 255 * 100) + "%";
     threshHint.textContent = threshHintText(v2);
@@ -27425,7 +27444,7 @@
     const v2 = Math.max(-100, Math.min(100, Math.round(+value || 0)));
     const settings = editableRasterSettings("greyscale");
     settings.brightness = v2;
-    brightSlider.value = String(v2);
+    setSliderValue(brightSlider, v2);
     brightNum.textContent = v2 > 0 ? "+" + v2 : String(v2);
     brightTag.textContent = brightnessHintText(v2);
     $2("greyHint").textContent = greyHintText(settings);
@@ -27437,7 +27456,7 @@
     const v2 = Math.max(50, Math.min(200, Math.round(+value || 0)));
     const settings = editableRasterSettings("greyscale");
     settings.contrast = v2;
-    contrastSlider.value = String(v2);
+    setSliderValue(contrastSlider, v2);
     contrastNum.textContent = v2;
     contrastTag.textContent = contrastHintText(v2);
     $2("greyHint").textContent = greyHintText(settings);

@@ -25,27 +25,25 @@ Ethan Hu -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=rounded-step-icons-1">
+<link rel="stylesheet" href="styles.css?v=declutter-1">
 </head>
 <body>
 <div class="frame">
 
   <header class="masthead">
     <h1 class="title">PDF<em> Atelier</em></h1>
-    <div class="title-sub" data-i18n="brand.subtitle">PDF Tools</div>
     <div class="subhead">
       <div class="lede" id="masterLede">
         View a PDF cleanly with fast page navigation and zoom.
       </div>
       <div class="meta" id="masterMeta" tabindex="0" aria-label="Tool details" data-tooltip="Open a PDF for viewing&#10;Use page navigation&#10;Zoom without changing the file">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="7" r="1.3" fill="currentColor"/><path d="M9.5 10.5H12v7m-3 0h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="7.6" r="1.25" fill="currentColor"/><path d="M10.25 10.6H12v6.15m-2.25 0h4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     </div>
   </header>
 
   <!-- TOOL NAVIGATION -->
   <nav class="tool-nav" role="tablist" aria-label="PDF tools" data-i18n-aria-label="nav.toolsAria">
-    <div class="tool-nav-label" role="presentation" aria-hidden="true" data-i18n="nav.tools">Tools</div>
     <div class="tool-indicator" id="toolIndicator" role="presentation" aria-hidden="true"></div>
     <div class="tool-tab active" id="tab-preview" data-tool="preview" role="tab" aria-selected="true" aria-controls="tool-preview" tabindex="0">
       <span data-tool-label="preview">Preview</span>
@@ -83,7 +81,7 @@ Ethan Hu -->
             <strong id="mobileControlsTitle">Preview</strong>
           </div>
           <button class="mobile-controls-close" id="mobileControlsClose" type="button" aria-label="Close controls" data-i18n-aria-label="mobile.closeControls">
-            <span aria-hidden="true">×</span>
+            <svg class="x-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m6 6 8 8M14 6l-8 8"/></svg>
           </button>
         </div>
         <div class="mobile-controls-scroll">
@@ -91,9 +89,9 @@ Ethan Hu -->
       <!-- SHARED: Source -->
       <div class="section-label"><span data-i18n="sections.source">Source PDF</span></div>
       <div class="drop" id="dropZone" role="button" tabindex="0" aria-label="Upload a PDF">
-        <div class="glyph" id="dropGlyph">¶</div>
+        <div class="glyph" id="dropGlyph" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v3.5A1.5 1.5 0 0 0 15.5 8H19"/><path d="M12 17.5v-6.5M9.25 13.5 12 10.75l2.75 2.75"/></svg></div>
         <div class="lbl" id="dropLabel">Upload PDF</div>
-        <div class="sub" id="dropSub">PDF · click or drop</div>
+        <div class="sub" id="dropSub">Choose a file or drag it here</div>
       </div>
       <input type="file" id="fileInput" accept="application/pdf">
       <div class="err" id="errBox" role="alert" aria-live="assertive" aria-atomic="true" aria-hidden="true"></div>
@@ -101,12 +99,12 @@ Ethan Hu -->
       <div class="filecard" id="fileCard">
         <div class="filecard-head">
           <div class="name" id="fileName">—</div>
-          <button class="file-remove" id="fileRemoveBtn" type="button" aria-label="Remove current PDF"><span aria-hidden="true">×</span></button>
+          <button class="file-remove" id="fileRemoveBtn" type="button" aria-label="Remove current PDF"><svg class="x-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m6 6 8 8M14 6l-8 8"/></svg></button>
         </div>
         <div class="stats">
           <span><span data-i18n="file.pages">Pages</span> <b id="pageCount">—</b></span>
           <span><span data-i18n="file.size">Size</span> <b id="fileSize">—</b></span>
-          <span><span data-i18n="file.status">Status</span> <b id="fileStatus" role="status" aria-live="polite" aria-atomic="true">ready</b></span>
+          <span class="sr-only"><span data-i18n="file.status">Status</span> <b id="fileStatus" role="status" aria-live="polite" aria-atomic="true">ready</b></span>
         </div>
       </div>
 
@@ -260,8 +258,8 @@ Ethan Hu -->
             <button type="button" class="slider-reset" id="thresholdResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetThreshold">Reset</button>
             <span data-i18n="threshold.blackTag">255 · black</span>
           </div>
-          <div class="toggles">
-            <div class="toggle" id="invertToggle" role="button" tabindex="0" aria-pressed="false"><span aria-hidden="true">↻</span> <span data-i18n="actions.invert">Invert</span></div>
+          <div class="toggles switch-list">
+            <div class="toggle switch-row" id="invertToggle" role="switch" tabindex="0" aria-checked="false"><span data-i18n="actions.invert">Invert</span><span class="switch" aria-hidden="true"></span></div>
           </div>
         </div>
       </div>
@@ -306,9 +304,9 @@ Ethan Hu -->
             <div class="slider-tags slider-tags-with-reset"><span data-i18n="greyscale.lowTag">50% · low</span><button type="button" class="slider-reset" id="contrastResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetContrast">Reset</button><span data-i18n="greyscale.highTag">200% · high</span></div>
           </div>
 
-          <div class="toggles">
-            <div class="toggle" id="greyInvertToggle" role="button" tabindex="0" aria-pressed="false"><span aria-hidden="true">↻</span> <span data-i18n="actions.invert">Invert</span></div>
-            <div class="toggle" id="sepiaToggle" role="button" tabindex="0" aria-pressed="false"><span aria-hidden="true">◈</span> <span data-i18n="actions.sepia">Sepia</span></div>
+          <div class="toggles switch-list">
+            <div class="toggle switch-row" id="greyInvertToggle" role="switch" tabindex="0" aria-checked="false"><span data-i18n="actions.invert">Invert</span><span class="switch" aria-hidden="true"></span></div>
+            <div class="toggle switch-row" id="sepiaToggle" role="switch" tabindex="0" aria-checked="false"><span data-i18n="actions.sepia">Sepia</span><span class="switch" aria-hidden="true"></span></div>
           </div>
         </div>
       </div>
@@ -444,7 +442,7 @@ Ethan Hu -->
           <div class="page-editor-main" id="pageEditorMain">
             <div class="mobile-edit-header">
               <button type="button" class="mobile-edit-close" id="mobileEditCloseBtn" aria-label="Back to all pages" data-i18n-aria-label="edit.mobileCloseAria">
-                <span aria-hidden="true">×</span>
+                <svg class="x-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m6 6 8 8M14 6l-8 8"/></svg>
               </button>
               <div class="mobile-edit-heading">
                 <span id="mobileEditDocumentName"></span>
@@ -511,9 +509,6 @@ Ethan Hu -->
   </main>
 
   <footer>
-    <div class="footer-brand">
-      <span data-i18n="footer.type">Set in SF Pro / Inter</span>
-    </div>
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="Turn on dark mode" aria-pressed="false">
       <span id="themeToggleText">Dark mode</span>
       <span class="theme-toggle-track" aria-hidden="true"><span class="theme-toggle-thumb"></span></span>
@@ -539,6 +534,6 @@ Ethan Hu -->
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.bundle.js?v=page-jump-1"></script>
+<script src="app.bundle.js?v=apple-controls-1"></script>
 </body>
 </html>
