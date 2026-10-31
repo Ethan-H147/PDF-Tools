@@ -26268,6 +26268,7 @@
       const on = isCustom ? customColor : swatch.dataset.color === selected;
       swatch.setAttribute("aria-checked", on ? "true" : "false");
       swatch.tabIndex = 0;
+      if (isCustom) swatch.style.setProperty("--swatch", customColor ? selected : "transparent");
       swatch.setAttribute("aria-label", isCustom ? t2("text.colorCustom") : t2(COLOR_NAME_KEYS[Number(swatch.dataset.colorIndex)]));
     });
     if (colorPicker.container === container && !colorPopover.hidden) syncColorPicker();
