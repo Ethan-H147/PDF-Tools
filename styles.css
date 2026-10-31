@@ -4778,3 +4778,57 @@
   }
 
   .page-processing-segments { flex: 1 1 100%; }
+
+  /* SF Symbols-style chevrons for page navigation. */
+  .pagenav button {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+  }
+
+  .chevron-icon {
+    display: block;
+    fill: none;
+    height: 18px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    width: 18px;
+  }
+
+  /* Dragging hides the stage scrollbar; keep its gutter so the grid doesn't widen and reflow. */
+  .preview-stage.organizing { scrollbar-gutter: stable; }
+
+  .page-delete,
+  .page-delete:hover,
+  :is(.organizer-grid, .page-drag-clone) .page-delete {
+    background: transparent;
+    border: 0;
+  }
+
+  .page-delete svg {
+    height: 100%;
+    width: 100%;
+  }
+
+  .page-delete svg * {
+    stroke-width: 1.7px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .page-delete .page-delete-ring {
+    fill: #fff;
+    stroke: rgba(41, 151, 189, 0.45);
+    stroke-width: 2px;
+    transition: fill .16s, stroke .16s;
+  }
+
+  .page-delete:hover .page-delete-ring {
+    fill: #e8f7ff;
+    stroke: rgba(41, 151, 189, 0.72);
+  }
+
+  @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse) {
+    :is(.organizer-grid, .page-drag-clone) .page-delete .page-delete-ring { stroke-width: 1.5px; }
+  }

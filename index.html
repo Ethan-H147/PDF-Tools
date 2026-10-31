@@ -21,11 +21,11 @@ Ethan Hu -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>PDF Atelier</title>
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.svg?v=blue-tile-1" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=declutter-1">
+<link rel="stylesheet" href="styles.css?v=raster-fast-1">
 </head>
 <body>
 <div class="frame">
@@ -254,9 +254,9 @@ Ethan Hu -->
             <input type="range" min="0" max="255" value="128" class="slider" id="threshSlider">
           </div>
           <div class="slider-tags slider-tags-with-reset">
-            <span data-i18n="threshold.whiteTag">0 · white</span>
+            <span data-i18n="threshold.whiteTag">White</span>
             <button type="button" class="slider-reset" id="thresholdResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetThreshold">Reset</button>
-            <span data-i18n="threshold.blackTag">255 · black</span>
+            <span data-i18n="threshold.blackTag">Black</span>
           </div>
           <div class="toggles switch-list">
             <div class="toggle switch-row" id="invertToggle" role="switch" tabindex="0" aria-checked="false"><span data-i18n="actions.invert">Invert</span><span class="switch" aria-hidden="true"></span></div>
@@ -289,7 +289,7 @@ Ethan Hu -->
             <div class="slider-control">
               <input type="range" min="-100" max="100" value="0" class="slider" id="brightSlider">
             </div>
-            <div class="slider-tags slider-tags-with-reset"><span data-i18n="greyscale.darkTag">−100 · dark</span><button type="button" class="slider-reset" id="brightnessResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetBrightness">Reset</button><span data-i18n="greyscale.lightTag">+100 · light</span></div>
+            <div class="slider-tags slider-tags-with-reset"><span data-i18n="greyscale.darkTag">Dark</span><button type="button" class="slider-reset" id="brightnessResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetBrightness">Reset</button><span data-i18n="greyscale.lightTag">Light</span></div>
           </div>
 
           <div class="grey-row">
@@ -301,7 +301,7 @@ Ethan Hu -->
             <div class="slider-control">
               <input type="range" min="50" max="200" value="100" class="slider" id="contrastSlider">
             </div>
-            <div class="slider-tags slider-tags-with-reset"><span data-i18n="greyscale.lowTag">50% · low</span><button type="button" class="slider-reset" id="contrastResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetContrast">Reset</button><span data-i18n="greyscale.highTag">200% · high</span></div>
+            <div class="slider-tags slider-tags-with-reset"><span data-i18n="greyscale.lowTag">Low</span><button type="button" class="slider-reset" id="contrastResetBtn" data-i18n="actions.reset" data-i18n-aria-label="actions.resetContrast">Reset</button><span data-i18n="greyscale.highTag">High</span></div>
           </div>
 
           <div class="toggles switch-list">
@@ -317,9 +317,9 @@ Ethan Hu -->
       <!-- SHARED: Pages -->
       <div class="section-label pages-section-label" style="margin-top:26px"><span data-i18n="sections.pages">Pages</span></div>
       <div class="pagenav">
-        <button id="prevPage" disabled>‹</button>
+        <button id="prevPage" type="button" data-i18n-aria-label="pages.previous" aria-label="Previous page" disabled><svg class="chevron-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg></button>
         <div class="num" id="pageCounter" tabindex="0" role="group" data-i18n-aria-label="pages.jump" aria-label="Jump to page"><span data-i18n="file.pagePrefix">Page </span><input id="pageJumpInput" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="go" autocomplete="off" data-i18n-aria-label="pages.jump" aria-label="Jump to page" hidden><b id="curPage">—</b> / <b id="totPage">—</b><span data-i18n="file.pageSuffix"></span><span class="page-custom-badge" id="pageCustomBadge" hidden>Custom</span></div>
-        <button id="nextPage" disabled>›</button>
+        <button id="nextPage" type="button" data-i18n-aria-label="pages.next" aria-label="Next page" disabled><svg class="chevron-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M7.5 4.5 13 10l-5.5 5.5"/></svg></button>
       </div>
 
       <!-- SHARED: Download -->
@@ -534,6 +534,6 @@ Ethan Hu -->
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.bundle.js?v=apple-controls-1"></script>
+<script src="app.bundle.js?v=raster-fast-1"></script>
 </body>
 </html>

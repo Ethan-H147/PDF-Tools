@@ -1,10 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#171614"/>
-  <path d="M9 6.5h10l5 5v14H9z" fill="#f5f1e8"/>
-  <path d="M19 6.5v5h5" fill="none" stroke="#171614" stroke-width="1.5" stroke-linejoin="miter"/>
-  <g fill="#176bdf" transform="translate(3.2 0) skewX(-10)">
-    <path d="m11.3 22 4.05-10h2.45l-4.05 10z"/>
-    <path d="m17.8 12 3.55 10h-2.7l-3.5-10z"/>
-    <path d="M13.8 18h5.65l.75 2h-7.25z"/>
-  </g>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b9bff"/>
+      <stop offset="1" stop-color="#0068d9"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7.2" fill="url(#tile)"/>
+  <path d="M10.4 6.5h7.4l5 5V24.3a1.2 1.2 0 0 1-1.2 1.2H10.4a1.2 1.2 0 0 1-1.2-1.2V7.7A1.2 1.2 0 0 1 10.4 6.5z" fill="#fff"/>
+  <path d="M17.8 6.5v4a1.1 1.1 0 0 0 1.1 1.1h3.9" fill="#cfe3ff"/>
+  <rect x="12" y="15.6" width="8" height="1.5" rx=".75" fill="#0a84ff" opacity=".55"/>
+  <rect x="12" y="19.2" width="5.6" height="1.5" rx=".75" fill="#0a84ff" opacity=".55"/>
 </svg>

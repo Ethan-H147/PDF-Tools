@@ -1026,18 +1026,20 @@
       if (organizing || editing) {
         previewCanvas.width = 0;
         previewCanvas.height = 0;
-        previewCanvas._mobileProcessedImage = null;
+        previewCanvas._processedImage = null;
       }
       if (!editing) {
         pageEditorCanvas.width = 0;
         pageEditorCanvas.height = 0;
       }
       if (!isRasterTool(activeTool)) {
-        previewCanvas._mobileProcessedImage = null;
+        previewCanvas._processedImage = null;
         histoCanvas.width = 0;
         histoCanvas.height = 0;
         forgetFullPageData();
       }
+    } else if (!isRasterTool(activeTool)) {
+      previewCanvas._processedImage = null;
     }
     previewStage.classList.toggle('organizing', organizing);
     previewStage.classList.toggle('editing', editing);
@@ -1492,13 +1494,13 @@
       'compress.summarySmall': 'Create the smallest PDF with lighter page images.',
       'resolution.fast': 'Fast',
       'resolution.900Warning': '900 dpi can make the exported PDF extremely large and make rendering/exporting take a very long time. Continue?',
-      'threshold.whiteTag': '0 · white',
-      'threshold.blackTag': '255 · black',
+      'threshold.whiteTag': 'White',
+      'threshold.blackTag': 'Black',
       'greyscale.brightness': 'brightness',
-      'greyscale.darkTag': '−100 · dark',
-      'greyscale.lightTag': '+100 · light',
-      'greyscale.lowTag': '50% · low',
-      'greyscale.highTag': '200% · high',
+      'greyscale.darkTag': 'Dark',
+      'greyscale.lightTag': 'Light',
+      'greyscale.lowTag': 'Low',
+      'greyscale.highTag': 'High',
       'hint.ready': 'ready',
       'hint.low': 'low',
       'hint.soft': 'soft',
@@ -1712,13 +1714,13 @@
       'compress.summaryBalanced': '压缩为较小的彩色 PDF，兼顾清晰度。',
       'compress.summarySmall': '优先减小体积，适合快速分享。',
       'resolution.fast': '快速',
-      'threshold.whiteTag': '0 · 白',
-      'threshold.blackTag': '255 · 黑',
+      'threshold.whiteTag': '白',
+      'threshold.blackTag': '黑',
       'greyscale.brightness': '亮度',
-      'greyscale.darkTag': '−100 · 暗',
-      'greyscale.lightTag': '+100 · 亮',
-      'greyscale.lowTag': '50% · 低',
-      'greyscale.highTag': '200% · 高',
+      'greyscale.darkTag': '暗',
+      'greyscale.lightTag': '亮',
+      'greyscale.lowTag': '低',
+      'greyscale.highTag': '高',
       'hint.ready': '就绪',
       'hint.low': '低',
       'hint.soft': '柔和',
@@ -1932,13 +1934,13 @@
       'compress.summaryBalanced': '壓縮成較小的彩色 PDF，同時保留清晰度。',
       'compress.summarySmall': '優先縮小檔案，適合快速分享。',
       'resolution.fast': '快速',
-      'threshold.whiteTag': '0 · 白',
-      'threshold.blackTag': '255 · 黑',
+      'threshold.whiteTag': '白',
+      'threshold.blackTag': '黑',
       'greyscale.brightness': '亮度',
-      'greyscale.darkTag': '−100 · 暗',
-      'greyscale.lightTag': '+100 · 亮',
-      'greyscale.lowTag': '50% · 低',
-      'greyscale.highTag': '200% · 高',
+      'greyscale.darkTag': '暗',
+      'greyscale.lightTag': '亮',
+      'greyscale.lowTag': '低',
+      'greyscale.highTag': '高',
       'hint.ready': '就緒',
       'hint.low': '低',
       'hint.soft': '柔和',
@@ -2158,13 +2160,13 @@
       'compress.summaryBalanced': '화질과 용량을 균형 있게 줄인 컬러 PDF를 만듭니다.',
       'compress.summarySmall': '공유하기 쉬운 작은 용량을 우선합니다.',
       'resolution.fast': '빠르게',
-      'threshold.whiteTag': '0 · 흰색',
-      'threshold.blackTag': '255 · 검정',
+      'threshold.whiteTag': '흰색',
+      'threshold.blackTag': '검정',
       'greyscale.brightness': '밝기',
-      'greyscale.darkTag': '−100 · 어둡게',
-      'greyscale.lightTag': '+100 · 밝게',
-      'greyscale.lowTag': '50% · 낮음',
-      'greyscale.highTag': '200% · 높음',
+      'greyscale.darkTag': '어둡게',
+      'greyscale.lightTag': '밝게',
+      'greyscale.lowTag': '낮음',
+      'greyscale.highTag': '높음',
       'hint.ready': '준비됨',
       'hint.low': '낮음',
       'hint.soft': '부드러움',
@@ -2384,13 +2386,13 @@
       'compress.summaryBalanced': '見やすさと容量のバランスを取ったカラーPDFを作成します。',
       'compress.summarySmall': '共有しやすい小さなファイルサイズを優先します。',
       'resolution.fast': '高速',
-      'threshold.whiteTag': '0 · 白',
-      'threshold.blackTag': '255 · 黒',
+      'threshold.whiteTag': '白',
+      'threshold.blackTag': '黒',
       'greyscale.brightness': '明るさ',
-      'greyscale.darkTag': '−100 · 暗い',
-      'greyscale.lightTag': '+100 · 明るい',
-      'greyscale.lowTag': '50% · 低',
-      'greyscale.highTag': '200% · 高',
+      'greyscale.darkTag': '暗い',
+      'greyscale.lightTag': '明るい',
+      'greyscale.lowTag': '低',
+      'greyscale.highTag': '高',
       'hint.ready': '準備完了',
       'hint.low': '低',
       'hint.soft': 'ソフト',
@@ -2609,13 +2611,13 @@
       'compress.summaryBalanced': 'Crea un PDF en color más pequeño con calidad equilibrada.',
       'compress.summarySmall': 'Crea el PDF más pequeño con imágenes de página más ligeras.',
       'resolution.fast': 'Rápido',
-      'threshold.whiteTag': '0 · blanco',
-      'threshold.blackTag': '255 · negro',
+      'threshold.whiteTag': 'Blanco',
+      'threshold.blackTag': 'Negro',
       'greyscale.brightness': 'brillo',
-      'greyscale.darkTag': '−100 · oscuro',
-      'greyscale.lightTag': '+100 · claro',
-      'greyscale.lowTag': '50% · bajo',
-      'greyscale.highTag': '200% · alto',
+      'greyscale.darkTag': 'Oscuro',
+      'greyscale.lightTag': 'Claro',
+      'greyscale.lowTag': 'Bajo',
+      'greyscale.highTag': 'Alto',
       'hint.ready': 'listo',
       'hint.low': 'bajo',
       'hint.soft': 'suave',
@@ -2834,13 +2836,13 @@
       'compress.summaryBalanced': 'Crée un PDF couleur plus léger avec une qualité équilibrée.',
       'compress.summarySmall': 'Crée le PDF le plus léger avec des images de page allégées.',
       'resolution.fast': 'Rapide',
-      'threshold.whiteTag': '0 · blanc',
-      'threshold.blackTag': '255 · noir',
+      'threshold.whiteTag': 'Blanc',
+      'threshold.blackTag': 'Noir',
       'greyscale.brightness': 'luminosité',
-      'greyscale.darkTag': '−100 · sombre',
-      'greyscale.lightTag': '+100 · clair',
-      'greyscale.lowTag': '50% · faible',
-      'greyscale.highTag': '200% · élevé',
+      'greyscale.darkTag': 'Sombre',
+      'greyscale.lightTag': 'Clair',
+      'greyscale.lowTag': 'Faible',
+      'greyscale.highTag': 'Élevé',
       'hint.ready': 'prêt',
       'hint.low': 'bas',
       'hint.soft': 'doux',
@@ -3143,6 +3145,8 @@
     Object.assign(LOCALES[locale], additions);
   });
   Object.entries({ en: 'Jump to page', 'zh-Hans': '跳转到页面', 'zh-Hant-TW': '跳至頁面', ko: '페이지로 이동', ja: 'ページへ移動', es: 'Ir a la página', fr: 'Aller à la page' }).forEach(([locale, label]) => { LOCALES[locale]['pages.jump'] = label; });
+  Object.entries({ en: 'Previous page', 'zh-Hans': '上一页', 'zh-Hant-TW': '上一頁', ko: '이전 페이지', ja: '前のページ', es: 'Página anterior', fr: 'Page précédente' }).forEach(([locale, label]) => { LOCALES[locale]['pages.previous'] = label; });
+  Object.entries({ en: 'Next page', 'zh-Hans': '下一页', 'zh-Hant-TW': '下一頁', ko: '다음 페이지', ja: '次のページ', es: 'Página siguiente', fr: 'Page suivante' }).forEach(([locale, label]) => { LOCALES[locale]['pages.next'] = label; });
 
   Object.entries({
     en: ['Use signature', 'Drag to position', 'Make signature smaller', 'Make signature larger', 'Use signature to place it on this page.'],
@@ -3769,7 +3773,7 @@
     state.fullPageCacheOrder = [];
     previewCanvas.width = 0;
     previewCanvas.height = 0;
-    previewCanvas._mobileProcessedImage = null;
+    previewCanvas._processedImage = null;
     pageEditorCanvas.width = 0;
     pageEditorCanvas.height = 0;
     canvasWrap.style.display = 'none';
@@ -4046,7 +4050,7 @@
     state.fullPageCacheOrder = [];
     previewCanvas.width = 0;
     previewCanvas.height = 0;
-    previewCanvas._mobileProcessedImage = null;
+    previewCanvas._processedImage = null;
     pageEditorCanvas.width = 0;
     pageEditorCanvas.height = 0;
     signatureState.stamps = [];
@@ -4111,7 +4115,7 @@
     if (lazyOpen) {
       setLoader(true, state.largePdfSafeMode ? t('progress.openingLargePdf') : t('progress.openingPdf'), 45);
       await ensurePageMeta(0);
-      if (activeTool === 'edit') await ensureRasterPreviewData(0);
+      if (activeTool === 'edit') await (MOBILE_PERFORMANCE_MODE ? ensureRasterPreviewData(0) : ensurePageData(0));
       if (loadToken !== pdfLoadGeneration) return false;
     } else {
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -4230,6 +4234,30 @@
       : Math.max(0.35, budgetScale);
   }
 
+  // Desktop threshold/greyscale previews render near on-screen size and sharpen as the
+  // zoom grows, instead of processing every export-resolution pixel on each slider tick.
+  const RASTER_PREVIEW_UPGRADE_SLACK = 0.85;
+  const RASTER_PREVIEW_DOWNGRADE_FACTOR = 2;
+  function getDesktopRasterPreviewScale(baseVp) {
+    const exportScale = getRenderScale(baseVp);
+    const fitWidth = getFitCanvasWidth({ w: baseVp.width * exportScale, h: baseVp.height * exportScale });
+    const screenScale = (fitWidth * zoomLevel * (devicePixelRatio || 1)) / Math.max(1, baseVp.width);
+    return Math.min(exportScale, Math.max(getRasterPreviewScale(baseVp), screenScale));
+  }
+
+  let rasterPreviewUpgradeTimer = null;
+  function queueRasterPreviewUpgrade() {
+    clearTimeout(rasterPreviewUpgradeTimer);
+    rasterPreviewUpgradeTimer = setTimeout(() => {
+      rasterPreviewUpgradeTimer = null;
+      const pd = currentPageData();
+      if (!isRasterTool(activeTool) || !pd?.w || !pd.scale || pd.renderKey !== RASTER_PREVIEW_KEY) return;
+      const baseVp = { width: pd.w / pd.scale, height: pd.h / pd.scale };
+      const wanted = getDesktopRasterPreviewScale(baseVp);
+      if (pd.scale < wanted * RASTER_PREVIEW_UPGRADE_SLACK || pd.scale > wanted * RASTER_PREVIEW_DOWNGRADE_FACTOR) requestPreviewRender(false);
+    }, 220);
+  }
+
   async function ensurePageMeta(sourceIndex) {
     if (!state.pdfDoc || sourceIndex == null) return null;
     const generation = state.renderGeneration;
@@ -4317,11 +4345,11 @@
     if (!state.pdfDoc || sourceIndex == null) return null;
     const renderKey = opts.renderKey || state.resolution;
     const existing = state.pages[sourceIndex];
-    if (pageHasFullData(existing, renderKey)) {
+    if (pageHasFullData(existing, renderKey) && !(opts.minScale > existing.scale) && !(opts.maxScale < existing.scale)) {
       touchFullPageCache(sourceIndex);
       return existing;
     }
-    const jobKey = state.renderGeneration + ':full:' + sourceIndex + ':' + renderKey;
+    const jobKey = state.renderGeneration + ':full:' + sourceIndex + ':' + renderKey + (opts.minScale ? ':' + opts.scale : '');
     if (pageRenderJobs.has(jobKey)) return pageRenderJobs.get(jobKey);
     const job = renderPageToLuminance(sourceIndex + 1, { ...opts, renderKey }).finally(() => pageRenderJobs.delete(jobKey));
     pageRenderJobs.set(jobKey, job);
@@ -4331,7 +4359,24 @@
   async function ensureRasterPreviewData(sourceIndex) {
     if (!state.pdfDoc || sourceIndex == null) return null;
     if (!MOBILE_PERFORMANCE_MODE) {
-      return ensurePageData(sourceIndex, { renderKey: state.resolution, skipThumb: true });
+      const existing = state.pages[sourceIndex];
+      let baseVp;
+      if (existing?.w && existing.scale) {
+        baseVp = { width: existing.w / existing.scale, height: existing.h / existing.scale };
+      } else {
+        const pdfDoc = state.pdfDoc;
+        const page = await pdfDoc.getPage(sourceIndex + 1);
+        if (pdfDoc !== state.pdfDoc) return null;
+        baseVp = page.getViewport({ scale: 1 });
+      }
+      const scale = getDesktopRasterPreviewScale(baseVp);
+      return ensurePageData(sourceIndex, {
+        renderKey: RASTER_PREVIEW_KEY,
+        scale,
+        minScale: scale * RASTER_PREVIEW_UPGRADE_SLACK,
+        maxScale: scale * RASTER_PREVIEW_DOWNGRADE_FACTOR,
+        skipThumb: true,
+      });
     }
     const generation = state.renderGeneration;
     const pdfDoc = state.pdfDoc;
@@ -4986,80 +5031,64 @@
     return thumb;
   }
 
-  // ── Processing functions ──
-  function applyThresholdToCanvas(pd, canvas, settings = state) {
-    if (!MOBILE_PERFORMANCE_MODE || canvas.width !== pd.w || canvas.height !== pd.h) {
+  // Both tools map each of the 256 luminance levels to one output colour, so the
+  // per-pixel work is a table lookup. Exports reuse the same tables.
+  function thresholdLevels(settings) {
+    const levels = new Uint8Array(256);
+    for (let value = 0; value < 256; value++) {
+      levels[value] = (settings.invert ? value >= settings.threshold : value < settings.threshold) ? 0 : 255;
+    }
+    return levels;
+  }
+
+  function greyscaleLevels(settings) {
+    const r = new Uint8Array(256);
+    const g = new Uint8Array(256);
+    const b = new Uint8Array(256);
+    const bf = settings.brightness * 1.28;
+    const cf = settings.contrast / 100;
+    for (let source = 0; source < 256; source++) {
+      let value = Math.max(0, Math.min(255, (source - 128) * cf + 128 + bf)) | 0;
+      if (settings.greyInvert) value = 255 - value;
+      r[source] = settings.sepia ? Math.min(255, (value * 1.12) | 0) : value;
+      g[source] = value;
+      b[source] = settings.sepia ? Math.max(0, (value * 0.72) | 0) : value;
+    }
+    return { r, g, b };
+  }
+
+  const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+  function packOpaquePixel(r, g, b) {
+    return LITTLE_ENDIAN
+      ? ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0
+      : ((r << 24) | (g << 16) | (b << 8) | 255) >>> 0;
+  }
+
+  function drawLuminanceThroughLevels(pd, canvas, r, g, b) {
+    if (canvas.width !== pd.w || canvas.height !== pd.h) {
       canvas.width = pd.w;
       canvas.height = pd.h;
-      canvas._mobileProcessedImage = null;
+      canvas._processedImage = null;
     }
     const ctx = canvas.getContext('2d');
-    const img = MOBILE_PERFORMANCE_MODE
-      ? (canvas._mobileProcessedImage ||= ctx.createImageData(pd.w, pd.h))
-      : ctx.createImageData(pd.w, pd.h);
-    const d = img.data; const lum = pd.lum;
-    const thresh = settings.threshold; const inv = settings.invert;
-    const lut = MOBILE_PERFORMANCE_MODE ? new Uint8ClampedArray(256) : null;
-    if (lut) {
-      for (let value = 0; value < 256; value++) {
-        lut[value] = (inv ? value >= thresh : value < thresh) ? 0 : 255;
-      }
-    }
-    for (let j = 0, i = 0; j < lum.length; j++, i += 4) {
-      const v = lut ? lut[lum[j]] : (inv ? lum[j] >= thresh : lum[j] < thresh) ? 0 : 255;
-      d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
-    }
+    const img = (canvas._processedImage ||= ctx.createImageData(pd.w, pd.h));
+    const lut = new Uint32Array(256);
+    for (let value = 0; value < 256; value++) lut[value] = packOpaquePixel(r[value], g[value], b[value]);
+    const lum = pd.lum;
+    const out = new Uint32Array(img.data.buffer, img.data.byteOffset, lum.length);
+    for (let j = 0; j < lum.length; j++) out[j] = lut[lum[j]];
     ctx.putImageData(img, 0, 0);
   }
 
+  // ── Processing functions ──
+  function applyThresholdToCanvas(pd, canvas, settings = state) {
+    const levels = thresholdLevels(settings);
+    drawLuminanceThroughLevels(pd, canvas, levels, levels, levels);
+  }
+
   function applyGreyscaleToCanvas(pd, canvas, settings = state) {
-    if (!MOBILE_PERFORMANCE_MODE || canvas.width !== pd.w || canvas.height !== pd.h) {
-      canvas.width = pd.w;
-      canvas.height = pd.h;
-      canvas._mobileProcessedImage = null;
-    }
-    const ctx = canvas.getContext('2d');
-    const img = MOBILE_PERFORMANCE_MODE
-      ? (canvas._mobileProcessedImage ||= ctx.createImageData(pd.w, pd.h))
-      : ctx.createImageData(pd.w, pd.h);
-    const d = img.data; const lum = pd.lum;
-    const bf = settings.brightness * 1.28;
-    const cf = settings.contrast / 100;
-    const inv = settings.greyInvert;
-    const sep = settings.sepia;
-    const lut = MOBILE_PERFORMANCE_MODE ? new Uint8ClampedArray(256 * 3) : null;
-    if (lut) {
-      for (let source = 0; source < 256; source++) {
-        let value = Math.max(0, Math.min(255, (source - 128) * cf + 128 + bf)) | 0;
-        if (inv) value = 255 - value;
-        const offset = source * 3;
-        lut[offset] = sep ? Math.min(255, (value * 1.12) | 0) : value;
-        lut[offset + 1] = value;
-        lut[offset + 2] = sep ? Math.max(0, (value * 0.72) | 0) : value;
-      }
-    }
-    for (let j = 0, i = 0; j < lum.length; j++, i += 4) {
-      if (lut) {
-        const offset = lum[j] * 3;
-        d[i] = lut[offset];
-        d[i + 1] = lut[offset + 1];
-        d[i + 2] = lut[offset + 2];
-        d[i + 3] = 255;
-        continue;
-      }
-      let v = (lum[j] - 128) * cf + 128 + bf;
-      v = Math.max(0, Math.min(255, v)) | 0;
-      if (inv) v = 255 - v;
-      if (sep) {
-        d[i]   = Math.min(255, (v * 1.12) | 0);
-        d[i+1] = v;
-        d[i+2] = Math.max(0,  (v * 0.72) | 0);
-      } else {
-        d[i] = v; d[i+1] = v; d[i+2] = v;
-      }
-      d[i+3] = 255;
-    }
-    ctx.putImageData(img, 0, 0);
+    const { r, g, b } = greyscaleLevels(settings);
+    drawLuminanceThroughLevels(pd, canvas, r, g, b);
   }
 
   async function canvasToImageInput(canvas, mimeType, quality) {
@@ -6129,7 +6158,8 @@
       del.type = 'button';
       del.className = 'page-delete';
       del.setAttribute('aria-label', 'Delete original page ' + (sourceIndex + 1));
-      del.innerHTML = '<svg aria-hidden="true" viewBox="0 0 20 20"><path d="m6 6 8 8M14 6l-8 8"/></svg>';
+      // Ring and X share one SVG so pixel snapping can't pull them off-center.
+      del.innerHTML = '<svg aria-hidden="true" viewBox="0 0 34 34"><circle class="page-delete-ring" cx="17" cy="17" r="16"/><path d="m13 13 8 8m0-8-8 8"/></svg>';
       del.addEventListener('pointerdown', e => e.stopPropagation());
       del.addEventListener('click', e => {
         e.stopPropagation();
@@ -6359,6 +6389,8 @@
     touchTarget.addEventListener('touchcancel', cancel);
   }
 
+  const ORGANIZER_DRAG_SLOP = 4;
+
   function beginOrganizerDrag(e, card, sourceIndex, touchHold = false) {
     if (e.pointerType === 'touch' && !touchHold) return;
     if (operationInProgress || !state.pdfDoc || organizerDrag.active || (e.pointerType === 'mouse' && e.button !== 0)) return;
@@ -6374,11 +6406,49 @@
       return;
     }
     rememberOrganizerTap(e, outputIndex, sourceIndex);
+    if (touchHold) {
+      activateOrganizerDrag(e, card, sourceIndex, true);
+      return;
+    }
+    // A mouse or pen press alone shouldn't lift the page; wait until it actually moves.
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const pointerId = e.pointerId;
+    const stopWaiting = () => {
+      window.removeEventListener('pointermove', onPendingMove);
+      window.removeEventListener('pointerup', onPendingUp);
+      window.removeEventListener('pointercancel', stopWaiting);
+    };
+    const onPendingMove = move => {
+      if (move.pointerId !== pointerId) return;
+      if (Math.hypot(move.clientX - startX, move.clientY - startY) < ORGANIZER_DRAG_SLOP) return;
+      stopWaiting();
+      if (operationInProgress || organizerDrag.active || !card.isConnected) return;
+      activateOrganizerDrag(move, card, sourceIndex, false, startX, startY);
+    };
+    const onPendingUp = up => {
+      if (up.pointerId !== pointerId) return;
+      stopWaiting();
+      const pageIndex = state.pageOrder.indexOf(sourceIndex);
+      if (pageIndex < 0 || state.curPage === pageIndex + 1) return;
+      state.curPage = pageIndex + 1;
+      updatePageState();
+      if (activeTool !== 'organize') requestPreviewRender(isRasterTool(activeTool));
+    };
+    window.addEventListener('pointermove', onPendingMove);
+    window.addEventListener('pointerup', onPendingUp);
+    window.addEventListener('pointercancel', stopWaiting);
+    e.preventDefault();
+  }
+
+  function activateOrganizerDrag(e, card, sourceIndex, touchHold, grabX = e.clientX, grabY = e.clientY) {
+    const outputIndex = state.pageOrder.indexOf(sourceIndex);
+    if (outputIndex < 0) return;
     const sourceFlowIndex = buildOrganizerFlow().findIndex(item =>
       item.type === 'page' && item.sourceIndex === sourceIndex);
     const rect = card.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
+    const offsetX = grabX - rect.left;
+    const offsetY = grabY - rect.top;
     const clone = card.cloneNode(true);
     clone.classList.add('page-drag-clone');
     clone.style.width = rect.width + 'px';
@@ -7048,65 +7118,117 @@
     return { w: canvas.width, h: canvas.height, scale, wPt: baseVp.width, hPt: baseVp.height };
   }
 
+  // Raster exports store pixels in the smallest form the PDF allows: threshold pages as
+  // 1-bit black and white, greyscale as one grey channel, and only sepia as RGB.
+  function packOneBitRows(source, stride, w, h, levels) {
+    const rowBytes = (w + 7) >> 3;
+    const out = new Uint8Array(rowBytes * h);
+    let src = 0;
+    for (let y = 0, o = 0; y < h; y++) {
+      for (let x = 0; x < w; x += 8) {
+        const n = Math.min(8, w - x);
+        let byte = 0;
+        for (let k = 0; k < n; k++, src += stride) {
+          if (levels[source[src]]) byte |= 0x80 >> k;
+        }
+        out[o++] = byte;
+      }
+    }
+    return out;
+  }
+
+  function rasterPageSamples(source, stride, w, h, tool, settings) {
+    if (tool === 'threshold') {
+      return { colorSpace: 'DeviceGray', bits: 1, data: packOneBitRows(source, stride, w, h, thresholdLevels(settings)) };
+    }
+    const { r, g, b } = greyscaleLevels(settings);
+    const count = w * h;
+    if (!settings.sepia) {
+      const data = new Uint8Array(count);
+      for (let j = 0, i = 0; j < count; j++, i += stride) data[j] = g[source[i]];
+      return { colorSpace: 'DeviceGray', bits: 8, data };
+    }
+    const data = new Uint8Array(count * 3);
+    for (let j = 0, i = 0, o = 0; j < count; j++, i += stride, o += 3) {
+      const value = source[i];
+      data[o] = r[value];
+      data[o + 1] = g[value];
+      data[o + 2] = b[value];
+    }
+    return { colorSpace: 'DeviceRGB', bits: 8, data };
+  }
+
+  async function deflateBytes(bytes) {
+    if (typeof CompressionStream !== 'function') return null;
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  async function addRasterImagePage(doc, PDFLib, samples, w, h, wPt, hPt) {
+    const dict = {
+      Type: 'XObject',
+      Subtype: 'Image',
+      Width: w,
+      Height: h,
+      ColorSpace: samples.colorSpace,
+      BitsPerComponent: samples.bits,
+    };
+    const compressed = await deflateBytes(samples.data);
+    const stream = compressed
+      ? doc.context.stream(compressed, { ...dict, Filter: 'FlateDecode' })
+      : doc.context.flateStream(samples.data, dict);
+    const imageRef = doc.context.register(stream);
+    const page = doc.addPage([wPt, hPt]);
+    const name = page.node.newXObject('Image', imageRef);
+    page.pushOperators(
+      PDFLib.pushGraphicsState(),
+      PDFLib.concatTransformationMatrix(wPt, 0, 0, hPt, 0, 0),
+      PDFLib.drawObject(name),
+      PDFLib.popGraphicsState(),
+    );
+  }
+
   async function createRasterProcessedPdfArtifact(context) {
-    const { jsPDF } = await ensureJsPdf();
+    const PDFLib = await ensurePdfLib();
+    const doc = await PDFLib.PDFDocument.create();
     const tmp = document.createElement('canvas');
-    let pdf = null;
     const count = context.pageOrder.length;
     if (!count) throw new Error(t('errors.noPagesExport'));
+    const tool = context.settings.processTool;
     const mobilePixelBudget = getMobileExportPagePixelBudget(count);
-    const mobileGreyscaleJpeg = MOBILE_PERFORMANCE_MODE && context.settings.processTool === 'greyscale';
+    const mobileGreyscaleJpeg = MOBILE_PERFORMANCE_MODE && tool === 'greyscale';
     const mobileGreyscaleQuality = getMobileGreyscaleJpegQuality(count);
     for (let i = 0; i < count; i++) {
       setLoader(true, t('progress.exportingPage', { page: i + 1, count }), currentPageProgress(i, count));
       const sourceIndex = context.pageOrder[i];
       const pageSettings = {
         ...context.settings,
-        ...effectiveRasterSettings(context.settings.processTool, sourceIndex, context.settings),
+        ...effectiveRasterSettings(tool, sourceIndex, context.settings),
       };
-      let wPt;
-      let hPt;
       if (MOBILE_PERFORMANCE_MODE) {
-        const size = await renderMobileProcessedPageToCanvas(
-          sourceIndex,
-          tmp,
-          pageSettings,
-          mobilePixelBudget,
-        );
+        const size = await renderMobileProcessedPageToCanvas(sourceIndex, tmp, pageSettings, mobilePixelBudget);
         if (!size) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
-        wPt = size.wPt;
-        hPt = size.hPt;
+        if (mobileGreyscaleJpeg) {
+          const image = await doc.embedJpg(await canvasToImageInput(tmp, 'image/jpeg', mobileGreyscaleQuality));
+          doc.addPage([size.wPt, size.hPt]).drawImage(image, { x: 0, y: 0, width: size.wPt, height: size.hPt });
+        } else {
+          // The canvas already holds black and white pixels; read them back through a mid-grey cut.
+          const pixels = tmp.getContext('2d').getImageData(0, 0, size.w, size.h).data;
+          const samples = rasterPageSamples(pixels, 4, size.w, size.h, 'threshold', { threshold: 128, invert: false });
+          await addRasterImagePage(doc, PDFLib, samples, size.w, size.h, size.wPt, size.hPt);
+        }
+        tmp.width = 0;
+        tmp.height = 0;
       } else {
         const pd = await ensurePageData(sourceIndex);
         if (!pd) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
-        if (context.settings.processTool === 'threshold') applyThresholdToCanvas(pd, tmp, pageSettings);
-        else applyGreyscaleToCanvas(pd, tmp, pageSettings);
-        wPt = pd.w / pd.scale;
-        hPt = pd.h / pd.scale;
+        const samples = rasterPageSamples(pd.lum, 1, pd.w, pd.h, tool, pageSettings);
+        await addRasterImagePage(doc, PDFLib, samples, pd.w, pd.h, pd.w / pd.scale, pd.h / pd.scale);
       }
-      const orient = wPt > hPt ? 'l' : 'p';
-      let imageInput = await canvasToImageInput(
-        tmp,
-        mobileGreyscaleJpeg ? 'image/jpeg' : 'image/png',
-        mobileGreyscaleJpeg ? mobileGreyscaleQuality : undefined,
-      );
-      if (i === 0) {
-        pdf = new jsPDF({
-          orientation: orient,
-          unit: 'pt',
-          format: [wPt, hPt],
-        });
-      } else {
-        pdf.addPage([wPt, hPt], orient);
-      }
-      pdf.addImage(imageInput, mobileGreyscaleJpeg ? 'JPEG' : 'PNG', 0, 0, wPt, hPt, undefined, 'FAST');
-      imageInput = null;
-      tmp.width = 0;
-      tmp.height = 0;
       await yieldToMainThread();
     }
-    return createJsPdfOutputArtifact(pdf, context.fileBase, {
-      source: 'jsPDF',
+    return createPdfArtifact(await doc.save(), context.fileBase, {
+      source: 'pdf-lib',
       rasterized: true,
       preservesOriginalQuality: false,
     });
@@ -7833,6 +7955,7 @@
     if (isOriginalPreviewTool() && previewCanvas.width && currentSourceIndex() != null) {
       queueOriginalPreviewUpgrade(currentSourceIndex(), originalPreviewRenderToken);
     }
+    if (!MOBILE_PERFORMANCE_MODE && isRasterTool(activeTool) && previewCanvas.width) queueRasterPreviewUpgrade();
 
     requestAnimationFrame(() => {
       if (isZoomedIn) restoreScrollCenter(center);
