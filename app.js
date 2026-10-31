@@ -3804,6 +3804,18 @@
     ['text.font', 'text.colorCustom', 'text.font.sans', 'text.font.serif', 'text.font.rounded', 'text.font.mono', 'text.font.handwritten', 'text.font.script']
       .forEach((key, index) => { LOCALES[locale][key] = values[index]; });
   });
+  Object.entries({
+    en: ['Colors', 'Grid', 'Spectrum', 'Sliders', 'Red', 'Green', 'Blue', 'Hex color #', 'Opacity', 'Pick a color from the screen', 'Save color', 'Close'],
+    'zh-Hans': ['颜色', '网格', '光谱', '滑块', '红', '绿', '蓝', '十六进制颜色 #', '不透明度', '从屏幕取色', '存储颜色', '关闭'],
+    'zh-Hant-TW': ['顏色', '格狀', '光譜', '滑桿', '紅', '綠', '藍', '十六進位色碼 #', '不透明度', '從螢幕選取顏色', '儲存顏色', '關閉'],
+    ko: ['색상', '격자', '스펙트럼', '슬라이더', '빨강', '초록', '파랑', '16진수 색상 #', '불투명도', '화면에서 색상 선택', '색상 저장', '닫기'],
+    ja: ['カラー', 'グリッド', 'スペクトル', 'スライダ', '赤', '緑', '青', '16 進数カラー #', '不透明度', '画面から色を選択', 'カラーを保存', '閉じる'],
+    es: ['Colores', 'Cuadrícula', 'Espectro', 'Reguladores', 'Rojo', 'Verde', 'Azul', 'Color hexadecimal #', 'Opacidad', 'Tomar un color de la pantalla', 'Guardar color', 'Cerrar'],
+    fr: ['Couleurs', 'Grille', 'Spectre', 'Curseurs', 'Rouge', 'Vert', 'Bleu', 'Couleur hexadécimale #', 'Opacité', 'Prélever une couleur à l’écran', 'Enregistrer la couleur', 'Fermer'],
+  }).forEach(([locale, values]) => {
+    ['color.title', 'color.grid', 'color.spectrum', 'color.sliders', 'color.red', 'color.green', 'color.blue', 'color.hex', 'color.opacity', 'color.eyedropper', 'color.save', 'color.close']
+      .forEach((key, index) => { LOCALES[locale][key] = values[index]; });
+  });
 
   Object.entries({
     en: ['Use signature', 'Drag to position', 'Make signature smaller', 'Make signature larger', 'Use signature to place it on this page.'],
@@ -4661,7 +4673,7 @@
   });
   document.addEventListener('pointerdown', e => {
     if (!mobileControlsOpen) return;
-    if (mobileControlsSheet?.contains(e.target) || mobileControlsToggle?.contains(e.target)) return;
+    if (mobileControlsSheet?.contains(e.target) || mobileControlsToggle?.contains(e.target) || colorPopover?.contains(e.target)) return;
     setMobileControlsOpen(false);
   });
   activateElementOnKeyboard(dropZone);
@@ -5852,14 +5864,6 @@
   function renderColorSwatches(container, selected, onPick) {
     if (!container) return;
     if (!container.children.length) {
-      const well = document.createElement('input');
-      well.type = 'color';
-      well.className = 'color-well-input';
-      well.tabIndex = -1;
-      well.setAttribute('aria-hidden', 'true');
-      well.addEventListener('input', () => {
-        if (!operationInProgress) container._onPick?.(well.value.toLowerCase());
-      });
       TEXT_COLORS.forEach((color, index) => {
         const swatch = document.createElement('button');
         swatch.type = 'button';
@@ -5877,17 +5881,13 @@
       custom.type = 'button';
       custom.className = 'color-swatch color-swatch-custom';
       custom.setAttribute('role', 'radio');
+      custom.setAttribute('aria-haspopup', 'dialog');
       custom.addEventListener('click', () => {
         if (operationInProgress) return;
-        well.value = container._selected || TEXT_COLORS[0];
-        try {
-          if (well.showPicker) well.showPicker();
-          else well.click();
-        } catch {
-          well.click();
-        }
+        if (colorPicker.container === container && !colorPopover.hidden) closeColorPicker();
+        else openColorPicker(container, custom);
       });
-      container.append(custom, well);
+      container.appendChild(custom);
     }
     container._onPick = onPick;
     container._selected = selected;
@@ -5897,14 +5897,296 @@
       const on = isCustom ? customColor : swatch.dataset.color === selected;
       swatch.setAttribute('aria-checked', on ? 'true' : 'false');
       swatch.tabIndex = 0;
-      if (isCustom) {
-        swatch.style.setProperty('--custom', customColor ? selected : 'transparent');
-        swatch.setAttribute('aria-label', t('text.colorCustom'));
-      } else {
-        swatch.setAttribute('aria-label', t(COLOR_NAME_KEYS[Number(swatch.dataset.colorIndex)]));
-      }
+      swatch.setAttribute('aria-label', isCustom ? t('text.colorCustom') : t(COLOR_NAME_KEYS[Number(swatch.dataset.colorIndex)]));
+    });
+    if (colorPicker.container === container && !colorPopover.hidden) syncColorPicker();
+  }
+
+  // ── Colours panel ──
+  // A small take on the system colour picker: a 12 × 10 grid, a hue/lightness spectrum,
+  // RGB sliders, opacity, an eyedropper where the browser has one, and saved colours.
+  const colorPopover = $('colorPopover');
+  const colorGrid = $('colorGrid');
+  const colorSpectrum = $('colorSpectrum');
+  const colorSpectrumMarker = $('colorSpectrumMarker');
+  const colorOpacity = $('colorOpacity');
+  const colorOpacityValue = $('colorOpacityValue');
+  const colorHex = $('colorHex');
+  const colorCurrent = $('colorCurrent');
+  const colorSaved = $('colorSaved');
+  const colorEyedropper = $('colorEyedropper');
+  const SAVED_COLORS_KEY = 'pdf-atelier-saved-colors';
+  const GRID_HUES = [195, 215, 240, 270, 300, 340, 5, 25, 38, 50, 62, 90];
+  const colorPicker = { container: null, anchor: null, r: 0, g: 0, b: 0, a: 1, view: 'grid' };
+
+  function parseColor(value) {
+    const hex = String(value || '').replace('#', '');
+    const full = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+    const n = parseInt(full.slice(0, 6), 16);
+    if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(full) || Number.isNaN(n)) return { r: 0, g: 0, b: 0, a: 1 };
+    return {
+      r: (n >> 16) & 255,
+      g: (n >> 8) & 255,
+      b: n & 255,
+      a: full.length === 8 ? parseInt(full.slice(6), 16) / 255 : 1,
+    };
+  }
+
+  function colorToHex({ r, g, b, a = 1 }) {
+    const part = v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0');
+    return '#' + part(r) + part(g) + part(b) + (a < 0.999 ? part(a * 255) : '');
+  }
+
+  function hslToRgb(h, s, l) {
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return { r: Math.round(f(0) * 255), g: Math.round(f(8) * 255), b: Math.round(f(4) * 255) };
+  }
+
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    if (max === min) return { h: 0, s: 0, l };
+    const d = max - min;
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return { h: h * 60, s, l };
+  }
+
+  function gridColors() {
+    const colors = [];
+    for (let i = 0; i < 12; i++) {
+      const v = Math.round(255 * (1 - i / 11));
+      colors.push(colorToHex({ r: v, g: v, b: v }));
+    }
+    for (let row = 0; row < 9; row++) {
+      const l = 0.14 + row * 0.085;
+      const s = row < 2 ? 1 : row > 6 ? 0.85 : 0.95;
+      GRID_HUES.forEach(h => colors.push(colorToHex(hslToRgb(h, s, l))));
+    }
+    return colors;
+  }
+
+  function buildColorGrid() {
+    if (colorGrid.children.length) return;
+    gridColors().forEach(color => {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'color-grid-cell';
+      cell.dataset.color = color;
+      cell.style.background = color;
+      cell.setAttribute('aria-label', color);
+      cell.addEventListener('click', () => setPickerColor(parseColor(color), { keepAlpha: true }));
+      colorGrid.appendChild(cell);
     });
   }
+
+  function drawColorSpectrum() {
+    if (colorSpectrum._drawn) return;
+    const ctx = colorSpectrum.getContext('2d');
+    const { width, height } = colorSpectrum;
+    const img = ctx.createImageData(width, height);
+    for (let y = 0; y < height; y++) {
+      const h = (y / (height - 1)) * 360;
+      for (let x = 0; x < width; x++) {
+        const { r, g, b } = hslToRgb(h, 1, 1 - x / (width - 1));
+        const i = (y * width + x) * 4;
+        img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    colorSpectrum._drawn = true;
+  }
+
+  function readSavedColors() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVED_COLORS_KEY) || '[]');
+      return Array.isArray(saved) ? saved.filter(c => typeof c === 'string').slice(0, 8) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeSavedColors(colors) {
+    try {
+      localStorage.setItem(SAVED_COLORS_KEY, JSON.stringify(colors.slice(0, 8)));
+    } catch {
+      // Private windows can refuse storage; saved colours then last for this visit only.
+    }
+    colorPicker.savedFallback = colors.slice(0, 8);
+  }
+
+  function savedColors() {
+    const stored = readSavedColors();
+    return stored.length ? stored : (colorPicker.savedFallback || []);
+  }
+
+  function renderSavedColors() {
+    colorSaved.innerHTML = '';
+    savedColors().forEach(color => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'color-saved-chip';
+      chip.style.setProperty('--chip', color);
+      chip.setAttribute('aria-label', color);
+      chip.addEventListener('click', () => setPickerColor(parseColor(color)));
+      colorSaved.appendChild(chip);
+    });
+  }
+
+  function syncColorPicker() {
+    const { r, g, b, a } = colorPicker;
+    const hex = colorToHex({ r, g, b, a });
+    const opaque = colorToHex({ r, g, b });
+    setSegmentValue($('colorViewSegments'), colorPicker.view);
+    colorPopover.querySelectorAll('[data-color-view]').forEach(view => {
+      view.hidden = view.dataset.colorView !== colorPicker.view;
+    });
+    colorGrid.querySelectorAll('.color-grid-cell').forEach(cell => {
+      cell.classList.toggle('selected', cell.dataset.color === opaque);
+    });
+    const hsl = rgbToHsl(r, g, b);
+    colorSpectrumMarker.style.left = ((1 - hsl.l) * 100) + '%';
+    colorSpectrumMarker.style.top = (hsl.h / 360 * 100) + '%';
+    colorSpectrumMarker.style.background = opaque;
+    colorPopover.querySelectorAll('[data-channel]').forEach(input => {
+      const channel = input.dataset.channel;
+      const value = colorPicker[channel];
+      if (document.activeElement !== input) input.value = String(value);
+      const from = { r, g, b, [channel]: 0 };
+      const to = { r, g, b, [channel]: 255 };
+      input.style.setProperty('--track', 'linear-gradient(to right, ' + colorToHex(from) + ', ' + colorToHex(to) + ')');
+      const number = colorPopover.querySelector('[data-channel-value="' + channel + '"]');
+      if (number && document.activeElement !== number) number.value = String(value);
+    });
+    if (document.activeElement !== colorHex) colorHex.value = opaque.slice(1).toUpperCase();
+    if (document.activeElement !== colorOpacity) colorOpacity.value = String(Math.round(a * 100));
+    colorOpacity.style.setProperty('--track', 'linear-gradient(to right, ' + opaque + '00, ' + opaque + ')');
+    colorOpacityValue.textContent = Math.round(a * 100) + '%';
+    colorCurrent.style.setProperty('--current', hex);
+    colorEyedropper.hidden = typeof window.EyeDropper !== 'function';
+  }
+
+  function setPickerColor(color, { keepAlpha = false, commit = true } = {}) {
+    colorPicker.r = color.r;
+    colorPicker.g = color.g;
+    colorPicker.b = color.b;
+    if (!keepAlpha && color.a != null) colorPicker.a = color.a;
+    syncColorPicker();
+    if (commit) colorPicker.container?._onPick?.(colorToHex(colorPicker));
+  }
+
+  function positionColorPicker() {
+    if (colorPopover.hidden) return;
+    if (isPhoneViewport()) {
+      colorPopover.classList.add('is-sheet');
+      colorPopover.style.left = '';
+      colorPopover.style.top = '';
+      return;
+    }
+    colorPopover.classList.remove('is-sheet');
+    const anchor = colorPicker.anchor?.getBoundingClientRect();
+    const width = colorPopover.offsetWidth;
+    const height = colorPopover.offsetHeight;
+    const margin = 12;
+    let left = anchor ? anchor.right + 16 : (innerWidth - width) / 2;
+    if (left + width > innerWidth - margin) left = anchor ? anchor.left - width - 16 : margin;
+    left = Math.max(margin, Math.min(innerWidth - width - margin, left));
+    let top = anchor ? anchor.top + anchor.height / 2 - height / 2 : (innerHeight - height) / 2;
+    top = Math.max(margin, Math.min(innerHeight - height - margin, top));
+    colorPopover.style.left = left + 'px';
+    colorPopover.style.top = top + 'px';
+  }
+
+  function openColorPicker(container, anchor) {
+    colorPicker.container = container;
+    colorPicker.anchor = anchor;
+    const current = parseColor(container._selected);
+    Object.assign(colorPicker, current);
+    buildColorGrid();
+    drawColorSpectrum();
+    renderSavedColors();
+    syncColorPicker();
+    colorPopover.hidden = false;
+    anchor.setAttribute('aria-expanded', 'true');
+    positionColorPicker();
+    $('colorPopoverClose').focus({ preventScroll: true });
+  }
+
+  function closeColorPicker({ restoreFocus = false } = {}) {
+    if (colorPopover.hidden) return;
+    colorPopover.hidden = true;
+    colorPicker.anchor?.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) colorPicker.anchor?.focus({ preventScroll: true });
+    colorPicker.container = null;
+  }
+
+  bindSegments($('colorViewSegments'), view => {
+    colorPicker.view = view;
+    syncColorPicker();
+    positionColorPicker();
+  });
+  $('colorPopoverClose')?.addEventListener('click', () => closeColorPicker({ restoreFocus: true }));
+  colorPopover?.querySelectorAll('[data-channel]').forEach(input => {
+    input.addEventListener('input', () => setPickerColor({ ...colorPicker, [input.dataset.channel]: Number(input.value) }));
+  });
+  colorPopover?.querySelectorAll('[data-channel-value]').forEach(input => {
+    input.addEventListener('input', () => {
+      const value = Math.round(Number(input.value));
+      if (input.value === '' || !Number.isFinite(value)) return;
+      setPickerColor({ ...colorPicker, [input.dataset.channelValue]: Math.max(0, Math.min(255, value)) });
+    });
+  });
+  colorHex?.addEventListener('input', () => {
+    const value = colorHex.value.replace(/[^0-9a-f]/gi, '');
+    if (value.length === 6 || value.length === 3) setPickerColor(parseColor(value), { keepAlpha: true });
+  });
+  colorHex?.addEventListener('blur', syncColorPicker);
+  colorOpacity?.addEventListener('input', () => {
+    colorPicker.a = Number(colorOpacity.value) / 100;
+    setPickerColor(colorPicker, { keepAlpha: true });
+  });
+  colorSpectrum?.addEventListener('pointerdown', e => {
+    const pick = event => {
+      const rect = colorSpectrum.getBoundingClientRect();
+      const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+      setPickerColor(hslToRgb(y * 360, 1, 1 - x), { keepAlpha: true });
+    };
+    colorSpectrum.setPointerCapture(e.pointerId);
+    pick(e);
+    const move = event => pick(event);
+    const up = () => {
+      colorSpectrum.removeEventListener('pointermove', move);
+      colorSpectrum.removeEventListener('pointerup', up);
+      colorSpectrum.removeEventListener('pointercancel', up);
+    };
+    colorSpectrum.addEventListener('pointermove', move);
+    colorSpectrum.addEventListener('pointerup', up);
+    colorSpectrum.addEventListener('pointercancel', up);
+  });
+  colorEyedropper?.addEventListener('click', async () => {
+    if (typeof window.EyeDropper !== 'function') return;
+    try {
+      const { sRGBHex } = await new window.EyeDropper().open();
+      setPickerColor(parseColor(sRGBHex), { keepAlpha: true });
+    } catch {
+      // The person pressed Escape; nothing to do.
+    }
+  });
+  $('colorSave')?.addEventListener('click', () => {
+    const hex = colorToHex(colorPicker);
+    writeSavedColors([hex, ...savedColors().filter(color => color !== hex)]);
+    renderSavedColors();
+  });
+  document.addEventListener('pointerdown', e => {
+    if (colorPopover.hidden || colorPopover.contains(e.target) || e.target.closest?.('.color-swatch-custom')) return;
+    closeColorPicker();
+  }, true);
+  window.addEventListener('resize', positionColorPicker);
 
   function renderFontOptions() {
     const container = $('textFontOptions');
@@ -9218,6 +9500,11 @@
         e.preventDefault();
         return;
       }
+    }
+    if (e.key === 'Escape' && !colorPopover.hidden) {
+      e.preventDefault();
+      closeColorPicker({ restoreFocus: true });
+      return;
     }
     if (e.key === 'Escape' && mobileControlsOpen) {
       e.preventDefault();

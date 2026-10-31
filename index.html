@@ -25,7 +25,7 @@ Ethan Hu -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:wght@500&family=Nunito:wght@600&family=Roboto+Mono:wght@500&family=Caveat:wght@600&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=text-fonts-1">
+<link rel="stylesheet" href="styles.css?v=colors-panel-1">
 </head>
 <body>
 <div class="frame">
@@ -665,10 +665,55 @@ Ethan Hu -->
 
 </div>
 
+<div class="color-popover" id="colorPopover" role="dialog" aria-labelledby="colorPopoverTitle" hidden>
+  <div class="color-popover-head">
+    <button type="button" class="color-popover-icon" id="colorPopoverClose" data-i18n-aria-label="color.close" aria-label="Close">
+      <svg class="x-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m6 6 8 8M14 6l-8 8"/></svg>
+    </button>
+    <div class="color-popover-title" id="colorPopoverTitle" data-i18n="color.title">Colors</div>
+    <button type="button" class="color-popover-icon" id="colorEyedropper" data-i18n-aria-label="color.eyedropper" aria-label="Pick a color from the screen" hidden>
+      <svg class="eyedropper-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="eyedropper-bulb" d="M15.2 3.9a2.7 2.7 0 0 1 3.8 0l1.1 1.1a2.7 2.7 0 0 1 0 3.8l-2.3 2.3-4.9-4.9 2.3-2.3Z"/><path d="m11.3 6.6 6.1 6.1"/><path d="m13.6 8.9-7.9 7.9a1.6 1.6 0 0 0-.4.7l-.6 2.2a.6.6 0 0 0 .7.7l2.2-.6a1.6 1.6 0 0 0 .7-.4l7.9-7.9"/></svg>
+    </button>
+  </div>
+  <div class="page-processing-segments seg" id="colorViewSegments" role="group" data-i18n-aria-label="color.title" aria-label="Colors">
+    <button type="button" class="page-processing-segment on" data-value="grid" aria-pressed="true" data-i18n="color.grid">Grid</button>
+    <button type="button" class="page-processing-segment" data-value="spectrum" aria-pressed="false" data-i18n="color.spectrum">Spectrum</button>
+    <button type="button" class="page-processing-segment" data-value="sliders" aria-pressed="false" data-i18n="color.sliders">Sliders</button>
+  </div>
+  <div class="color-view" data-color-view="grid">
+    <div class="color-grid" id="colorGrid"></div>
+  </div>
+  <div class="color-view" data-color-view="spectrum" hidden>
+    <div class="color-spectrum" id="colorSpectrumWrap">
+      <canvas id="colorSpectrum" width="288" height="240"></canvas>
+      <span class="color-spectrum-marker" id="colorSpectrumMarker" aria-hidden="true"></span>
+    </div>
+  </div>
+  <div class="color-view color-sliders" data-color-view="sliders" hidden>
+    <label class="color-channel-row"><span data-i18n="color.red">Red</span><input type="range" class="color-range" data-channel="r" min="0" max="255"><input type="number" class="color-number" data-channel-value="r" min="0" max="255"></label>
+    <label class="color-channel-row"><span data-i18n="color.green">Green</span><input type="range" class="color-range" data-channel="g" min="0" max="255"><input type="number" class="color-number" data-channel-value="g" min="0" max="255"></label>
+    <label class="color-channel-row"><span data-i18n="color.blue">Blue</span><input type="range" class="color-range" data-channel="b" min="0" max="255"><input type="number" class="color-number" data-channel-value="b" min="0" max="255"></label>
+    <label class="color-hex-row"><span data-i18n="color.hex">Hex color #</span><input type="text" class="color-hex" id="colorHex" maxlength="6" spellcheck="false" autocomplete="off"></label>
+  </div>
+  <div class="color-section-label" data-i18n="color.opacity">Opacity</div>
+  <div class="color-opacity-row">
+    <input type="range" class="color-range color-opacity" id="colorOpacity" min="0" max="100" data-i18n-aria-label="color.opacity" aria-label="Opacity">
+    <span class="color-value-pill" id="colorOpacityValue">100%</span>
+  </div>
+  <div class="color-popover-divider"></div>
+  <div class="color-popover-foot">
+    <div class="color-current" id="colorCurrent" aria-hidden="true"><span></span></div>
+    <div class="color-saved" id="colorSaved"></div>
+    <button type="button" class="color-save" id="colorSave" data-i18n-aria-label="color.save" aria-label="Save color">
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 5v10M5 10h10"/></svg>
+    </button>
+  </div>
+</div>
+
 <div class="page-context-menu" id="pageContextMenu" role="menu" hidden>
   <button type="button" id="contextSplitBtn" role="menuitem">Split after this page</button>
 </div>
 
-<script src="app.bundle.js?v=text-fonts-1"></script>
+<script src="app.bundle.js?v=colors-panel-1"></script>
 </body>
 </html>

@@ -24410,6 +24410,19 @@
     });
   });
   Object.entries({
+    en: ["Colors", "Grid", "Spectrum", "Sliders", "Red", "Green", "Blue", "Hex color #", "Opacity", "Pick a color from the screen", "Save color", "Close"],
+    "zh-Hans": ["\u989C\u8272", "\u7F51\u683C", "\u5149\u8C31", "\u6ED1\u5757", "\u7EA2", "\u7EFF", "\u84DD", "\u5341\u516D\u8FDB\u5236\u989C\u8272 #", "\u4E0D\u900F\u660E\u5EA6", "\u4ECE\u5C4F\u5E55\u53D6\u8272", "\u5B58\u50A8\u989C\u8272", "\u5173\u95ED"],
+    "zh-Hant-TW": ["\u984F\u8272", "\u683C\u72C0", "\u5149\u8B5C", "\u6ED1\u687F", "\u7D05", "\u7DA0", "\u85CD", "\u5341\u516D\u9032\u4F4D\u8272\u78BC #", "\u4E0D\u900F\u660E\u5EA6", "\u5F9E\u87A2\u5E55\u9078\u53D6\u984F\u8272", "\u5132\u5B58\u984F\u8272", "\u95DC\u9589"],
+    ko: ["\uC0C9\uC0C1", "\uACA9\uC790", "\uC2A4\uD399\uD2B8\uB7FC", "\uC2AC\uB77C\uC774\uB354", "\uBE68\uAC15", "\uCD08\uB85D", "\uD30C\uB791", "16\uC9C4\uC218 \uC0C9\uC0C1 #", "\uBD88\uD22C\uBA85\uB3C4", "\uD654\uBA74\uC5D0\uC11C \uC0C9\uC0C1 \uC120\uD0DD", "\uC0C9\uC0C1 \uC800\uC7A5", "\uB2EB\uAE30"],
+    ja: ["\u30AB\u30E9\u30FC", "\u30B0\u30EA\u30C3\u30C9", "\u30B9\u30DA\u30AF\u30C8\u30EB", "\u30B9\u30E9\u30A4\u30C0", "\u8D64", "\u7DD1", "\u9752", "16 \u9032\u6570\u30AB\u30E9\u30FC #", "\u4E0D\u900F\u660E\u5EA6", "\u753B\u9762\u304B\u3089\u8272\u3092\u9078\u629E", "\u30AB\u30E9\u30FC\u3092\u4FDD\u5B58", "\u9589\u3058\u308B"],
+    es: ["Colores", "Cuadr\xEDcula", "Espectro", "Reguladores", "Rojo", "Verde", "Azul", "Color hexadecimal #", "Opacidad", "Tomar un color de la pantalla", "Guardar color", "Cerrar"],
+    fr: ["Couleurs", "Grille", "Spectre", "Curseurs", "Rouge", "Vert", "Bleu", "Couleur hexad\xE9cimale #", "Opacit\xE9", "Pr\xE9lever une couleur \xE0 l\u2019\xE9cran", "Enregistrer la couleur", "Fermer"]
+  }).forEach(([locale, values]) => {
+    ["color.title", "color.grid", "color.spectrum", "color.sliders", "color.red", "color.green", "color.blue", "color.hex", "color.opacity", "color.eyedropper", "color.save", "color.close"].forEach((key, index) => {
+      LOCALES[locale][key] = values[index];
+    });
+  });
+  Object.entries({
     en: ["Use signature", "Drag to position", "Make signature smaller", "Make signature larger", "Use signature to place it on this page."],
     "zh-Hans": ["\u4F7F\u7528\u7B7E\u540D", "\u62D6\u52A8\u4EE5\u8C03\u6574\u4F4D\u7F6E", "\u7F29\u5C0F\u7B7E\u540D", "\u653E\u5927\u7B7E\u540D", "\u70B9\u51FB\u201C\u4F7F\u7528\u7B7E\u540D\u201D\u5C06\u5176\u653E\u5230\u5F53\u524D\u9875\u9762\u3002"],
     "zh-Hant-TW": ["\u4F7F\u7528\u7C3D\u540D", "\u62D6\u66F3\u4EE5\u8ABF\u6574\u4F4D\u7F6E", "\u7E2E\u5C0F\u7C3D\u540D", "\u653E\u5927\u7C3D\u540D", "\u9EDE\u9078\u300C\u4F7F\u7528\u7C3D\u540D\u300D\u5C07\u5176\u653E\u5230\u76EE\u524D\u9801\u9762\u3002"],
@@ -25143,7 +25156,7 @@
   });
   document.addEventListener("pointerdown", (e2) => {
     if (!mobileControlsOpen) return;
-    if (mobileControlsSheet?.contains(e2.target) || mobileControlsToggle?.contains(e2.target)) return;
+    if (mobileControlsSheet?.contains(e2.target) || mobileControlsToggle?.contains(e2.target) || colorPopover?.contains(e2.target)) return;
     setMobileControlsOpen(false);
   });
   activateElementOnKeyboard(dropZone);
@@ -26222,14 +26235,6 @@
   function renderColorSwatches(container, selected, onPick) {
     if (!container) return;
     if (!container.children.length) {
-      const well = document.createElement("input");
-      well.type = "color";
-      well.className = "color-well-input";
-      well.tabIndex = -1;
-      well.setAttribute("aria-hidden", "true");
-      well.addEventListener("input", () => {
-        if (!operationInProgress) container._onPick?.(well.value.toLowerCase());
-      });
       TEXT_COLORS.forEach((color, index) => {
         const swatch = document.createElement("button");
         swatch.type = "button";
@@ -26247,17 +26252,13 @@
       custom.type = "button";
       custom.className = "color-swatch color-swatch-custom";
       custom.setAttribute("role", "radio");
+      custom.setAttribute("aria-haspopup", "dialog");
       custom.addEventListener("click", () => {
         if (operationInProgress) return;
-        well.value = container._selected || TEXT_COLORS[0];
-        try {
-          if (well.showPicker) well.showPicker();
-          else well.click();
-        } catch {
-          well.click();
-        }
+        if (colorPicker.container === container && !colorPopover.hidden) closeColorPicker();
+        else openColorPicker(container, custom);
       });
-      container.append(custom, well);
+      container.appendChild(custom);
     }
     container._onPick = onPick;
     container._selected = selected;
@@ -26267,14 +26268,278 @@
       const on = isCustom ? customColor : swatch.dataset.color === selected;
       swatch.setAttribute("aria-checked", on ? "true" : "false");
       swatch.tabIndex = 0;
-      if (isCustom) {
-        swatch.style.setProperty("--custom", customColor ? selected : "transparent");
-        swatch.setAttribute("aria-label", t2("text.colorCustom"));
-      } else {
-        swatch.setAttribute("aria-label", t2(COLOR_NAME_KEYS[Number(swatch.dataset.colorIndex)]));
-      }
+      swatch.setAttribute("aria-label", isCustom ? t2("text.colorCustom") : t2(COLOR_NAME_KEYS[Number(swatch.dataset.colorIndex)]));
+    });
+    if (colorPicker.container === container && !colorPopover.hidden) syncColorPicker();
+  }
+  var colorPopover = $2("colorPopover");
+  var colorGrid = $2("colorGrid");
+  var colorSpectrum = $2("colorSpectrum");
+  var colorSpectrumMarker = $2("colorSpectrumMarker");
+  var colorOpacity = $2("colorOpacity");
+  var colorOpacityValue = $2("colorOpacityValue");
+  var colorHex = $2("colorHex");
+  var colorCurrent = $2("colorCurrent");
+  var colorSaved = $2("colorSaved");
+  var colorEyedropper = $2("colorEyedropper");
+  var SAVED_COLORS_KEY = "pdf-atelier-saved-colors";
+  var GRID_HUES = [195, 215, 240, 270, 300, 340, 5, 25, 38, 50, 62, 90];
+  var colorPicker = { container: null, anchor: null, r: 0, g: 0, b: 0, a: 1, view: "grid" };
+  function parseColor(value) {
+    const hex = String(value || "").replace("#", "");
+    const full = hex.length === 3 ? hex.split("").map((c2) => c2 + c2).join("") : hex;
+    const n2 = parseInt(full.slice(0, 6), 16);
+    if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(full) || Number.isNaN(n2)) return { r: 0, g: 0, b: 0, a: 1 };
+    return {
+      r: n2 >> 16 & 255,
+      g: n2 >> 8 & 255,
+      b: n2 & 255,
+      a: full.length === 8 ? parseInt(full.slice(6), 16) / 255 : 1
+    };
+  }
+  function colorToHex({ r: r2, g: g2, b: b2, a: a2 = 1 }) {
+    const part = (v2) => Math.round(Math.max(0, Math.min(255, v2))).toString(16).padStart(2, "0");
+    return "#" + part(r2) + part(g2) + part(b2) + (a2 < 0.999 ? part(a2 * 255) : "");
+  }
+  function hslToRgb(h2, s2, l2) {
+    const k2 = (n2) => (n2 + h2 / 30) % 12;
+    const a2 = s2 * Math.min(l2, 1 - l2);
+    const f2 = (n2) => l2 - a2 * Math.max(-1, Math.min(k2(n2) - 3, Math.min(9 - k2(n2), 1)));
+    return { r: Math.round(f2(0) * 255), g: Math.round(f2(8) * 255), b: Math.round(f2(4) * 255) };
+  }
+  function rgbToHsl(r2, g2, b2) {
+    r2 /= 255;
+    g2 /= 255;
+    b2 /= 255;
+    const max = Math.max(r2, g2, b2);
+    const min = Math.min(r2, g2, b2);
+    const l2 = (max + min) / 2;
+    if (max === min) return { h: 0, s: 0, l: l2 };
+    const d2 = max - min;
+    const s2 = l2 > 0.5 ? d2 / (2 - max - min) : d2 / (max + min);
+    const h2 = max === r2 ? (g2 - b2) / d2 + (g2 < b2 ? 6 : 0) : max === g2 ? (b2 - r2) / d2 + 2 : (r2 - g2) / d2 + 4;
+    return { h: h2 * 60, s: s2, l: l2 };
+  }
+  function gridColors() {
+    const colors = [];
+    for (let i2 = 0; i2 < 12; i2++) {
+      const v2 = Math.round(255 * (1 - i2 / 11));
+      colors.push(colorToHex({ r: v2, g: v2, b: v2 }));
+    }
+    for (let row = 0; row < 9; row++) {
+      const l2 = 0.14 + row * 0.085;
+      const s2 = row < 2 ? 1 : row > 6 ? 0.85 : 0.95;
+      GRID_HUES.forEach((h2) => colors.push(colorToHex(hslToRgb(h2, s2, l2))));
+    }
+    return colors;
+  }
+  function buildColorGrid() {
+    if (colorGrid.children.length) return;
+    gridColors().forEach((color) => {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "color-grid-cell";
+      cell.dataset.color = color;
+      cell.style.background = color;
+      cell.setAttribute("aria-label", color);
+      cell.addEventListener("click", () => setPickerColor(parseColor(color), { keepAlpha: true }));
+      colorGrid.appendChild(cell);
     });
   }
+  function drawColorSpectrum() {
+    if (colorSpectrum._drawn) return;
+    const ctx = colorSpectrum.getContext("2d");
+    const { width, height } = colorSpectrum;
+    const img = ctx.createImageData(width, height);
+    for (let y2 = 0; y2 < height; y2++) {
+      const h2 = y2 / (height - 1) * 360;
+      for (let x2 = 0; x2 < width; x2++) {
+        const { r: r2, g: g2, b: b2 } = hslToRgb(h2, 1, 1 - x2 / (width - 1));
+        const i2 = (y2 * width + x2) * 4;
+        img.data[i2] = r2;
+        img.data[i2 + 1] = g2;
+        img.data[i2 + 2] = b2;
+        img.data[i2 + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    colorSpectrum._drawn = true;
+  }
+  function readSavedColors() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVED_COLORS_KEY) || "[]");
+      return Array.isArray(saved) ? saved.filter((c2) => typeof c2 === "string").slice(0, 8) : [];
+    } catch {
+      return [];
+    }
+  }
+  function writeSavedColors(colors) {
+    try {
+      localStorage.setItem(SAVED_COLORS_KEY, JSON.stringify(colors.slice(0, 8)));
+    } catch {
+    }
+    colorPicker.savedFallback = colors.slice(0, 8);
+  }
+  function savedColors() {
+    const stored = readSavedColors();
+    return stored.length ? stored : colorPicker.savedFallback || [];
+  }
+  function renderSavedColors() {
+    colorSaved.innerHTML = "";
+    savedColors().forEach((color) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "color-saved-chip";
+      chip.style.setProperty("--chip", color);
+      chip.setAttribute("aria-label", color);
+      chip.addEventListener("click", () => setPickerColor(parseColor(color)));
+      colorSaved.appendChild(chip);
+    });
+  }
+  function syncColorPicker() {
+    const { r: r2, g: g2, b: b2, a: a2 } = colorPicker;
+    const hex = colorToHex({ r: r2, g: g2, b: b2, a: a2 });
+    const opaque = colorToHex({ r: r2, g: g2, b: b2 });
+    setSegmentValue($2("colorViewSegments"), colorPicker.view);
+    colorPopover.querySelectorAll("[data-color-view]").forEach((view) => {
+      view.hidden = view.dataset.colorView !== colorPicker.view;
+    });
+    colorGrid.querySelectorAll(".color-grid-cell").forEach((cell) => {
+      cell.classList.toggle("selected", cell.dataset.color === opaque);
+    });
+    const hsl = rgbToHsl(r2, g2, b2);
+    colorSpectrumMarker.style.left = (1 - hsl.l) * 100 + "%";
+    colorSpectrumMarker.style.top = hsl.h / 360 * 100 + "%";
+    colorSpectrumMarker.style.background = opaque;
+    colorPopover.querySelectorAll("[data-channel]").forEach((input) => {
+      const channel = input.dataset.channel;
+      const value = colorPicker[channel];
+      if (document.activeElement !== input) input.value = String(value);
+      const from = { r: r2, g: g2, b: b2, [channel]: 0 };
+      const to = { r: r2, g: g2, b: b2, [channel]: 255 };
+      input.style.setProperty("--track", "linear-gradient(to right, " + colorToHex(from) + ", " + colorToHex(to) + ")");
+      const number = colorPopover.querySelector('[data-channel-value="' + channel + '"]');
+      if (number && document.activeElement !== number) number.value = String(value);
+    });
+    if (document.activeElement !== colorHex) colorHex.value = opaque.slice(1).toUpperCase();
+    if (document.activeElement !== colorOpacity) colorOpacity.value = String(Math.round(a2 * 100));
+    colorOpacity.style.setProperty("--track", "linear-gradient(to right, " + opaque + "00, " + opaque + ")");
+    colorOpacityValue.textContent = Math.round(a2 * 100) + "%";
+    colorCurrent.style.setProperty("--current", hex);
+    colorEyedropper.hidden = typeof window.EyeDropper !== "function";
+  }
+  function setPickerColor(color, { keepAlpha = false, commit = true } = {}) {
+    colorPicker.r = color.r;
+    colorPicker.g = color.g;
+    colorPicker.b = color.b;
+    if (!keepAlpha && color.a != null) colorPicker.a = color.a;
+    syncColorPicker();
+    if (commit) colorPicker.container?._onPick?.(colorToHex(colorPicker));
+  }
+  function positionColorPicker() {
+    if (colorPopover.hidden) return;
+    if (isPhoneViewport()) {
+      colorPopover.classList.add("is-sheet");
+      colorPopover.style.left = "";
+      colorPopover.style.top = "";
+      return;
+    }
+    colorPopover.classList.remove("is-sheet");
+    const anchor = colorPicker.anchor?.getBoundingClientRect();
+    const width = colorPopover.offsetWidth;
+    const height = colorPopover.offsetHeight;
+    const margin = 12;
+    let left = anchor ? anchor.right + 16 : (innerWidth - width) / 2;
+    if (left + width > innerWidth - margin) left = anchor ? anchor.left - width - 16 : margin;
+    left = Math.max(margin, Math.min(innerWidth - width - margin, left));
+    let top = anchor ? anchor.top + anchor.height / 2 - height / 2 : (innerHeight - height) / 2;
+    top = Math.max(margin, Math.min(innerHeight - height - margin, top));
+    colorPopover.style.left = left + "px";
+    colorPopover.style.top = top + "px";
+  }
+  function openColorPicker(container, anchor) {
+    colorPicker.container = container;
+    colorPicker.anchor = anchor;
+    const current = parseColor(container._selected);
+    Object.assign(colorPicker, current);
+    buildColorGrid();
+    drawColorSpectrum();
+    renderSavedColors();
+    syncColorPicker();
+    colorPopover.hidden = false;
+    anchor.setAttribute("aria-expanded", "true");
+    positionColorPicker();
+    $2("colorPopoverClose").focus({ preventScroll: true });
+  }
+  function closeColorPicker({ restoreFocus = false } = {}) {
+    if (colorPopover.hidden) return;
+    colorPopover.hidden = true;
+    colorPicker.anchor?.setAttribute("aria-expanded", "false");
+    if (restoreFocus) colorPicker.anchor?.focus({ preventScroll: true });
+    colorPicker.container = null;
+  }
+  bindSegments($2("colorViewSegments"), (view) => {
+    colorPicker.view = view;
+    syncColorPicker();
+    positionColorPicker();
+  });
+  $2("colorPopoverClose")?.addEventListener("click", () => closeColorPicker({ restoreFocus: true }));
+  colorPopover?.querySelectorAll("[data-channel]").forEach((input) => {
+    input.addEventListener("input", () => setPickerColor({ ...colorPicker, [input.dataset.channel]: Number(input.value) }));
+  });
+  colorPopover?.querySelectorAll("[data-channel-value]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const value = Math.round(Number(input.value));
+      if (input.value === "" || !Number.isFinite(value)) return;
+      setPickerColor({ ...colorPicker, [input.dataset.channelValue]: Math.max(0, Math.min(255, value)) });
+    });
+  });
+  colorHex?.addEventListener("input", () => {
+    const value = colorHex.value.replace(/[^0-9a-f]/gi, "");
+    if (value.length === 6 || value.length === 3) setPickerColor(parseColor(value), { keepAlpha: true });
+  });
+  colorHex?.addEventListener("blur", syncColorPicker);
+  colorOpacity?.addEventListener("input", () => {
+    colorPicker.a = Number(colorOpacity.value) / 100;
+    setPickerColor(colorPicker, { keepAlpha: true });
+  });
+  colorSpectrum?.addEventListener("pointerdown", (e2) => {
+    const pick = (event) => {
+      const rect = colorSpectrum.getBoundingClientRect();
+      const x2 = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      const y2 = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+      setPickerColor(hslToRgb(y2 * 360, 1, 1 - x2), { keepAlpha: true });
+    };
+    colorSpectrum.setPointerCapture(e2.pointerId);
+    pick(e2);
+    const move = (event) => pick(event);
+    const up = () => {
+      colorSpectrum.removeEventListener("pointermove", move);
+      colorSpectrum.removeEventListener("pointerup", up);
+      colorSpectrum.removeEventListener("pointercancel", up);
+    };
+    colorSpectrum.addEventListener("pointermove", move);
+    colorSpectrum.addEventListener("pointerup", up);
+    colorSpectrum.addEventListener("pointercancel", up);
+  });
+  colorEyedropper?.addEventListener("click", async () => {
+    if (typeof window.EyeDropper !== "function") return;
+    try {
+      const { sRGBHex } = await new window.EyeDropper().open();
+      setPickerColor(parseColor(sRGBHex), { keepAlpha: true });
+    } catch {
+    }
+  });
+  $2("colorSave")?.addEventListener("click", () => {
+    const hex = colorToHex(colorPicker);
+    writeSavedColors([hex, ...savedColors().filter((color) => color !== hex)]);
+    renderSavedColors();
+  });
+  document.addEventListener("pointerdown", (e2) => {
+    if (colorPopover.hidden || colorPopover.contains(e2.target) || e2.target.closest?.(".color-swatch-custom")) return;
+    closeColorPicker();
+  }, true);
+  window.addEventListener("resize", positionColorPicker);
   function renderFontOptions() {
     const container = $2("textFontOptions");
     if (!container) return;
@@ -29295,6 +29560,11 @@
         e2.preventDefault();
         return;
       }
+    }
+    if (e2.key === "Escape" && !colorPopover.hidden) {
+      e2.preventDefault();
+      closeColorPicker({ restoreFocus: true });
+      return;
     }
     if (e2.key === "Escape" && mobileControlsOpen) {
       e2.preventDefault();
