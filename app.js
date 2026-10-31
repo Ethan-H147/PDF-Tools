@@ -717,10 +717,18 @@
 
   let themeTransitionGeneration = 0;
 
+  // Phone browsers (Android Chrome, Safari before iOS 26) colour their status bar and
+  // toolbar from theme-color, so it follows the theme and the phone layout's background.
+  function syncThemeColor(dark = document.body.classList.contains('dark-mode')) {
+    const meta = document.getElementById('themeColorMeta');
+    if (meta) meta.content = dark ? '#000000' : isPhoneViewport() ? '#e9e9ed' : '#f5f5f7';
+  }
+
   function setDarkMode(enabled, persist = false, animate = false) {
     const applyThemeState = () => {
       document.body.classList.toggle('dark-mode', enabled);
       document.documentElement.classList.toggle('dark-mode', enabled);
+      syncThemeColor(enabled);
       themeToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
       themeToggle.setAttribute('aria-label', enabled ? t('theme.offAria') : t('theme.onAria'));
       themeToggleText.textContent = enabled ? t('theme.light') : t('theme.dark');
@@ -6193,6 +6201,7 @@
     closeColorPicker();
   }, true);
   window.addEventListener('resize', positionColorPicker);
+  window.addEventListener('resize', () => syncThemeColor());
 
   function renderFontOptions() {
     const container = $('textFontOptions');

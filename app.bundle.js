@@ -21407,10 +21407,15 @@
     }
   }
   var themeTransitionGeneration = 0;
+  function syncThemeColor(dark = document.body.classList.contains("dark-mode")) {
+    const meta = document.getElementById("themeColorMeta");
+    if (meta) meta.content = dark ? "#000000" : isPhoneViewport() ? "#e9e9ed" : "#f5f5f7";
+  }
   function setDarkMode(enabled, persist = false, animate = false) {
     const applyThemeState = () => {
       document.body.classList.toggle("dark-mode", enabled);
       document.documentElement.classList.toggle("dark-mode", enabled);
+      syncThemeColor(enabled);
       themeToggle.setAttribute("aria-pressed", enabled ? "true" : "false");
       themeToggle.setAttribute("aria-label", enabled ? t2("theme.offAria") : t2("theme.onAria"));
       themeToggleText.textContent = enabled ? t2("theme.light") : t2("theme.dark");
@@ -26544,6 +26549,7 @@
     closeColorPicker();
   }, true);
   window.addEventListener("resize", positionColorPicker);
+  window.addEventListener("resize", () => syncThemeColor());
   function renderFontOptions() {
     const container = $2("textFontOptions");
     if (!container) return;
