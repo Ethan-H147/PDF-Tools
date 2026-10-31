@@ -5620,11 +5620,24 @@
 
   /* Colour orbs give a little when pressed. */
   .color-swatch {
-    transition: transform .16s cubic-bezier(.2, .8, .2, 1), box-shadow .16s;
+    transition: transform .16s cubic-bezier(.2, .8, .2, 1), filter .16s, box-shadow .16s;
   }
 
-  .color-swatch:active { transform: scale(.88); }
+  /* Outranks the generic button:active press, which only scales to 98%. */
+  button.color-swatch:not(:disabled):active {
+    filter: brightness(.7);
+    transform: scale(.84);
+    transition: transform .16s cubic-bezier(.2, .8, .2, 1), filter .16s;
+  }
 
   @media (prefers-reduced-motion: reduce) {
-    .color-swatch:active { transform: none; }
+    button.color-swatch:not(:disabled):active { transform: none; }
   }
+
+  /* Dark mode: a flat black page with no glow behind the header; the header and tool bar
+     use the same #1C1C1E as the panels. */
+  html.dark-mode,
+  body.dark-mode { background: #000; }
+
+  body.dark-mode header.masthead,
+  body.dark-mode .tool-nav { background: #1c1c1e; }
