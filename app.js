@@ -3829,6 +3829,8 @@
     ['color.title', 'color.grid', 'color.spectrum', 'color.sliders', 'color.red', 'color.green', 'color.blue', 'color.hex', 'color.opacity', 'color.eyedropper', 'color.save', 'color.close']
       .forEach((key, index) => { LOCALES[locale][key] = values[index]; });
   });
+  Object.entries({ en: 'Delete', 'zh-Hans': '删除', 'zh-Hant-TW': '刪除', ko: '삭제', ja: '削除', es: 'Eliminar', fr: 'Supprimer' })
+    .forEach(([locale, label]) => { LOCALES[locale]['stamp.delete'] = label; });
 
   Object.entries({
     en: ['Use signature', 'Drag to position', 'Make signature smaller', 'Make signature larger', 'Use signature to place it on this page.'],
@@ -4302,6 +4304,7 @@
   }
 
   function updatePageState() {
+    hideStampMenu();
     syncPageHistory();
     syncDocumentName();
     const count = activePageCount();
@@ -5320,10 +5323,7 @@
     const placedCount = activeSignatureStamps().filter(stamp => stamp.kind !== 'text').length;
     const selected = !!getSignatureStamp(signatureState.selectedId);
     const mobileSigning = isPhoneViewport() && activeTool === 'sign';
-    const mobileStamping = isPhoneViewport() && isStampTool();
-    const currentSelection = getSignatureStamp(signatureState.selectedId)?.pageIndex === currentSourceIndex();
     $('mobileSignUse').disabled = !hasInk || !hasPdf || operationInProgress;
-    $('mobileSignActions').hidden = !mobileStamping || !currentSelection;
     if (mobileSigning) mobileControlsLabel.textContent = t('sign.drawSignature');
     signHint.textContent = hasInk ? t('sign.ready') : t('sign.drawSignature');
     signatureClearBtn.disabled = !hasInk;
@@ -5356,30 +5356,6 @@
     signatureState.selectedId = stamp.id;
     setMobileControlsOpen(false, { restoreFocus: true });
     updatePageState();
-  }
-
-  function resizeMobileSignature(factor) {
-    const stamp = getSignatureStamp(signatureState.selectedId);
-    if (!stamp || operationInProgress || stamp.pageIndex !== currentSourceIndex()) return;
-    const centerX = stamp.xPct + stamp.wPct / 2;
-    const centerY = stamp.yPct + stamp.hPct / 2;
-    const minScale = stamp.kind === 'text' ? Math.max(1 / stamp.wPct, 0.5 / stamp.hPct) : Math.max(5 / stamp.wPct, 2 / stamp.hPct);
-    const maxScale = Math.min(95 / stamp.wPct, 95 / stamp.hPct);
-    const scale = Math.max(minScale, Math.min(maxScale, factor));
-    stamp.wPct *= scale;
-    stamp.hPct *= scale;
-    stamp.xPct = centerX - stamp.wPct / 2;
-    stamp.yPct = centerY - stamp.hPct / 2;
-    clampSignatureStamp(stamp);
-    if (stamp.kind === 'text') {
-      stamp.size = Math.max(4, Math.min(400, Math.round(stamp.size * scale)));
-      refreshTextStamp(stamp);
-      stamp.xPct = centerX - stamp.wPct / 2;
-      stamp.yPct = centerY - stamp.hPct / 2;
-      clampSignatureStamp(stamp);
-      loadTextStampIntoControls(stamp);
-    }
-    updateSignatureOverlay();
   }
 
   function defaultSignaturePlacement(rect, dataUrl = signatureState.dataUrl, ratio = signatureState.ratio) {
@@ -5537,6 +5513,11 @@
   function moveSignatureDrag(e) {
     const drag = signatureState.drag;
     if (!drag) return;
+    if (stampHold) {
+      // Wait for the hold to resolve: a real move cancels it, a tiny wobble is ignored.
+      if (Math.hypot(e.clientX - stampHold.x, e.clientY - stampHold.y) <= STAMP_HOLD_SLOP) return;
+      cancelStampHold();
+    }
     if (drag.mode === 'resize') {
       resizeSignatureStampFromPointer(e, drag);
       return;
@@ -5556,6 +5537,7 @@
   }
 
   function endSignatureDrag(e) {
+    cancelStampHold();
     if (!signatureState.drag) return;
     moveSignatureDrag(e);
     const drag = signatureState.drag;
@@ -5594,6 +5576,83 @@
     moveSignatureDrag(e);
   }
 
+  const STAMP_HOLD_MS = 480;
+  const STAMP_HOLD_SLOP = 8;
+  let stampHold = null;
+  const stampMenu = document.createElement('div');
+  stampMenu.className = 'stamp-menu';
+  stampMenu.setAttribute('role', 'menu');
+  stampMenu.hidden = true;
+  const stampMenuDelete = document.createElement('button');
+  stampMenuDelete.type = 'button';
+  stampMenuDelete.className = 'stamp-menu-item is-destructive';
+  stampMenuDelete.setAttribute('role', 'menuitem');
+  stampMenu.appendChild(stampMenuDelete);
+  document.body.appendChild(stampMenu);
+
+  function cancelStampHold() {
+    if (stampHold) clearTimeout(stampHold.timer);
+    stampHold = null;
+  }
+
+  function hideStampMenu() {
+    stampMenu.hidden = true;
+  }
+
+  function showStampMenu(id) {
+    signatureState.selectedId = id;
+    updateSignatureOverlay();
+    const stampEl = signatureOverlay.querySelector('[data-signature-id="' + id + '"]');
+    if (!stampEl) return;
+    stampMenu.dataset.stampId = String(id);
+    stampMenuDelete.innerHTML = '<span></span><svg class="trash-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4.1A1.1 1.1 0 0 1 9.1 3h1.8A1.1 1.1 0 0 1 12 4.1v1.4M5.1 5.5l.75 10.4a1.7 1.7 0 0 0 1.7 1.6h4.9a1.7 1.7 0 0 0 1.7-1.6l.75-10.4M8.3 8.6v5.9M10 8.6v5.9M11.7 8.6v5.9"/></svg>';
+    stampMenuDelete.querySelector('span').textContent = t('stamp.delete');
+    stampMenu.hidden = false;
+    const box = stampEl.getBoundingClientRect();
+    const menu = stampMenu.getBoundingClientRect();
+    let top = box.top - menu.height - 10;
+    const below = top < 8;
+    if (below) top = Math.min(innerHeight - menu.height - 8, box.bottom + 10);
+    const left = Math.max(8, Math.min(innerWidth - menu.width - 8, box.left + box.width / 2 - menu.width / 2));
+    stampMenu.style.left = left + 'px';
+    stampMenu.style.top = top + 'px';
+    stampMenu.classList.toggle('is-below', below);
+  }
+
+  function startStampHold(e, id) {
+    cancelStampHold();
+    stampHold = {
+      x: e.clientX,
+      y: e.clientY,
+      timer: setTimeout(() => {
+        stampHold = null;
+        // Stop the drag where it is, then offer Delete.
+        window.removeEventListener('pointermove', moveSignatureDrag);
+        window.removeEventListener('pointerup', endSignatureDrag);
+        window.removeEventListener('pointercancel', endSignatureDrag);
+        signatureState.drag = null;
+        navigator.vibrate?.(10);
+        showStampMenu(id);
+      }, STAMP_HOLD_MS),
+    };
+  }
+
+  stampMenuDelete.addEventListener('click', () => {
+    signatureState.selectedId = Number(stampMenu.dataset.stampId);
+    hideStampMenu();
+    deleteSelectedSignatureStamp();
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!stampMenu.hidden && !stampMenu.contains(e.target)) hideStampMenu();
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !stampMenu.hidden) hideStampMenu();
+  });
+  window.addEventListener('resize', hideStampMenu);
+  signatureOverlay?.addEventListener('contextmenu', e => {
+    if (e.target.closest('.signature-stamp')) e.preventDefault();
+  });
+
   function beginSignatureOverlayDrag(e) {
     if (!isStampTool() || (e.pointerType === 'mouse' && e.button !== 0)) return;
     const stampEl = e.target.closest('.signature-stamp');
@@ -5624,6 +5683,7 @@
         offsetY: (e.clientY - rect.top) / Math.max(1, rect.height),
         ghost: null,
       };
+      if (e.pointerType !== 'mouse') startStampHold(e, stamp.id);
     }
     updateSignatureOverlay();
     window.addEventListener('pointermove', moveSignatureDrag);
@@ -9445,9 +9505,6 @@
   signatureClearBtn.addEventListener('click', clearSignature);
   signatureRemoveBtn.addEventListener('click', deleteSelectedSignatureStamp);
   $('mobileSignUse').addEventListener('click', placeMobileSignature);
-  $('mobileSignSmaller').addEventListener('click', () => resizeMobileSignature(0.88));
-  $('mobileSignLarger').addEventListener('click', () => resizeMobileSignature(1.12));
-  $('mobileSignDelete').addEventListener('click', deleteSelectedSignatureStamp);
   signatureDragSource.addEventListener('pointerdown', beginSignatureDragFromSource);
   signatureOverlay.addEventListener('pointerdown', beginSignatureOverlayDrag);
   canvasWrap.addEventListener('pointerdown', e => {

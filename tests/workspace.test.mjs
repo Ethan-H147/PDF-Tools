@@ -404,9 +404,11 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
         await stamp.waitFor();
         await mobile.waitForTimeout(300);
         const before = await stamp.boundingBox();
-        await mobile.locator('#mobileSignLarger').click();
-        assert((await stamp.boundingBox()).width > before.width);
-        await mobile.locator('#mobileSignSmaller').click();
+        // Phones resize with the corner handles, which take touches just outside the box.
+        await dispatch('touchStart', before.x + before.width + 10, before.y + before.height + 10);
+        await dispatch('touchMove', before.x + before.width + 50, before.y + before.height + 25);
+        await dispatch('touchEnd');
+        assert((await stamp.boundingBox()).width > before.width, 'Dragging a corner must resize the signature');
         const position = await stamp.boundingBox();
         await dispatch('touchStart', position.x + position.width / 2, position.y + position.height / 2);
         await dispatch('touchMove', position.x + position.width / 2 + 35, position.y + position.height / 2 + 45);
@@ -418,9 +420,15 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
         assert.equal(inspected.pages, 3);
         assert(inspected.text.includes('Document page 1'));
         assert.match(signed.toString('latin1'), /\/Subtype\s*\/Image/);
-        await mobile.locator('#mobileSignDelete').click();
+        // Holding the signature still opens a Delete menu.
+        const held = await stamp.boundingBox();
+        await dispatch('touchStart', held.x + held.width / 2, held.y + held.height / 2);
+        await mobile.waitForTimeout(650);
+        await dispatch('touchEnd');
+        await mobile.locator('.stamp-menu').waitFor({ state: 'visible' });
+        await mobile.locator('.stamp-menu-item').click();
         assert.equal(await stamp.count(), 0);
-        assert.equal(await mobile.locator('#mobileSignActions').isVisible(), false);
+        assert.equal(await mobile.locator('.stamp-menu').isVisible(), false);
       } finally { await mobile.close(); }
     });
 

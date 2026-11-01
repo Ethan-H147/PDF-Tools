@@ -24430,6 +24430,9 @@
       LOCALES[locale][key] = values[index];
     });
   });
+  Object.entries({ en: "Delete", "zh-Hans": "\u5220\u9664", "zh-Hant-TW": "\u522A\u9664", ko: "\uC0AD\uC81C", ja: "\u524A\u9664", es: "Eliminar", fr: "Supprimer" }).forEach(([locale, label]) => {
+    LOCALES[locale]["stamp.delete"] = label;
+  });
   Object.entries({
     en: ["Use signature", "Drag to position", "Make signature smaller", "Make signature larger", "Use signature to place it on this page."],
     "zh-Hans": ["\u4F7F\u7528\u7B7E\u540D", "\u62D6\u52A8\u4EE5\u8C03\u6574\u4F4D\u7F6E", "\u7F29\u5C0F\u7B7E\u540D", "\u653E\u5927\u7B7E\u540D", "\u70B9\u51FB\u201C\u4F7F\u7528\u7B7E\u540D\u201D\u5C06\u5176\u653E\u5230\u5F53\u524D\u9875\u9762\u3002"],
@@ -24825,6 +24828,7 @@
     return state.pageOrder.some((sourceIndex, outputIndex) => sourceIndex !== outputIndex);
   }
   function updatePageState() {
+    hideStampMenu();
     syncPageHistory();
     syncDocumentName();
     const count = activePageCount();
@@ -25746,10 +25750,7 @@
     const placedCount = activeSignatureStamps().filter((stamp) => stamp.kind !== "text").length;
     const selected = !!getSignatureStamp(signatureState.selectedId);
     const mobileSigning = isPhoneViewport() && activeTool === "sign";
-    const mobileStamping = isPhoneViewport() && isStampTool();
-    const currentSelection = getSignatureStamp(signatureState.selectedId)?.pageIndex === currentSourceIndex();
     $2("mobileSignUse").disabled = !hasInk || !hasPdf || operationInProgress;
-    $2("mobileSignActions").hidden = !mobileStamping || !currentSelection;
     if (mobileSigning) mobileControlsLabel.textContent = t2("sign.drawSignature");
     signHint.textContent = hasInk ? t2("sign.ready") : t2("sign.drawSignature");
     signatureClearBtn.disabled = !hasInk;
@@ -25777,29 +25778,6 @@
     signatureState.selectedId = stamp.id;
     setMobileControlsOpen(false, { restoreFocus: true });
     updatePageState();
-  }
-  function resizeMobileSignature(factor) {
-    const stamp = getSignatureStamp(signatureState.selectedId);
-    if (!stamp || operationInProgress || stamp.pageIndex !== currentSourceIndex()) return;
-    const centerX = stamp.xPct + stamp.wPct / 2;
-    const centerY = stamp.yPct + stamp.hPct / 2;
-    const minScale = stamp.kind === "text" ? Math.max(1 / stamp.wPct, 0.5 / stamp.hPct) : Math.max(5 / stamp.wPct, 2 / stamp.hPct);
-    const maxScale = Math.min(95 / stamp.wPct, 95 / stamp.hPct);
-    const scale = Math.max(minScale, Math.min(maxScale, factor));
-    stamp.wPct *= scale;
-    stamp.hPct *= scale;
-    stamp.xPct = centerX - stamp.wPct / 2;
-    stamp.yPct = centerY - stamp.hPct / 2;
-    clampSignatureStamp(stamp);
-    if (stamp.kind === "text") {
-      stamp.size = Math.max(4, Math.min(400, Math.round(stamp.size * scale)));
-      refreshTextStamp(stamp);
-      stamp.xPct = centerX - stamp.wPct / 2;
-      stamp.yPct = centerY - stamp.hPct / 2;
-      clampSignatureStamp(stamp);
-      loadTextStampIntoControls(stamp);
-    }
-    updateSignatureOverlay();
   }
   function defaultSignaturePlacement(rect, dataUrl = signatureState.dataUrl, ratio = signatureState.ratio) {
     const wPct = Math.max(18, Math.min(38, 190 / Math.max(1, rect.width) * 100));
@@ -25943,6 +25921,10 @@
   function moveSignatureDrag(e2) {
     const drag = signatureState.drag;
     if (!drag) return;
+    if (stampHold) {
+      if (Math.hypot(e2.clientX - stampHold.x, e2.clientY - stampHold.y) <= STAMP_HOLD_SLOP) return;
+      cancelStampHold();
+    }
     if (drag.mode === "resize") {
       resizeSignatureStampFromPointer(e2, drag);
       return;
@@ -25959,6 +25941,7 @@
     }
   }
   function endSignatureDrag(e2) {
+    cancelStampHold();
     if (!signatureState.drag) return;
     moveSignatureDrag(e2);
     const drag = signatureState.drag;
@@ -25995,6 +25978,76 @@
     window.addEventListener("pointercancel", endSignatureDrag);
     moveSignatureDrag(e2);
   }
+  var STAMP_HOLD_MS = 480;
+  var STAMP_HOLD_SLOP = 8;
+  var stampHold = null;
+  var stampMenu = document.createElement("div");
+  stampMenu.className = "stamp-menu";
+  stampMenu.setAttribute("role", "menu");
+  stampMenu.hidden = true;
+  var stampMenuDelete = document.createElement("button");
+  stampMenuDelete.type = "button";
+  stampMenuDelete.className = "stamp-menu-item is-destructive";
+  stampMenuDelete.setAttribute("role", "menuitem");
+  stampMenu.appendChild(stampMenuDelete);
+  document.body.appendChild(stampMenu);
+  function cancelStampHold() {
+    if (stampHold) clearTimeout(stampHold.timer);
+    stampHold = null;
+  }
+  function hideStampMenu() {
+    stampMenu.hidden = true;
+  }
+  function showStampMenu(id) {
+    signatureState.selectedId = id;
+    updateSignatureOverlay();
+    const stampEl = signatureOverlay.querySelector('[data-signature-id="' + id + '"]');
+    if (!stampEl) return;
+    stampMenu.dataset.stampId = String(id);
+    stampMenuDelete.innerHTML = '<span></span><svg class="trash-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4.1A1.1 1.1 0 0 1 9.1 3h1.8A1.1 1.1 0 0 1 12 4.1v1.4M5.1 5.5l.75 10.4a1.7 1.7 0 0 0 1.7 1.6h4.9a1.7 1.7 0 0 0 1.7-1.6l.75-10.4M8.3 8.6v5.9M10 8.6v5.9M11.7 8.6v5.9"/></svg>';
+    stampMenuDelete.querySelector("span").textContent = t2("stamp.delete");
+    stampMenu.hidden = false;
+    const box = stampEl.getBoundingClientRect();
+    const menu = stampMenu.getBoundingClientRect();
+    let top = box.top - menu.height - 10;
+    const below = top < 8;
+    if (below) top = Math.min(innerHeight - menu.height - 8, box.bottom + 10);
+    const left = Math.max(8, Math.min(innerWidth - menu.width - 8, box.left + box.width / 2 - menu.width / 2));
+    stampMenu.style.left = left + "px";
+    stampMenu.style.top = top + "px";
+    stampMenu.classList.toggle("is-below", below);
+  }
+  function startStampHold(e2, id) {
+    cancelStampHold();
+    stampHold = {
+      x: e2.clientX,
+      y: e2.clientY,
+      timer: setTimeout(() => {
+        stampHold = null;
+        window.removeEventListener("pointermove", moveSignatureDrag);
+        window.removeEventListener("pointerup", endSignatureDrag);
+        window.removeEventListener("pointercancel", endSignatureDrag);
+        signatureState.drag = null;
+        navigator.vibrate?.(10);
+        showStampMenu(id);
+      }, STAMP_HOLD_MS)
+    };
+  }
+  stampMenuDelete.addEventListener("click", () => {
+    signatureState.selectedId = Number(stampMenu.dataset.stampId);
+    hideStampMenu();
+    deleteSelectedSignatureStamp();
+  });
+  document.addEventListener("pointerdown", (e2) => {
+    if (!stampMenu.hidden && !stampMenu.contains(e2.target)) hideStampMenu();
+  }, true);
+  document.addEventListener("keydown", (e2) => {
+    if (e2.key === "Escape" && !stampMenu.hidden) hideStampMenu();
+  });
+  window.addEventListener("resize", hideStampMenu);
+  signatureOverlay?.addEventListener("contextmenu", (e2) => {
+    if (e2.target.closest(".signature-stamp")) e2.preventDefault();
+  });
   function beginSignatureOverlayDrag(e2) {
     if (!isStampTool() || e2.pointerType === "mouse" && e2.button !== 0) return;
     const stampEl = e2.target.closest(".signature-stamp");
@@ -26025,6 +26078,7 @@
         offsetY: (e2.clientY - rect.top) / Math.max(1, rect.height),
         ghost: null
       };
+      if (e2.pointerType !== "mouse") startStampHold(e2, stamp.id);
     }
     updateSignatureOverlay();
     window.addEventListener("pointermove", moveSignatureDrag);
@@ -29507,9 +29561,6 @@
   signatureClearBtn.addEventListener("click", clearSignature);
   signatureRemoveBtn.addEventListener("click", deleteSelectedSignatureStamp);
   $2("mobileSignUse").addEventListener("click", placeMobileSignature);
-  $2("mobileSignSmaller").addEventListener("click", () => resizeMobileSignature(0.88));
-  $2("mobileSignLarger").addEventListener("click", () => resizeMobileSignature(1.12));
-  $2("mobileSignDelete").addEventListener("click", deleteSelectedSignatureStamp);
   signatureDragSource.addEventListener("pointerdown", beginSignatureDragFromSource);
   signatureOverlay.addEventListener("pointerdown", beginSignatureOverlayDrag);
   canvasWrap.addEventListener("pointerdown", (e2) => {

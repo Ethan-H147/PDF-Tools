@@ -4111,22 +4111,15 @@
     width: 18px;
   }
 
-  .mobile-sign-use,
-  .mobile-sign-actions { display: none; }
+  .mobile-sign-use { display: none; }
 
   @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse) {
     .mobile-signing .signature-drag-source,
-    .mobile-signing #signatureRemoveBtn,
-    .mobile-signing .signature-stamp.selected .signature-resize-handle { display: none; }
+    .mobile-signing #signatureRemoveBtn { display: none; }
     .mobile-signing .sign-pad-wrap { height: auto; }
     .mobile-signing .sign-pad-wrap canvas { height: auto; width: 100%; }
     .mobile-signing .mobile-sign-use { display: block; min-height: 44px; border-radius: 999px; background: var(--accent); color: white; }
     .mobile-signing .mobile-sign-use:disabled { opacity: .4; }
-    .mobile-signing .mobile-sign-actions { display: flex; align-items: center; gap: 6px; padding: 0 16px 8px; flex: 0 0 auto; }
-    .mobile-signing .mobile-sign-actions[hidden] { display: none; }
-    .mobile-sign-actions > span { flex: 1; color: var(--ink-mute); font-size: 12px; }
-    .mobile-sign-actions button { border: 0; border-radius: 50%; background: rgba(118, 118, 128, .11); color: var(--ink); width: 44px; height: 44px; padding: 0; display: grid; place-items: center; font-size: 23px; flex-shrink: 0; }
-    .mobile-sign-actions svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   }
 
   /* Phones have one viewport, with scroll ownership inside the active surface. */
@@ -4430,8 +4423,7 @@
   body.organizer-dragging .preview-stage.organizing { overflow: hidden !important; }
 
   .zoom-btn { display: grid; place-items: center; padding: 0; }
-  .zoom-btn .step-icon,
-  .mobile-sign-actions .step-icon {
+  .zoom-btn .step-icon {
     display: block;
     width: 20px;
     height: 20px;
@@ -5721,6 +5713,86 @@
     }
   }
 
-  @media (max-width: 700px), (max-width: 1000px) and (max-height: 500px) and (pointer: coarse) {
-    body.dark-mode .mobile-sign-actions button { background: rgba(118, 118, 128, 0.24); }
+
+  /* Hold-to-delete menu for placed signatures and text (touch). */
+  .signature-stamp { -webkit-touch-callout: none; }
+
+  .stamp-menu {
+    animation: stamp-menu-in .16s cubic-bezier(.2, .8, .2, 1);
+    backdrop-filter: blur(24px) saturate(1.6);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    background: rgba(250, 250, 252, 0.92);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+    padding: 4px;
+    position: fixed;
+    transform-origin: bottom center;
+    z-index: 10040;
+  }
+
+  .stamp-menu.is-below { transform-origin: top center; }
+  .stamp-menu[hidden] { display: none; }
+
+  .stamp-menu-item {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    color: #ff3b30;
+    cursor: pointer;
+    display: flex;
+    font-family: var(--font-ui);
+    font-size: 16px;
+    font-weight: 500;
+    gap: 24px;
+    justify-content: space-between;
+    min-height: 44px;
+    min-width: 150px;
+    padding: 0 14px;
+  }
+
+  .stamp-menu-item:active { background: rgba(118, 118, 128, 0.14); }
+
+  @media (hover: hover) {
+    .stamp-menu-item:hover { background: rgba(118, 118, 128, 0.14); }
+  }
+
+  .stamp-menu-item svg {
+    fill: none;
+    height: 19px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.6;
+    width: 19px;
+  }
+
+  body.dark-mode .stamp-menu {
+    background: rgba(44, 44, 46, 0.92);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  }
+
+  body.dark-mode .stamp-menu-item { color: #ff453a; }
+
+  @keyframes stamp-menu-in {
+    from { opacity: 0; transform: scale(.92); }
+  }
+
+  /* Corner handles get a finger-sized hit area outside each corner, now that phones
+     resize with them; the inside of the box stays free for dragging even when small. */
+  @media (pointer: coarse) {
+    .signature-resize-handle { pointer-events: none; }
+
+    .signature-resize-handle::before {
+      content: "";
+      height: 30px;
+      pointer-events: auto;
+      position: absolute;
+      width: 30px;
+    }
+
+    .signature-resize-handle[data-signature-handle="nw"]::before { left: -24px; top: -24px; }
+    .signature-resize-handle[data-signature-handle="ne"]::before { right: -24px; top: -24px; }
+    .signature-resize-handle[data-signature-handle="se"]::before { bottom: -24px; right: -24px; }
+    .signature-resize-handle[data-signature-handle="sw"]::before { bottom: -24px; left: -24px; }
   }
