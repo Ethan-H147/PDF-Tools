@@ -20770,31 +20770,19 @@
   var PDF_LIB_SCRIPT_URLS = [
     new URL("./vendor/pdf-lib-2.9.2/dist/pdf-lib.min.js", APP_ASSET_BASE).href
   ];
-  var JSPDF_SCRIPT_URLS = [
-    "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
-    "https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"
-  ];
   var COMPRESSION_PRESETS = {
     original: {
-      hint: "original",
-      summary: "Compact the PDF while keeping original page content.",
-      rasterize: false
+      hint: "original"
     },
     balanced: {
       hint: "balanced",
-      summary: "Create a smaller color PDF with balanced quality.",
-      rasterize: true,
-      dpi: 160,
-      jpegQuality: 0.78,
-      maxDimension: 2600
+      maxSide: 1800,
+      jpegQuality: 0.72
     },
     small: {
       hint: "small",
-      summary: "Create the smallest PDF with lighter page images.",
-      rasterize: true,
-      dpi: 110,
-      jpegQuality: 0.58,
-      maxDimension: 1800
+      maxSide: 1200,
+      jpegQuality: 0.55
     }
   };
   var lastSingleTapAt = 0;
@@ -21936,12 +21924,6 @@
     if (!window.PDFLib) throw new Error("PDF library did not load. Check your connection and try again.");
     return window.PDFLib;
   }
-  async function ensureJsPdf() {
-    if (window.jspdf?.jsPDF) return window.jspdf;
-    await loadScriptOnce("Rendered PDF", JSPDF_SCRIPT_URLS);
-    if (!window.jspdf?.jsPDF) throw new Error("Rendered PDF library did not load. Check your connection and try again.");
-    return window.jspdf;
-  }
   function normalizePdfBytes(bytes) {
     if (bytes instanceof Uint8Array) return bytes;
     if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
@@ -21959,21 +21941,6 @@
   function createPdfArtifact(bytes, fileBase, meta = {}) {
     return {
       bytes: normalizePdfBytes(bytes),
-      fileBase: cleanDownloadBase(fileBase, outputBaseName()),
-      mimeType: "application/pdf",
-      meta: {
-        processors: [],
-        ...meta
-      }
-    };
-  }
-  function createJsPdfOutputArtifact(pdf, fileBase, meta = {}) {
-    if (!MOBILE_PERFORMANCE_MODE) {
-      return createPdfArtifact(pdf.output("arraybuffer"), fileBase, meta);
-    }
-    return {
-      bytes: null,
-      blob: pdf.output("blob"),
       fileBase: cleanDownloadBase(fileBase, outputBaseName()),
       mimeType: "application/pdf",
       meta: {
@@ -24434,6 +24401,85 @@
     LOCALES[locale]["stamp.delete"] = label;
   });
   Object.entries({
+    en: {
+      "tool.compress.meta": "Text and drawings always stay sharp<br/>Balanced shrinks photos for everyday sharing<br/>Small shrinks them further when size matters most",
+      "compress.summaryBalanced": "Shrinks photos and scans to a balanced quality. Text and drawings stay sharp.",
+      "compress.summarySmall": "Shrinks photos and scans further for the smallest file. Text and drawings stay sharp.",
+      "compress.estimateNone": "Choose a PDF to compress.",
+      "compress.estimateOriginal": "Keeps every page as it is; the file stays about {size}.",
+      "compress.estimateImages": "Only images get smaller, so the savings depend on how many photos or scans the PDF has.",
+      "compress.result": "Saved {percent}%: {from} \u2192 {to}.",
+      "compress.resultNone": "No images could be made smaller, so the file stays {size}.",
+      "progress.compressingImage": "Compressing image {page} of {count}"
+    },
+    "zh-Hans": {
+      "tool.compress.meta": "\u6587\u5B57\u548C\u56FE\u5F62\u59CB\u7EC8\u6E05\u6670<br/>\u5747\u8861\uFF1A\u538B\u7F29\u7167\u7247\uFF0C\u9002\u5408\u65E5\u5E38\u5206\u4EAB<br/>\u5C0F\u4F53\u79EF\uFF1A\u8FDB\u4E00\u6B65\u538B\u7F29\uFF0C\u4F53\u79EF\u4F18\u5148",
+      "compress.summaryBalanced": "\u628A\u7167\u7247\u548C\u626B\u63CF\u9875\u538B\u7F29\u5230\u9002\u4E2D\u7684\u753B\u8D28\uFF0C\u6587\u5B57\u548C\u56FE\u5F62\u4FDD\u6301\u6E05\u6670\u3002",
+      "compress.summarySmall": "\u8FDB\u4E00\u6B65\u538B\u7F29\u7167\u7247\u548C\u626B\u63CF\u9875\uFF0C\u5F97\u5230\u6700\u5C0F\u7684\u6587\u4EF6\uFF0C\u6587\u5B57\u548C\u56FE\u5F62\u4FDD\u6301\u6E05\u6670\u3002",
+      "compress.estimateNone": "\u9009\u62E9\u8981\u538B\u7F29\u7684 PDF\u3002",
+      "compress.estimateOriginal": "\u4FDD\u6301\u6BCF\u4E00\u9875\u539F\u6837\uFF0C\u6587\u4EF6\u7EA6\u4E3A {size}\u3002",
+      "compress.estimateImages": "\u53EA\u4F1A\u7F29\u5C0F\u56FE\u7247\uFF0C\u8282\u7701\u591A\u5C11\u53D6\u51B3\u4E8E PDF \u91CC\u7167\u7247\u6216\u626B\u63CF\u9875\u7684\u591A\u5C11\u3002",
+      "compress.result": "\u51CF\u5C0F\u4E86 {percent}%\uFF1A{from} \u2192 {to}\u3002",
+      "compress.resultNone": "\u6CA1\u6709\u53EF\u4EE5\u7F29\u5C0F\u7684\u56FE\u7247\uFF0C\u6587\u4EF6\u4ECD\u4E3A {size}\u3002",
+      "progress.compressingImage": "\u6B63\u5728\u538B\u7F29\u7B2C {page}/{count} \u5F20\u56FE\u7247"
+    },
+    "zh-Hant-TW": {
+      "tool.compress.meta": "\u6587\u5B57\u548C\u5716\u5F62\u59CB\u7D42\u6E05\u6670<br/>\u5747\u8861\uFF1A\u58D3\u7E2E\u7167\u7247\uFF0C\u9069\u5408\u65E5\u5E38\u5206\u4EAB<br/>\u5C0F\u9AD4\u7A4D\uFF1A\u9032\u4E00\u6B65\u58D3\u7E2E\uFF0C\u9AD4\u7A4D\u512A\u5148",
+      "compress.summaryBalanced": "\u628A\u7167\u7247\u548C\u6383\u63CF\u9801\u58D3\u7E2E\u5230\u9069\u4E2D\u7684\u756B\u8CEA\uFF0C\u6587\u5B57\u548C\u5716\u5F62\u4FDD\u6301\u6E05\u6670\u3002",
+      "compress.summarySmall": "\u9032\u4E00\u6B65\u58D3\u7E2E\u7167\u7247\u548C\u6383\u63CF\u9801\uFF0C\u5F97\u5230\u6700\u5C0F\u7684\u6A94\u6848\uFF0C\u6587\u5B57\u548C\u5716\u5F62\u4FDD\u6301\u6E05\u6670\u3002",
+      "compress.estimateNone": "\u9078\u64C7\u8981\u58D3\u7E2E\u7684 PDF\u3002",
+      "compress.estimateOriginal": "\u4FDD\u6301\u6BCF\u4E00\u9801\u539F\u6A23\uFF0C\u6A94\u6848\u7D04\u70BA {size}\u3002",
+      "compress.estimateImages": "\u53EA\u6703\u7E2E\u5C0F\u5716\u7247\uFF0C\u80FD\u7701\u591A\u5C11\u53D6\u6C7A\u65BC PDF \u88E1\u7167\u7247\u6216\u6383\u63CF\u9801\u7684\u591A\u5BE1\u3002",
+      "compress.result": "\u6E1B\u5C11\u4E86 {percent}%\uFF1A{from} \u2192 {to}\u3002",
+      "compress.resultNone": "\u6C92\u6709\u53EF\u4EE5\u7E2E\u5C0F\u7684\u5716\u7247\uFF0C\u6A94\u6848\u4ECD\u70BA {size}\u3002",
+      "progress.compressingImage": "\u6B63\u5728\u58D3\u7E2E\u7B2C {page}/{count} \u5F35\u5716\u7247"
+    },
+    ko: {
+      "tool.compress.meta": "\uD14D\uC2A4\uD2B8\uC640 \uB3C4\uD615\uC740 \uD56D\uC0C1 \uC120\uBA85\uD558\uAC8C \uC720\uC9C0<br/>\uADE0\uD615: \uC77C\uC0C1 \uACF5\uC720\uC6A9\uC73C\uB85C \uC0AC\uC9C4 \uC555\uCD95<br/>\uC791\uAC8C: \uC6A9\uB7C9\uC774 \uC911\uC694\uD560 \uB54C \uB354 \uC555\uCD95",
+      "compress.summaryBalanced": "\uC0AC\uC9C4\uACFC \uC2A4\uCE94\uC744 \uC801\uB2F9\uD55C \uD654\uC9C8\uB85C \uC904\uC785\uB2C8\uB2E4. \uD14D\uC2A4\uD2B8\uC640 \uB3C4\uD615\uC740 \uC120\uBA85\uD558\uAC8C \uC720\uC9C0\uB429\uB2C8\uB2E4.",
+      "compress.summarySmall": "\uC0AC\uC9C4\uACFC \uC2A4\uCE94\uC744 \uB354 \uC904\uC5EC \uAC00\uC7A5 \uC791\uC740 \uD30C\uC77C\uC744 \uB9CC\uB4ED\uB2C8\uB2E4. \uD14D\uC2A4\uD2B8\uC640 \uB3C4\uD615\uC740 \uC120\uBA85\uD558\uAC8C \uC720\uC9C0\uB429\uB2C8\uB2E4.",
+      "compress.estimateNone": "\uC555\uCD95\uD560 PDF\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
+      "compress.estimateOriginal": "\uBAA8\uB4E0 \uD398\uC774\uC9C0\uB97C \uADF8\uB300\uB85C \uC720\uC9C0\uD558\uBA70 \uD30C\uC77C\uC740 \uC57D {size}\uC785\uB2C8\uB2E4.",
+      "compress.estimateImages": "\uC774\uBBF8\uC9C0\uB9CC \uC791\uC544\uC9C0\uBBC0\uB85C \uC808\uC57D\uB418\uB294 \uC6A9\uB7C9\uC740 PDF\uC5D0 \uC788\uB294 \uC0AC\uC9C4\uC774\uB098 \uC2A4\uCE94\uC758 \uC591\uC5D0 \uB530\uB77C \uB2E4\uB985\uB2C8\uB2E4.",
+      "compress.result": "{percent}% \uC904\uC5C8\uC2B5\uB2C8\uB2E4: {from} \u2192 {to}.",
+      "compress.resultNone": "\uC904\uC77C \uC218 \uC788\uB294 \uC774\uBBF8\uC9C0\uAC00 \uC5C6\uC5B4 \uD30C\uC77C\uC740 {size} \uADF8\uB300\uB85C\uC785\uB2C8\uB2E4.",
+      "progress.compressingImage": "\uC774\uBBF8\uC9C0 \uC555\uCD95 \uC911 {page}/{count}"
+    },
+    ja: {
+      "tool.compress.meta": "\u6587\u5B57\u3068\u56F3\u5F62\u306F\u5E38\u306B\u304F\u3063\u304D\u308A<br/>\u6A19\u6E96\uFF1A\u666E\u6BB5\u306E\u5171\u6709\u5411\u3051\u306B\u5199\u771F\u3092\u5727\u7E2E<br/>\u5C0F\uFF1A\u30B5\u30A4\u30BA\u512A\u5148\u3067\u3055\u3089\u306B\u5727\u7E2E",
+      "compress.summaryBalanced": "\u5199\u771F\u3084\u30B9\u30AD\u30E3\u30F3\u3092\u307B\u3069\u3088\u3044\u753B\u8CEA\u306B\u7E2E\u5C0F\u3057\u307E\u3059\u3002\u6587\u5B57\u3068\u56F3\u5F62\u306F\u304F\u3063\u304D\u308A\u3057\u305F\u307E\u307E\u3067\u3059\u3002",
+      "compress.summarySmall": "\u5199\u771F\u3084\u30B9\u30AD\u30E3\u30F3\u3092\u3055\u3089\u306B\u7E2E\u5C0F\u3057\u3066\u6700\u5C0F\u306E\u30D5\u30A1\u30A4\u30EB\u306B\u3057\u307E\u3059\u3002\u6587\u5B57\u3068\u56F3\u5F62\u306F\u304F\u3063\u304D\u308A\u3057\u305F\u307E\u307E\u3067\u3059\u3002",
+      "compress.estimateNone": "\u5727\u7E2E\u3059\u308B PDF \u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002",
+      "compress.estimateOriginal": "\u3059\u3079\u3066\u306E\u30DA\u30FC\u30B8\u3092\u305D\u306E\u307E\u307E\u4FDD\u3061\u3001\u30D5\u30A1\u30A4\u30EB\u306F\u7D04 {size} \u3067\u3059\u3002",
+      "compress.estimateImages": "\u5C0F\u3055\u304F\u306A\u308B\u306E\u306F\u753B\u50CF\u3060\u3051\u306A\u306E\u3067\u3001\u52B9\u679C\u306F PDF \u5185\u306E\u5199\u771F\u3084\u30B9\u30AD\u30E3\u30F3\u306E\u91CF\u306B\u3088\u3063\u3066\u5909\u308F\u308A\u307E\u3059\u3002",
+      "compress.result": "{percent}% \u524A\u6E1B\u3057\u307E\u3057\u305F\uFF1A{from} \u2192 {to}\u3002",
+      "compress.resultNone": "\u5C0F\u3055\u304F\u3067\u304D\u308B\u753B\u50CF\u304C\u306A\u3044\u305F\u3081\u3001\u30D5\u30A1\u30A4\u30EB\u306F {size} \u306E\u307E\u307E\u3067\u3059\u3002",
+      "progress.compressingImage": "\u753B\u50CF\u3092\u5727\u7E2E\u4E2D {page}/{count}"
+    },
+    es: {
+      "tool.compress.meta": "El texto y los dibujos siempre se ven n\xEDtidos<br/>Equilibrado reduce las fotos para compartir a diario<br/>Peque\xF1o las reduce m\xE1s cuando importa el tama\xF1o",
+      "compress.summaryBalanced": "Reduce fotos y escaneos a una calidad equilibrada. El texto y los dibujos se mantienen n\xEDtidos.",
+      "compress.summarySmall": "Reduce a\xFAn m\xE1s fotos y escaneos para el archivo m\xE1s peque\xF1o. El texto y los dibujos se mantienen n\xEDtidos.",
+      "compress.estimateNone": "Elige un PDF para comprimir.",
+      "compress.estimateOriginal": "Conserva cada p\xE1gina tal cual; el archivo se queda en unos {size}.",
+      "compress.estimateImages": "Solo se reducen las im\xE1genes, as\xED que el ahorro depende de cu\xE1ntas fotos o escaneos tenga el PDF.",
+      "compress.result": "Ahorro del {percent}%: {from} \u2192 {to}.",
+      "compress.resultNone": "No hab\xEDa im\xE1genes que reducir, as\xED que el archivo sigue en {size}.",
+      "progress.compressingImage": "Comprimiendo imagen {page} de {count}"
+    },
+    fr: {
+      "tool.compress.meta": "Le texte et les dessins restent toujours nets<br/>\xC9quilibr\xE9 r\xE9duit les photos pour le partage courant<br/>Petit les r\xE9duit davantage quand la taille compte",
+      "compress.summaryBalanced": "R\xE9duit les photos et num\xE9risations \xE0 une qualit\xE9 \xE9quilibr\xE9e. Le texte et les dessins restent nets.",
+      "compress.summarySmall": "R\xE9duit davantage les photos et num\xE9risations pour le plus petit fichier. Le texte et les dessins restent nets.",
+      "compress.estimateNone": "Choisissez un PDF \xE0 compresser.",
+      "compress.estimateOriginal": "Chaque page reste telle quelle ; le fichier fait environ {size}.",
+      "compress.estimateImages": "Seules les images sont r\xE9duites : le gain d\xE9pend du nombre de photos ou de num\xE9risations du PDF.",
+      "compress.result": "Gain de {percent} % : {from} \u2192 {to}.",
+      "compress.resultNone": "Aucune image ne pouvait \xEAtre r\xE9duite : le fichier reste \xE0 {size}.",
+      "progress.compressingImage": "Compression de l\u2019image {page} sur {count}"
+    }
+  }).forEach(([locale, strings]) => Object.assign(LOCALES[locale], strings));
+  Object.entries({
     en: ["Use signature", "Drag to position", "Make signature smaller", "Make signature larger", "Use signature to place it on this page."],
     "zh-Hans": ["\u4F7F\u7528\u7B7E\u540D", "\u62D6\u52A8\u4EE5\u8C03\u6574\u4F4D\u7F6E", "\u7F29\u5C0F\u7B7E\u540D", "\u653E\u5927\u7B7E\u540D", "\u70B9\u51FB\u201C\u4F7F\u7528\u7B7E\u540D\u201D\u5C06\u5176\u653E\u5230\u5F53\u524D\u9875\u9762\u3002"],
     "zh-Hant-TW": ["\u4F7F\u7528\u7C3D\u540D", "\u62D6\u66F3\u4EE5\u8ABF\u6574\u4F4D\u7F6E", "\u7E2E\u5C0F\u7C3D\u540D", "\u653E\u5927\u7C3D\u540D", "\u9EDE\u9078\u300C\u4F7F\u7528\u7C3D\u540D\u300D\u5C07\u5176\u653E\u5230\u76EE\u524D\u9801\u9762\u3002"],
@@ -24692,31 +24738,16 @@
       mobileEditQualityLabel.textContent = ultra ? t2("edit.qualityUltra") : t2("edit.qualityHigh");
     }
   }
-  function estimateCompressedOutput(preset) {
-    if (!state.pdfDoc || !activePageCount()) return null;
-    let totalPixels = 0;
-    state.pageOrder.forEach((sourceIndex) => {
-      const pd = state.pages[sourceIndex];
-      const baseW = pd?.baseW || (pd?.w && pd?.scale ? pd.w / pd.scale : 612);
-      const baseH = pd?.baseH || (pd?.h && pd?.scale ? pd.h / pd.scale : 792);
-      const requestedScale = (preset.dpi || 144) / 72;
-      const cappedScale = Math.min(requestedScale, (preset.maxDimension || 2400) / Math.max(baseW, baseH));
-      totalPixels += Math.max(1, Math.floor(baseW * cappedScale)) * Math.max(1, Math.floor(baseH * cappedScale));
-    });
-    const bytesPerPixel = state.compressMode === "small" ? 0.075 : 0.12;
-    const midpoint = totalPixels * bytesPerPixel + activePageCount() * 2600;
-    return {
-      low: Math.max(1024, midpoint * 0.62),
-      high: Math.max(2048, midpoint * 1.42)
-    };
-  }
   function compressionEstimateText(preset) {
-    if (!state.pdfDoc) return "Choose a PDF to see an estimated output size.";
-    if (!preset.rasterize) {
-      return "Expected output: close to the source size" + (state.fileSize ? " (" + fmtBytes(state.fileSize) + ")" : "") + ".";
+    if (!state.pdfDoc) return t2("compress.estimateNone");
+    const result = lastCompressResult;
+    if (result && result.mode === state.compressMode && result.fileName === state.fileName) {
+      if (!result.replaced || result.to >= result.from) return t2("compress.resultNone", { size: fmtBytes(result.to) });
+      const percent = Math.round((1 - result.to / result.from) * 100);
+      return t2("compress.result", { percent, from: fmtBytes(result.from), to: fmtBytes(result.to) });
     }
-    const estimate = estimateCompressedOutput(preset);
-    return estimate ? "Rough estimate: " + fmtBytes(estimate.low) + "\u2013" + fmtBytes(estimate.high) + " \xB7 actual size depends on page detail." : "Output size will be estimated after the PDF is ready.";
+    if (!preset.maxSide) return t2("compress.estimateOriginal", { size: fmtBytes(state.fileSize || 0) });
+    return t2("compress.estimateImages");
   }
   function syncCompressControls() {
     const preset = COMPRESSION_PRESETS[state.compressMode] || COMPRESSION_PRESETS.original;
@@ -25368,7 +25399,7 @@
     return MOBILE_PERFORMANCE_MODE ? capScaleToPixelBudget(baseVp, Math.min(1.65, requestedScale), RASTER_PREVIEW_MAX_PIXELS) : requestedScale;
   }
   function isOriginalPreviewTool(id = activeTool) {
-    return id === "preview" || id === "merge" || id === "sign" || id === "text" || id === "image" && imageState.mode === "fromPdf" || id === "compress" && state.compressMode === "original";
+    return id === "preview" || id === "merge" || id === "sign" || id === "text" || id === "image" && imageState.mode === "fromPdf" || id === "compress";
   }
   function getOriginalPreviewScale(baseVp, targetCssWidth) {
     const basePixels = Math.max(1, baseVp.width * baseVp.height);
@@ -27598,10 +27629,6 @@
       return;
     }
     const token = ++processedPreviewRenderToken;
-    if (activeTool === "compress" && state.compressMode !== "original") {
-      await drawCompressedPreview(sourceIndex, token);
-      return;
-    }
     if (isOriginalPreviewTool() && sourceIndex != null) {
       const pd2 = await ensurePageMeta(sourceIndex);
       if (!pd2 || token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || !isOriginalPreviewTool()) return;
@@ -27615,54 +27642,6 @@
     if (processTool === "threshold") applyThresholdToCanvas(pd, previewCanvas, previewSettings);
     else applyGreyscaleToCanvas(pd, previewCanvas, previewSettings);
     proofMeta.textContent = t2("proof.pagePixels", { w: pd.w, h: pd.h, page: state.curPage, count: activePageCount() });
-    applyZoom();
-  }
-  async function decodeCompressedPreview(blob) {
-    if (typeof createImageBitmap === "function") return createImageBitmap(blob);
-    const url = URL.createObjectURL(blob);
-    try {
-      const image = new Image();
-      image.decoding = "async";
-      image.src = url;
-      await image.decode();
-      return image;
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-  async function drawCompressedPreview(sourceIndex, token) {
-    const mode = state.compressMode;
-    const preset = COMPRESSION_PRESETS[mode];
-    if (!preset?.rasterize) return;
-    const tmp = document.createElement("canvas");
-    const pixelBudget = MOBILE_PERFORMANCE_MODE ? getMobileExportPagePixelBudget(activePageCount()) : void 0;
-    const size = await renderCompressedPageToCanvas(sourceIndex, preset, tmp, pixelBudget);
-    if (!size || token !== processedPreviewRenderToken || activeTool !== "compress" || state.compressMode !== mode || sourceIndex !== currentSourceIndex()) {
-      tmp.width = 0;
-      tmp.height = 0;
-      return;
-    }
-    const width = tmp.width;
-    const height = tmp.height;
-    const blob = await new Promise((resolve) => tmp.toBlob(resolve, "image/jpeg", preset.jpegQuality));
-    if (!blob) throw new Error("Could not encode the compressed preview.");
-    const image = await decodeCompressedPreview(blob);
-    if (token !== processedPreviewRenderToken || activeTool !== "compress" || state.compressMode !== mode || sourceIndex !== currentSourceIndex()) {
-      image.close?.();
-      tmp.width = 0;
-      tmp.height = 0;
-      return;
-    }
-    previewCanvas.width = width;
-    previewCanvas.height = height;
-    const ctx = previewCanvas.getContext("2d");
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(image, 0, 0, width, height);
-    image.close?.();
-    tmp.width = 0;
-    tmp.height = 0;
-    proofMeta.textContent = t2("proof.pagePixels", { w: width, h: height, page: state.curPage, count: activePageCount() });
     applyZoom();
   }
   async function drawHistogram() {
@@ -29317,84 +29296,192 @@
       preservesOriginalQuality: false
     });
   }
-  async function renderCompressedPageToCanvas(sourceIndex, preset, canvas, pixelBudget) {
-    const generation = state.renderGeneration;
-    const pdfDoc = state.pdfDoc;
-    const page = await state.pdfDoc.getPage(sourceIndex + 1);
-    const baseVp = page.getViewport({ scale: 1 });
-    const requestedScale = (preset.dpi || 144) / 72;
-    let cappedScale = Math.min(requestedScale, (preset.maxDimension || 2400) / Math.max(baseVp.width, baseVp.height));
-    if (MOBILE_PERFORMANCE_MODE) {
-      cappedScale = capScaleToPixelBudget(baseVp, cappedScale, pixelBudget);
+  var COMPRESS_MIN_SIDE = 160;
+  var COMPRESS_MIN_SAVINGS = 0.9;
+  function pdfImageComponents(pdfLib, context, colorSpace) {
+    const cs = context.lookup(colorSpace);
+    if (cs instanceof pdfLib.PDFName) {
+      const name = cs.toString();
+      if (name === "/DeviceRGB" || name === "/CalRGB") return 3;
+      if (name === "/DeviceGray" || name === "/CalGray") return 1;
+      return 0;
     }
-    const scale = MOBILE_PERFORMANCE_MODE ? cappedScale : Math.max(0.5, cappedScale);
-    const vp = page.getViewport({ scale });
-    canvas.width = Math.max(1, Math.floor(vp.width));
-    canvas.height = Math.max(1, Math.floor(vp.height));
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const rendered = await runPdfPageRender(page, { canvasContext: ctx, viewport: vp });
-    if (!rendered || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
-      canvas.width = 0;
-      canvas.height = 0;
-      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+    if (cs instanceof pdfLib.PDFArray && cs.size() >= 2) {
+      const kind = context.lookup(cs.get(0))?.toString();
+      if (kind === "/CalRGB") return 3;
+      if (kind === "/CalGray") return 1;
+      if (kind === "/ICCBased") {
+        const profile = context.lookup(cs.get(1));
+        const n2 = context.lookup(profile?.dict?.get(pdfLib.PDFName.of("N")))?.asNumber?.();
+        return n2 === 3 || n2 === 1 ? n2 : 0;
+      }
+    }
+    return 0;
+  }
+  function pdfFilterNames(pdfLib, context, dict) {
+    const filter = context.lookup(dict.get(pdfLib.PDFName.of("Filter")));
+    if (!filter) return [];
+    if (filter instanceof pdfLib.PDFArray) return filter.asArray().map((item) => context.lookup(item)?.toString());
+    return [filter.toString()];
+  }
+  function undoPngPredictor(data, columns, colors) {
+    const rowBytes = columns * colors;
+    const stride = rowBytes + 1;
+    const rows = Math.floor(data.length / stride);
+    const out = new Uint8Array(rows * rowBytes);
+    let previous = new Uint8Array(rowBytes);
+    for (let y2 = 0; y2 < rows; y2++) {
+      const type = data[y2 * stride];
+      const source = y2 * stride + 1;
+      const row = out.subarray(y2 * rowBytes, (y2 + 1) * rowBytes);
+      for (let i2 = 0; i2 < rowBytes; i2++) {
+        const x2 = data[source + i2];
+        const a2 = i2 >= colors ? row[i2 - colors] : 0;
+        const b2 = previous[i2];
+        const c2 = i2 >= colors ? previous[i2 - colors] : 0;
+        let value;
+        if (type === 0) value = x2;
+        else if (type === 1) value = x2 + a2;
+        else if (type === 2) value = x2 + b2;
+        else if (type === 3) value = x2 + (a2 + b2 >> 1);
+        else if (type === 4) {
+          const p2 = a2 + b2 - c2;
+          const pa = Math.abs(p2 - a2);
+          const pb = Math.abs(p2 - b2);
+          const pc = Math.abs(p2 - c2);
+          value = x2 + (pa <= pb && pa <= pc ? a2 : pb <= pc ? b2 : c2);
+        } else return null;
+        row[i2] = value & 255;
+      }
+      previous = row;
+    }
+    return out;
+  }
+  async function decodePdfImage(pdfLib, context, stream, width, height, components) {
+    const dict = stream.dict;
+    const filters = pdfFilterNames(pdfLib, context, dict);
+    if (filters.length === 1 && filters[0] === "/DCTDecode") {
+      try {
+        return await createImageBitmap(new Blob([stream.contents], { type: "image/jpeg" }));
+      } catch {
+        return null;
+      }
+    }
+    if (filters.length !== 1 || filters[0] !== "/FlateDecode") return null;
+    if (MOBILE_PERFORMANCE_MODE && width * height > MOBILE_RASTER_EXPORT_MAX_PIXELS) return null;
+    let data = pdfLib.decodePDFRawStream(stream).decode();
+    const parms = context.lookup(dict.get(pdfLib.PDFName.of("DecodeParms")));
+    const predictor = context.lookup(parms?.get?.(pdfLib.PDFName.of("Predictor")))?.asNumber?.() || 1;
+    if (predictor >= 10) {
+      data = undoPngPredictor(data, width, components);
+      if (!data) return null;
+    } else if (predictor !== 1) {
       return null;
     }
-    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
-    return {
-      wPt: baseVp.width,
-      hPt: baseVp.height
-    };
+    if (data.length < width * height * components) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    const img = ctx.createImageData(width, height);
+    const out = img.data;
+    for (let i2 = 0, j2 = 0; i2 < width * height; i2++, j2 += components) {
+      const o2 = i2 * 4;
+      out[o2] = data[j2];
+      out[o2 + 1] = components === 3 ? data[j2 + 1] : data[j2];
+      out[o2 + 2] = components === 3 ? data[j2 + 2] : data[j2];
+      out[o2 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
   }
-  async function createRasterCompressedPdfArtifact(context, preset) {
-    const { jsPDF } = await ensureJsPdf();
-    const tmp = document.createElement("canvas");
-    let pdf = null;
-    const count = context.pageOrder.length;
-    if (!count) throw new Error(t2("errors.noPagesExport"));
-    const mobilePixelBudget = getMobileExportPagePixelBudget(count);
-    for (let i2 = 0; i2 < count; i2++) {
-      setLoader(true, t2("progress.compressingPage", { page: i2 + 1, count }), currentPageProgress(i2, count));
-      const size = await renderCompressedPageToCanvas(context.pageOrder[i2], preset, tmp, mobilePixelBudget);
-      if (!size) throw new Error(t2("errors.renderPageFailed", { page: i2 + 1 }));
-      const orient = size.wPt > size.hPt ? "l" : "p";
-      let imageInput = await canvasToImageInput(tmp, "image/jpeg", preset.jpegQuality);
-      if (i2 === 0) {
-        pdf = new jsPDF({
-          orientation: orient,
-          unit: "pt",
-          format: [size.wPt, size.hPt],
-          compress: true
-        });
-      } else {
-        pdf.addPage([size.wPt, size.hPt], orient);
+  async function recompressPdfImages(pdfLib, doc, preset) {
+    const { PDFName, PDFRawStream } = pdfLib;
+    const context = doc.context;
+    const name = (key) => PDFName.of(key);
+    const candidates = context.enumerateIndirectObjects().filter(([, object]) => object instanceof PDFRawStream && context.lookup(object.dict.get(name("Subtype")))?.toString() === "/Image");
+    const stats = { images: candidates.length, replaced: 0 };
+    const canvas = document.createElement("canvas");
+    for (let index = 0; index < candidates.length; index++) {
+      const [ref, stream] = candidates[index];
+      setLoader(true, t2("progress.compressingImage", { page: index + 1, count: candidates.length }), currentPageProgress(index, candidates.length));
+      const dict = stream.dict;
+      const number = (key) => context.lookup(dict.get(name(key)))?.asNumber?.();
+      const width = number("Width");
+      const height = number("Height");
+      if (!width || !height || Math.max(width, height) < COMPRESS_MIN_SIDE) continue;
+      if (context.lookup(dict.get(name("ImageMask")))?.asBoolean?.()) continue;
+      if (dict.get(name("Mask")) || dict.get(name("Decode"))) continue;
+      const components = pdfImageComponents(pdfLib, context, dict.get(name("ColorSpace")));
+      const filters = pdfFilterNames(pdfLib, context, dict);
+      if (!components || filters[0] !== "/DCTDecode" && number("BitsPerComponent") !== 8) continue;
+      let source = null;
+      try {
+        source = await decodePdfImage(pdfLib, context, stream, width, height, components);
+      } catch (err) {
+        console.warn("Skipping an image that could not be decoded", err);
       }
-      pdf.addImage(imageInput, "JPEG", 0, 0, size.wPt, size.hPt, void 0, "FAST");
-      imageInput = null;
-      tmp.width = 0;
-      tmp.height = 0;
+      if (!source) continue;
+      const scale = Math.min(1, preset.maxSide / Math.max(width, height));
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      source.close?.();
+      if (source instanceof HTMLCanvasElement) {
+        source.width = 0;
+        source.height = 0;
+      }
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", preset.jpegQuality));
+      if (!blob || blob.size >= stream.contents.length * COMPRESS_MIN_SAVINGS) continue;
+      const replacement = context.stream(new Uint8Array(await blob.arrayBuffer()), {
+        Type: "XObject",
+        Subtype: "Image",
+        Width: canvas.width,
+        Height: canvas.height,
+        ColorSpace: "DeviceRGB",
+        BitsPerComponent: 8,
+        Filter: "DCTDecode"
+      });
+      ["SMask", "Interpolate", "Intent", "Metadata", "OC", "StructParent"].forEach((key) => {
+        const value = dict.get(name(key));
+        if (value) replacement.dict.set(name(key), value);
+      });
+      context.assign(ref, replacement);
+      stats.replaced++;
       await yieldToMainThread();
     }
-    return createJsPdfOutputArtifact(pdf, context.fileBase, {
-      source: "jsPDF",
-      compressionMode: context.settings.compressMode,
-      rasterized: true,
-      preservesOriginalQuality: false
-    });
+    canvas.width = 0;
+    canvas.height = 0;
+    return stats;
   }
+  var lastCompressResult = null;
   async function createCompressedPdfArtifact(context) {
-    const preset = COMPRESSION_PRESETS[context.settings.compressMode] || COMPRESSION_PRESETS.original;
-    if (!preset.rasterize) {
-      const artifact = await createPageOrderPdfArtifact(context.pageOrder, context.fileBase, context);
-      return clonePdfArtifact(artifact, {
-        meta: {
-          ...artifact.meta,
-          compressionMode: context.settings.compressMode
-        }
-      });
+    const mode = context.settings.compressMode;
+    const preset = COMPRESSION_PRESETS[mode] || COMPRESSION_PRESETS.original;
+    const base = await createPageOrderPdfArtifact(context.pageOrder, context.fileBase, context);
+    if (!preset.maxSide) {
+      return clonePdfArtifact(base, { meta: { ...base.meta, compressionMode: mode } });
     }
-    return createRasterCompressedPdfArtifact(context, preset);
+    const pdfLib = await ensurePdfLib();
+    const sourceBytes = base.bytes ? normalizePdfBytes(base.bytes) : new Uint8Array(await base.blob.arrayBuffer());
+    const doc = await pdfLib.PDFDocument.load(sourceBytes);
+    const stats = await recompressPdfImages(pdfLib, doc, preset);
+    setLoader(true, t2("progress.compressingPdf"), 100);
+    const saved = stats.replaced ? await doc.save({ useObjectStreams: true }) : sourceBytes;
+    const bytes = saved.length < sourceBytes.length ? saved : sourceBytes;
+    lastCompressResult = { mode, fileName: state.fileName, from: state.fileSize || sourceBytes.length, to: bytes.length, replaced: stats.replaced };
+    syncCompressControls();
+    return createPdfArtifact(bytes, context.fileBase, {
+      source: "pdf-lib",
+      compressionMode: mode,
+      rasterized: false,
+      preservesOriginalQuality: !stats.replaced
+    });
   }
   function setRasterScope(tool, scope) {
     if (operationInProgress || scope === "page" && !state.pdfDoc) return;
@@ -30151,4 +30238,9 @@
   setThresholdValue(128, false);
   setBrightnessValue(0, false);
   setContrastValue(100, false);
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("Offline support unavailable", err));
+    });
+  }
 })();

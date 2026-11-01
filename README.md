@@ -10,16 +10,19 @@ Files are processed locally in the browser. They are not uploaded to a server.
 - Organize pages by reordering, deleting, and splitting PDFs into named parts
 - Undo page deletion, reordering, split changes, and restoring original order
 - Merge multiple PDFs and send the result into the organizer
+- Sign pages, and add text, page numbers, or a watermark
+- Turn images into a PDF, or save PDF pages as PNG or JPEG images
 - Crop and rotate pages, including fine rotation when needed
-- Compress PDFs with original-quality, balanced, and small-size modes
+- Compress PDFs by shrinking embedded photos and scans while text and drawings stay sharp
 - Convert pages to black and white or grayscale with Fast, 300 dpi, 600 dpi, and warned 900 dpi render options
 - Export with page ranges, current-page-only export, and AES-256 password protection
 - Switch between light and dark mode
+- Install it to the home screen or desktop and use it offline
 - Use the interface in English, Simplified Chinese, Traditional Chinese, Korean, Japanese, Spanish, and French
 
 ## Quality and Privacy
 
-PDF Atelier tries to preserve original PDF quality whenever possible. Organize, split, merge, crop-only, and 90-degree rotation exports keep PDF page content intact where practical. Tools that alter pixels, such as threshold, grayscale, small-size compression, and fine rotation, may rasterize pages because those operations change the rendered page image.
+PDF Atelier tries to preserve original PDF quality whenever possible. Organize, split, merge, crop-only, and 90-degree rotation exports keep PDF page content intact where practical. Compression only re-encodes embedded images, so text, fonts, and vector drawings are copied unchanged. Tools that alter pixels, such as threshold, grayscale, and fine rotation, may rasterize pages because those operations change the rendered page image.
 
 Because processing happens in the browser, performance depends on the device and the PDF. Very large files can still be slow or memory-heavy, especially on phones and tablets. The 900 dpi raster option is intentionally guarded by a warning because it can make exports very large and significantly increase render/export time.
 
@@ -31,7 +34,7 @@ Publish the `vendor` directory along with the application. The host must serve `
 
 After editing `app.js` or `page-history.mjs`, run `npm ci` once and `npm run build` to update the browser bundle. `npm test` rebuilds it and tests direct-file startup, mobile controls, undo, and protected exports.
 
-For the best browser compatibility, serve it over HTTPS when publishing. Some browser APIs and CDN-loaded dependencies behave more predictably on a normal web origin than from a local file URL.
+For the best browser compatibility, serve it over HTTPS when publishing. When served, a service worker (`sw.js`) caches the app so it works offline after the first visit; `npm run build` stamps it with a new cache version whenever the app files change. Opening `index.html` from disk skips the service worker.
 
 ## Third-party Libraries
 
@@ -39,7 +42,6 @@ PDF Atelier uses third-party browser libraries including:
 
 - PDF.js
 - @cantoo/pdf-lib
-- jsPDF
 
 Those libraries remain under their own licenses. See their upstream projects for details.
 

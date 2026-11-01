@@ -264,7 +264,8 @@ test('secure PDF exports and mobile document controls', { timeout: 180000 }, asy
     });
 
     await t.test('encryption failure never falls back to an unprotected download', async () => {
-      const blocked = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1' });
+      // The offline service worker would otherwise fetch pdf-lib past the blocked route.
+      const blocked = await browser.newPage({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1' });
       try {
         await blocked.route('**/vendor/pdf-lib-2.9.2/**', route => route.abort());
         await blocked.goto(page.url());

@@ -42,31 +42,21 @@
   const PDF_LIB_SCRIPT_URLS = [
     new URL('./vendor/pdf-lib-2.9.2/dist/pdf-lib.min.js', APP_ASSET_BASE).href,
   ];
-  const JSPDF_SCRIPT_URLS = [
-    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js',
-  ];
+  // Balanced and Small only touch embedded images: the long side is capped and the
+  // image re-saved as JPEG. A full-page scan ends up near 160 dpi (Balanced) or 110 dpi.
   const COMPRESSION_PRESETS = {
     original: {
       hint: 'original',
-      summary: 'Compact the PDF while keeping original page content.',
-      rasterize: false,
     },
     balanced: {
       hint: 'balanced',
-      summary: 'Create a smaller color PDF with balanced quality.',
-      rasterize: true,
-      dpi: 160,
-      jpegQuality: 0.78,
-      maxDimension: 2600,
+      maxSide: 1800,
+      jpegQuality: 0.72,
     },
     small: {
       hint: 'small',
-      summary: 'Create the smallest PDF with lighter page images.',
-      rasterize: true,
-      dpi: 110,
-      jpegQuality: 0.58,
-      maxDimension: 1800,
+      maxSide: 1200,
+      jpegQuality: 0.55,
     },
   };
 
@@ -1323,13 +1313,6 @@
     return window.PDFLib;
   }
 
-  async function ensureJsPdf() {
-    if (window.jspdf?.jsPDF) return window.jspdf;
-    await loadScriptOnce('Rendered PDF', JSPDF_SCRIPT_URLS);
-    if (!window.jspdf?.jsPDF) throw new Error('Rendered PDF library did not load. Check your connection and try again.');
-    return window.jspdf;
-  }
-
   function normalizePdfBytes(bytes) {
     if (bytes instanceof Uint8Array) return bytes;
     if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes);
@@ -1350,22 +1333,6 @@
   function createPdfArtifact(bytes, fileBase, meta = {}) {
     return {
       bytes: normalizePdfBytes(bytes),
-      fileBase: cleanDownloadBase(fileBase, outputBaseName()),
-      mimeType: 'application/pdf',
-      meta: {
-        processors: [],
-        ...meta,
-      },
-    };
-  }
-
-  function createJsPdfOutputArtifact(pdf, fileBase, meta = {}) {
-    if (!MOBILE_PERFORMANCE_MODE) {
-      return createPdfArtifact(pdf.output('arraybuffer'), fileBase, meta);
-    }
-    return {
-      bytes: null,
-      blob: pdf.output('blob'),
       fileBase: cleanDownloadBase(fileBase, outputBaseName()),
       mimeType: 'application/pdf',
       meta: {
@@ -3831,6 +3798,86 @@
   });
   Object.entries({ en: 'Delete', 'zh-Hans': '删除', 'zh-Hant-TW': '刪除', ko: '삭제', ja: '削除', es: 'Eliminar', fr: 'Supprimer' })
     .forEach(([locale, label]) => { LOCALES[locale]['stamp.delete'] = label; });
+  // Compress now shrinks embedded images only.
+  Object.entries({
+    en: {
+      'tool.compress.meta': 'Text and drawings always stay sharp<br/>Balanced shrinks photos for everyday sharing<br/>Small shrinks them further when size matters most',
+      'compress.summaryBalanced': 'Shrinks photos and scans to a balanced quality. Text and drawings stay sharp.',
+      'compress.summarySmall': 'Shrinks photos and scans further for the smallest file. Text and drawings stay sharp.',
+      'compress.estimateNone': 'Choose a PDF to compress.',
+      'compress.estimateOriginal': 'Keeps every page as it is; the file stays about {size}.',
+      'compress.estimateImages': 'Only images get smaller, so the savings depend on how many photos or scans the PDF has.',
+      'compress.result': 'Saved {percent}%: {from} → {to}.',
+      'compress.resultNone': 'No images could be made smaller, so the file stays {size}.',
+      'progress.compressingImage': 'Compressing image {page} of {count}',
+    },
+    'zh-Hans': {
+      'tool.compress.meta': '文字和图形始终清晰<br/>均衡：压缩照片，适合日常分享<br/>小体积：进一步压缩，体积优先',
+      'compress.summaryBalanced': '把照片和扫描页压缩到适中的画质，文字和图形保持清晰。',
+      'compress.summarySmall': '进一步压缩照片和扫描页，得到最小的文件，文字和图形保持清晰。',
+      'compress.estimateNone': '选择要压缩的 PDF。',
+      'compress.estimateOriginal': '保持每一页原样，文件约为 {size}。',
+      'compress.estimateImages': '只会缩小图片，节省多少取决于 PDF 里照片或扫描页的多少。',
+      'compress.result': '减小了 {percent}%：{from} → {to}。',
+      'compress.resultNone': '没有可以缩小的图片，文件仍为 {size}。',
+      'progress.compressingImage': '正在压缩第 {page}/{count} 张图片',
+    },
+    'zh-Hant-TW': {
+      'tool.compress.meta': '文字和圖形始終清晰<br/>均衡：壓縮照片，適合日常分享<br/>小體積：進一步壓縮，體積優先',
+      'compress.summaryBalanced': '把照片和掃描頁壓縮到適中的畫質，文字和圖形保持清晰。',
+      'compress.summarySmall': '進一步壓縮照片和掃描頁，得到最小的檔案，文字和圖形保持清晰。',
+      'compress.estimateNone': '選擇要壓縮的 PDF。',
+      'compress.estimateOriginal': '保持每一頁原樣，檔案約為 {size}。',
+      'compress.estimateImages': '只會縮小圖片，能省多少取決於 PDF 裡照片或掃描頁的多寡。',
+      'compress.result': '減少了 {percent}%：{from} → {to}。',
+      'compress.resultNone': '沒有可以縮小的圖片，檔案仍為 {size}。',
+      'progress.compressingImage': '正在壓縮第 {page}/{count} 張圖片',
+    },
+    ko: {
+      'tool.compress.meta': '텍스트와 도형은 항상 선명하게 유지<br/>균형: 일상 공유용으로 사진 압축<br/>작게: 용량이 중요할 때 더 압축',
+      'compress.summaryBalanced': '사진과 스캔을 적당한 화질로 줄입니다. 텍스트와 도형은 선명하게 유지됩니다.',
+      'compress.summarySmall': '사진과 스캔을 더 줄여 가장 작은 파일을 만듭니다. 텍스트와 도형은 선명하게 유지됩니다.',
+      'compress.estimateNone': '압축할 PDF를 선택하세요.',
+      'compress.estimateOriginal': '모든 페이지를 그대로 유지하며 파일은 약 {size}입니다.',
+      'compress.estimateImages': '이미지만 작아지므로 절약되는 용량은 PDF에 있는 사진이나 스캔의 양에 따라 다릅니다.',
+      'compress.result': '{percent}% 줄었습니다: {from} → {to}.',
+      'compress.resultNone': '줄일 수 있는 이미지가 없어 파일은 {size} 그대로입니다.',
+      'progress.compressingImage': '이미지 압축 중 {page}/{count}',
+    },
+    ja: {
+      'tool.compress.meta': '文字と図形は常にくっきり<br/>標準：普段の共有向けに写真を圧縮<br/>小：サイズ優先でさらに圧縮',
+      'compress.summaryBalanced': '写真やスキャンをほどよい画質に縮小します。文字と図形はくっきりしたままです。',
+      'compress.summarySmall': '写真やスキャンをさらに縮小して最小のファイルにします。文字と図形はくっきりしたままです。',
+      'compress.estimateNone': '圧縮する PDF を選んでください。',
+      'compress.estimateOriginal': 'すべてのページをそのまま保ち、ファイルは約 {size} です。',
+      'compress.estimateImages': '小さくなるのは画像だけなので、効果は PDF 内の写真やスキャンの量によって変わります。',
+      'compress.result': '{percent}% 削減しました：{from} → {to}。',
+      'compress.resultNone': '小さくできる画像がないため、ファイルは {size} のままです。',
+      'progress.compressingImage': '画像を圧縮中 {page}/{count}',
+    },
+    es: {
+      'tool.compress.meta': 'El texto y los dibujos siempre se ven nítidos<br/>Equilibrado reduce las fotos para compartir a diario<br/>Pequeño las reduce más cuando importa el tamaño',
+      'compress.summaryBalanced': 'Reduce fotos y escaneos a una calidad equilibrada. El texto y los dibujos se mantienen nítidos.',
+      'compress.summarySmall': 'Reduce aún más fotos y escaneos para el archivo más pequeño. El texto y los dibujos se mantienen nítidos.',
+      'compress.estimateNone': 'Elige un PDF para comprimir.',
+      'compress.estimateOriginal': 'Conserva cada página tal cual; el archivo se queda en unos {size}.',
+      'compress.estimateImages': 'Solo se reducen las imágenes, así que el ahorro depende de cuántas fotos o escaneos tenga el PDF.',
+      'compress.result': 'Ahorro del {percent}%: {from} → {to}.',
+      'compress.resultNone': 'No había imágenes que reducir, así que el archivo sigue en {size}.',
+      'progress.compressingImage': 'Comprimiendo imagen {page} de {count}',
+    },
+    fr: {
+      'tool.compress.meta': 'Le texte et les dessins restent toujours nets<br/>Équilibré réduit les photos pour le partage courant<br/>Petit les réduit davantage quand la taille compte',
+      'compress.summaryBalanced': 'Réduit les photos et numérisations à une qualité équilibrée. Le texte et les dessins restent nets.',
+      'compress.summarySmall': 'Réduit davantage les photos et numérisations pour le plus petit fichier. Le texte et les dessins restent nets.',
+      'compress.estimateNone': 'Choisissez un PDF à compresser.',
+      'compress.estimateOriginal': 'Chaque page reste telle quelle ; le fichier fait environ {size}.',
+      'compress.estimateImages': 'Seules les images sont réduites : le gain dépend du nombre de photos ou de numérisations du PDF.',
+      'compress.result': 'Gain de {percent} % : {from} → {to}.',
+      'compress.resultNone': 'Aucune image ne pouvait être réduite : le fichier reste à {size}.',
+      'progress.compressingImage': 'Compression de l’image {page} sur {count}',
+    },
+  }).forEach(([locale, strings]) => Object.assign(LOCALES[locale], strings));
 
   Object.entries({
     en: ['Use signature', 'Drag to position', 'Make signature smaller', 'Make signature larger', 'Use signature to place it on this page.'],
@@ -4146,34 +4193,16 @@
     }
   }
 
-  function estimateCompressedOutput(preset) {
-    if (!state.pdfDoc || !activePageCount()) return null;
-    let totalPixels = 0;
-    state.pageOrder.forEach(sourceIndex => {
-      const pd = state.pages[sourceIndex];
-      const baseW = pd?.baseW || (pd?.w && pd?.scale ? pd.w / pd.scale : 612);
-      const baseH = pd?.baseH || (pd?.h && pd?.scale ? pd.h / pd.scale : 792);
-      const requestedScale = (preset.dpi || 144) / 72;
-      const cappedScale = Math.min(requestedScale, (preset.maxDimension || 2400) / Math.max(baseW, baseH));
-      totalPixels += Math.max(1, Math.floor(baseW * cappedScale)) * Math.max(1, Math.floor(baseH * cappedScale));
-    });
-    const bytesPerPixel = state.compressMode === 'small' ? 0.075 : 0.12;
-    const midpoint = totalPixels * bytesPerPixel + activePageCount() * 2600;
-    return {
-      low: Math.max(1024, midpoint * 0.62),
-      high: Math.max(2048, midpoint * 1.42),
-    };
-  }
-
   function compressionEstimateText(preset) {
-    if (!state.pdfDoc) return 'Choose a PDF to see an estimated output size.';
-    if (!preset.rasterize) {
-      return 'Expected output: close to the source size' + (state.fileSize ? ' (' + fmtBytes(state.fileSize) + ')' : '') + '.';
+    if (!state.pdfDoc) return t('compress.estimateNone');
+    const result = lastCompressResult;
+    if (result && result.mode === state.compressMode && result.fileName === state.fileName) {
+      if (!result.replaced || result.to >= result.from) return t('compress.resultNone', { size: fmtBytes(result.to) });
+      const percent = Math.round((1 - result.to / result.from) * 100);
+      return t('compress.result', { percent, from: fmtBytes(result.from), to: fmtBytes(result.to) });
     }
-    const estimate = estimateCompressedOutput(preset);
-    return estimate
-      ? 'Rough estimate: ' + fmtBytes(estimate.low) + '–' + fmtBytes(estimate.high) + ' · actual size depends on page detail.'
-      : 'Output size will be estimated after the PDF is ready.';
+    if (!preset.maxSide) return t('compress.estimateOriginal', { size: fmtBytes(state.fileSize || 0) });
+    return t('compress.estimateImages');
   }
 
   function syncCompressControls() {
@@ -4908,7 +4937,7 @@
   function isOriginalPreviewTool(id = activeTool) {
     return id === 'preview' || id === 'merge' || id === 'sign' || id === 'text'
       || (id === 'image' && imageState.mode === 'fromPdf')
-      || (id === 'compress' && state.compressMode === 'original');
+      || id === 'compress';
   }
 
   function getOriginalPreviewScale(baseVp, targetCssWidth) {
@@ -7308,10 +7337,6 @@
       return;
     }
     const token = ++processedPreviewRenderToken;
-    if (activeTool === 'compress' && state.compressMode !== 'original') {
-      await drawCompressedPreview(sourceIndex, token);
-      return;
-    }
     if (isOriginalPreviewTool() && sourceIndex != null) {
       const pd = await ensurePageMeta(sourceIndex);
       if (!pd || token !== processedPreviewRenderToken || sourceIndex !== currentSourceIndex() || !isOriginalPreviewTool()) return;
@@ -7327,58 +7352,6 @@
     if (processTool === 'threshold') applyThresholdToCanvas(pd, previewCanvas, previewSettings);
     else applyGreyscaleToCanvas(pd, previewCanvas, previewSettings);
     proofMeta.textContent = t('proof.pagePixels', { w: pd.w, h: pd.h, page: state.curPage, count: activePageCount() });
-    applyZoom();
-  }
-
-  async function decodeCompressedPreview(blob) {
-    if (typeof createImageBitmap === 'function') return createImageBitmap(blob);
-    const url = URL.createObjectURL(blob);
-    try {
-      const image = new Image();
-      image.decoding = 'async';
-      image.src = url;
-      await image.decode();
-      return image;
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  async function drawCompressedPreview(sourceIndex, token) {
-    const mode = state.compressMode;
-    const preset = COMPRESSION_PRESETS[mode];
-    if (!preset?.rasterize) return;
-    const tmp = document.createElement('canvas');
-    const pixelBudget = MOBILE_PERFORMANCE_MODE
-      ? getMobileExportPagePixelBudget(activePageCount())
-      : undefined;
-    const size = await renderCompressedPageToCanvas(sourceIndex, preset, tmp, pixelBudget);
-    if (!size || token !== processedPreviewRenderToken || activeTool !== 'compress' || state.compressMode !== mode || sourceIndex !== currentSourceIndex()) {
-      tmp.width = 0;
-      tmp.height = 0;
-      return;
-    }
-    const width = tmp.width;
-    const height = tmp.height;
-    const blob = await new Promise(resolve => tmp.toBlob(resolve, 'image/jpeg', preset.jpegQuality));
-    if (!blob) throw new Error('Could not encode the compressed preview.');
-    const image = await decodeCompressedPreview(blob);
-    if (token !== processedPreviewRenderToken || activeTool !== 'compress' || state.compressMode !== mode || sourceIndex !== currentSourceIndex()) {
-      image.close?.();
-      tmp.width = 0;
-      tmp.height = 0;
-      return;
-    }
-    previewCanvas.width = width;
-    previewCanvas.height = height;
-    const ctx = previewCanvas.getContext('2d');
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(image, 0, 0, width, height);
-    image.close?.();
-    tmp.width = 0;
-    tmp.height = 0;
-    proofMeta.textContent = t('proof.pagePixels', { w: width, h: height, page: state.curPage, count: activePageCount() });
     applyZoom();
   }
 
@@ -9238,86 +9211,203 @@
     });
   }
 
-  async function renderCompressedPageToCanvas(sourceIndex, preset, canvas, pixelBudget) {
-    const generation = state.renderGeneration;
-    const pdfDoc = state.pdfDoc;
-    const page = await state.pdfDoc.getPage(sourceIndex + 1);
-    const baseVp = page.getViewport({ scale: 1 });
-    const requestedScale = (preset.dpi || 144) / 72;
-    let cappedScale = Math.min(requestedScale, (preset.maxDimension || 2400) / Math.max(baseVp.width, baseVp.height));
-    if (MOBILE_PERFORMANCE_MODE) {
-      cappedScale = capScaleToPixelBudget(baseVp, cappedScale, pixelBudget);
+  // ── Compress: shrink the images inside the PDF ──
+  // Photos and scans are decoded, scaled down and saved as JPEG; text, fonts and vector
+  // drawings are copied untouched, so they stay sharp at any zoom. An image keeps its
+  // original data unless the new version is clearly smaller.
+  const COMPRESS_MIN_SIDE = 160;
+  const COMPRESS_MIN_SAVINGS = 0.9;
+
+  function pdfImageComponents(pdfLib, context, colorSpace) {
+    const cs = context.lookup(colorSpace);
+    if (cs instanceof pdfLib.PDFName) {
+      const name = cs.toString();
+      if (name === '/DeviceRGB' || name === '/CalRGB') return 3;
+      if (name === '/DeviceGray' || name === '/CalGray') return 1;
+      return 0;
     }
-    const scale = MOBILE_PERFORMANCE_MODE ? cappedScale : Math.max(0.5, cappedScale);
-    const vp = page.getViewport({ scale });
-    canvas.width = Math.max(1, Math.floor(vp.width));
-    canvas.height = Math.max(1, Math.floor(vp.height));
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const rendered = await runPdfPageRender(page, { canvasContext: ctx, viewport: vp });
-    if (!rendered || generation !== state.renderGeneration || pdfDoc !== state.pdfDoc) {
-      canvas.width = 0;
-      canvas.height = 0;
-      if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
+    if (cs instanceof pdfLib.PDFArray && cs.size() >= 2) {
+      const kind = context.lookup(cs.get(0))?.toString();
+      if (kind === '/CalRGB') return 3;
+      if (kind === '/CalGray') return 1;
+      if (kind === '/ICCBased') {
+        const profile = context.lookup(cs.get(1));
+        const n = context.lookup(profile?.dict?.get(pdfLib.PDFName.of('N')))?.asNumber?.();
+        return n === 3 || n === 1 ? n : 0;
+      }
+    }
+    return 0;
+  }
+
+  function pdfFilterNames(pdfLib, context, dict) {
+    const filter = context.lookup(dict.get(pdfLib.PDFName.of('Filter')));
+    if (!filter) return [];
+    if (filter instanceof pdfLib.PDFArray) return filter.asArray().map(item => context.lookup(item)?.toString());
+    return [filter.toString()];
+  }
+
+  function undoPngPredictor(data, columns, colors) {
+    const rowBytes = columns * colors;
+    const stride = rowBytes + 1;
+    const rows = Math.floor(data.length / stride);
+    const out = new Uint8Array(rows * rowBytes);
+    let previous = new Uint8Array(rowBytes);
+    for (let y = 0; y < rows; y++) {
+      const type = data[y * stride];
+      const source = y * stride + 1;
+      const row = out.subarray(y * rowBytes, (y + 1) * rowBytes);
+      for (let i = 0; i < rowBytes; i++) {
+        const x = data[source + i];
+        const a = i >= colors ? row[i - colors] : 0;
+        const b = previous[i];
+        const c = i >= colors ? previous[i - colors] : 0;
+        let value;
+        if (type === 0) value = x;
+        else if (type === 1) value = x + a;
+        else if (type === 2) value = x + b;
+        else if (type === 3) value = x + ((a + b) >> 1);
+        else if (type === 4) {
+          const p = a + b - c;
+          const pa = Math.abs(p - a);
+          const pb = Math.abs(p - b);
+          const pc = Math.abs(p - c);
+          value = x + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+        } else return null;
+        row[i] = value & 255;
+      }
+      previous = row;
+    }
+    return out;
+  }
+
+  // Returns something drawImage accepts for the image's pixels, or null to leave it alone.
+  async function decodePdfImage(pdfLib, context, stream, width, height, components) {
+    const dict = stream.dict;
+    const filters = pdfFilterNames(pdfLib, context, dict);
+    if (filters.length === 1 && filters[0] === '/DCTDecode') {
+      try {
+        return await createImageBitmap(new Blob([stream.contents], { type: 'image/jpeg' }));
+      } catch {
+        return null;
+      }
+    }
+    if (filters.length !== 1 || filters[0] !== '/FlateDecode') return null;
+    if (MOBILE_PERFORMANCE_MODE && width * height > MOBILE_RASTER_EXPORT_MAX_PIXELS) return null;
+    let data = pdfLib.decodePDFRawStream(stream).decode();
+    const parms = context.lookup(dict.get(pdfLib.PDFName.of('DecodeParms')));
+    const predictor = context.lookup(parms?.get?.(pdfLib.PDFName.of('Predictor')))?.asNumber?.() || 1;
+    if (predictor >= 10) {
+      data = undoPngPredictor(data, width, components);
+      if (!data) return null;
+    } else if (predictor !== 1) {
       return null;
     }
-    if (MOBILE_PERFORMANCE_MODE) page.cleanup?.();
-    return {
-      wPt: baseVp.width,
-      hPt: baseVp.height,
-    };
+    if (data.length < width * height * components) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(width, height);
+    const out = img.data;
+    for (let i = 0, j = 0; i < width * height; i++, j += components) {
+      const o = i * 4;
+      out[o] = data[j];
+      out[o + 1] = components === 3 ? data[j + 1] : data[j];
+      out[o + 2] = components === 3 ? data[j + 2] : data[j];
+      out[o + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
   }
 
-  async function createRasterCompressedPdfArtifact(context, preset) {
-    const { jsPDF } = await ensureJsPdf();
-    const tmp = document.createElement('canvas');
-    let pdf = null;
-    const count = context.pageOrder.length;
-    if (!count) throw new Error(t('errors.noPagesExport'));
-    const mobilePixelBudget = getMobileExportPagePixelBudget(count);
-    for (let i = 0; i < count; i++) {
-      setLoader(true, t('progress.compressingPage', { page: i + 1, count }), currentPageProgress(i, count));
-      const size = await renderCompressedPageToCanvas(context.pageOrder[i], preset, tmp, mobilePixelBudget);
-      if (!size) throw new Error(t('errors.renderPageFailed', { page: i + 1 }));
-      const orient = size.wPt > size.hPt ? 'l' : 'p';
-      let imageInput = await canvasToImageInput(tmp, 'image/jpeg', preset.jpegQuality);
-      if (i === 0) {
-        pdf = new jsPDF({
-          orientation: orient,
-          unit: 'pt',
-          format: [size.wPt, size.hPt],
-          compress: true,
-        });
-      } else {
-        pdf.addPage([size.wPt, size.hPt], orient);
+  async function recompressPdfImages(pdfLib, doc, preset) {
+    const { PDFName, PDFRawStream } = pdfLib;
+    const context = doc.context;
+    const name = key => PDFName.of(key);
+    const candidates = context.enumerateIndirectObjects().filter(([, object]) =>
+      object instanceof PDFRawStream && context.lookup(object.dict.get(name('Subtype')))?.toString() === '/Image');
+    const stats = { images: candidates.length, replaced: 0 };
+    const canvas = document.createElement('canvas');
+    for (let index = 0; index < candidates.length; index++) {
+      const [ref, stream] = candidates[index];
+      setLoader(true, t('progress.compressingImage', { page: index + 1, count: candidates.length }), currentPageProgress(index, candidates.length));
+      const dict = stream.dict;
+      const number = key => context.lookup(dict.get(name(key)))?.asNumber?.();
+      const width = number('Width');
+      const height = number('Height');
+      if (!width || !height || Math.max(width, height) < COMPRESS_MIN_SIDE) continue;
+      if (context.lookup(dict.get(name('ImageMask')))?.asBoolean?.()) continue;
+      if (dict.get(name('Mask')) || dict.get(name('Decode'))) continue;
+      const components = pdfImageComponents(pdfLib, context, dict.get(name('ColorSpace')));
+      const filters = pdfFilterNames(pdfLib, context, dict);
+      if (!components || (filters[0] !== '/DCTDecode' && number('BitsPerComponent') !== 8)) continue;
+      let source = null;
+      try {
+        source = await decodePdfImage(pdfLib, context, stream, width, height, components);
+      } catch (err) {
+        console.warn('Skipping an image that could not be decoded', err);
       }
-      pdf.addImage(imageInput, 'JPEG', 0, 0, size.wPt, size.hPt, undefined, 'FAST');
-      imageInput = null;
-      tmp.width = 0;
-      tmp.height = 0;
+      if (!source) continue;
+      const scale = Math.min(1, preset.maxSide / Math.max(width, height));
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      source.close?.();
+      if (source instanceof HTMLCanvasElement) { source.width = 0; source.height = 0; }
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', preset.jpegQuality));
+      if (!blob || blob.size >= stream.contents.length * COMPRESS_MIN_SAVINGS) continue;
+      const replacement = context.stream(new Uint8Array(await blob.arrayBuffer()), {
+        Type: 'XObject',
+        Subtype: 'Image',
+        Width: canvas.width,
+        Height: canvas.height,
+        ColorSpace: 'DeviceRGB',
+        BitsPerComponent: 8,
+        Filter: 'DCTDecode',
+      });
+      // A soft mask can keep its own resolution, so transparency survives untouched.
+      ['SMask', 'Interpolate', 'Intent', 'Metadata', 'OC', 'StructParent'].forEach(key => {
+        const value = dict.get(name(key));
+        if (value) replacement.dict.set(name(key), value);
+      });
+      context.assign(ref, replacement);
+      stats.replaced++;
       await yieldToMainThread();
     }
-    return createJsPdfOutputArtifact(pdf, context.fileBase, {
-      source: 'jsPDF',
-      compressionMode: context.settings.compressMode,
-      rasterized: true,
-      preservesOriginalQuality: false,
-    });
+    canvas.width = 0;
+    canvas.height = 0;
+    return stats;
   }
 
+  let lastCompressResult = null;
+
   async function createCompressedPdfArtifact(context) {
-    const preset = COMPRESSION_PRESETS[context.settings.compressMode] || COMPRESSION_PRESETS.original;
-    if (!preset.rasterize) {
-      const artifact = await createPageOrderPdfArtifact(context.pageOrder, context.fileBase, context);
-      return clonePdfArtifact(artifact, {
-        meta: {
-          ...artifact.meta,
-          compressionMode: context.settings.compressMode,
-        },
-      });
+    const mode = context.settings.compressMode;
+    const preset = COMPRESSION_PRESETS[mode] || COMPRESSION_PRESETS.original;
+    const base = await createPageOrderPdfArtifact(context.pageOrder, context.fileBase, context);
+    if (!preset.maxSide) {
+      return clonePdfArtifact(base, { meta: { ...base.meta, compressionMode: mode } });
     }
-    return createRasterCompressedPdfArtifact(context, preset);
+    const pdfLib = await ensurePdfLib();
+    const sourceBytes = base.bytes ? normalizePdfBytes(base.bytes) : new Uint8Array(await base.blob.arrayBuffer());
+    const doc = await pdfLib.PDFDocument.load(sourceBytes);
+    const stats = await recompressPdfImages(pdfLib, doc, preset);
+    setLoader(true, t('progress.compressingPdf'), 100);
+    const saved = stats.replaced ? await doc.save({ useObjectStreams: true }) : sourceBytes;
+    const bytes = saved.length < sourceBytes.length ? saved : sourceBytes;
+    lastCompressResult = { mode, fileName: state.fileName, from: state.fileSize || sourceBytes.length, to: bytes.length, replaced: stats.replaced };
+    syncCompressControls();
+    return createPdfArtifact(bytes, context.fileBase, {
+      source: 'pdf-lib',
+      compressionMode: mode,
+      rasterized: false,
+      preservesOriginalQuality: !stats.replaced,
+    });
   }
 
   // ── Threshold controls ──
@@ -10137,3 +10227,11 @@
   setThresholdValue(128, false);
   setBrightnessValue(0, false);
   setContrastValue(100, false);
+
+  // Offline support and "Add to Home Screen". Opening index.html from disk can't use a
+  // service worker, so this only runs when the site is served.
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Offline support unavailable', err));
+    });
+  }
